@@ -87,9 +87,29 @@ def _gemini_grounded_call(prompt: str, max_tokens: int, *, tools=None):
 
 app = FastAPI(title="AdProof API", version="0.1.0")
 
+# CORS — allow local dev + production frontends. Extra origins can be added
+# via the ALLOW_EXTRA_ORIGINS env var as a comma-separated list (e.g.
+# "https://staging.adproof.com,https://my-pr-branch.vercel.app").
+import os as _cors_os
+_extra_origins = [
+    o.strip() for o in
+    (_cors_os.environ.get("ALLOW_EXTRA_ORIGINS") or "").split(",")
+    if o.strip()
+]
+_default_origins = [
+    # Local development
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    # Vercel — main production + every preview deploy (PR branches, etc.).
+    # `allow_origin_regex` below handles the `*.vercel.app` wildcard.
+    "https://adproof.vercel.app",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_default_origins + _extra_origins,
+    # Matches every Vercel preview URL: adproof-git-feature.vercel.app,
+    # adproof-pr-42.vercel.app, etc.
+    allow_origin_regex=r"https://adproof-[a-z0-9-]+\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -115,15 +115,20 @@ Hit **Deploy** → wait for ✅ green.
 
 ### 2.2 Get the backend URL
 
-In Railway: **Settings → Networking → Generate Domain** → copy the URL (e.g. `https://adproof-api-production.up.railway.app`).
+In Railway: **Settings → Networking → Generate Domain**.
+
+⚠️ **Port gotcha**: the "Custom port" field shows `8080` as a placeholder. **Use 8080, not 8000.** Railway auto-injects `PORT=8080` into the container env, and our Dockerfile's `--port ${PORT:-8000}` respects that — so the container ends up listening on 8080. If you tell Railway to route public traffic to 8000, you'll get a 502 (mismatch).
+
+Once generated, copy the URL (e.g. `https://adproof-production.up.railway.app`).
 
 Confirm it works:
 ```bash
-curl https://adproof-api-production.up.railway.app/api/healthz
-# Expected: {"ok": true, "llm": true, "gemini": true, ...}
+curl https://adproof-production.up.railway.app/api/healthz
+# Expected: {"ok": true, "llm": true, "gemini": true, "groq": true, ...}
 ```
 
 If you see `{"llm": false}`, your env vars didn't apply — go back and check.
+If you see a 502, the target port in Generate Domain doesn't match what Uvicorn is listening on — click View Logs to see the actual port, then edit the domain's target port to match (usually 8080).
 
 ---
 
