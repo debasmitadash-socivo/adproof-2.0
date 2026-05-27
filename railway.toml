@@ -6,8 +6,9 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Railway injects PORT — the Dockerfile CMD respects it.
-startCommand = "cd api && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1"
+# No startCommand here — Railway runs `startCommand` directly without a shell,
+# which means `cd` (a shell builtin) breaks. The Dockerfile's CMD already
+# wraps the command in `sh -c` so it expands $PORT and runs `cd` correctly.
 healthcheckPath = "/api/healthz"
 healthcheckTimeout = 30
 # Restart on crash but cap to avoid loops on a bad deploy.

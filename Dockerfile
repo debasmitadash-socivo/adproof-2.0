@@ -10,8 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Python deps first (cached layer)
-COPY requirements.txt api/requirements.txt ./api-requirements.txt
+# Install Python deps first (cached layer — rebuilds only when requirements change)
 COPY requirements.txt ./requirements.txt
 COPY api/requirements.txt ./api/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip \
@@ -21,7 +20,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy source (everything except what's in .dockerignore)
 COPY . .
 
-# Railway/Render injects PORT; default to 8000 for local docker runs.
+# Railway/Render inject PORT; default to 8000 for local `docker run`.
 ENV PORT=8000
 EXPOSE 8000
 
@@ -30,4 +29,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen(f'http://localhost:{__import__(\"os\").environ.get(\"PORT\",\"8000\")}/api/healthz').read()" || exit 1
 
 # Workers=1 for v1 (single-process). Bump to 2-4 once we're on a paid Railway plan.
-CMD ["sh", "-c", "cd api && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+# --app-dir tells uvicorn where `main.py` lives without needing `cd` first
+# (avoids Railway's "executable `cd` not found" error when running CMD bare).
+CMD ["sh", "-c", "uvicorn main:app --app-dir api --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
