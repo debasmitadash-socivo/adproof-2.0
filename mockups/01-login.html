@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AdProof — Sign in</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.auth { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
+.auth-hero { padding: 56px 64px; display: flex; flex-direction: column;
+              position: relative; overflow: hidden; color: white; }
+.auth-hero { background: var(--gradient-sunset); }
+.auth-hero::before { content: ''; position: absolute; inset: 0;
+                      background: var(--mesh-bg); opacity: 0.6;
+                      mix-blend-mode: overlay; pointer-events: none; }
+.auth-hero::after { content: ''; position: absolute; right: -200px; bottom: -200px;
+                     width: 500px; height: 500px; border-radius: 50%;
+                     background: radial-gradient(circle, rgba(190,242,100,0.30), transparent 65%);
+                     pointer-events: none; }
+.auth-hero .inner { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; }
+.auth-hero .brand-mark { background: rgba(255,255,255,0.18);
+                          backdrop-filter: blur(8px); }
+.auth-hero h1 { font-family: 'Instrument Serif', serif; font-style: italic;
+                 font-size: 72px; font-weight: 400; letter-spacing: -0.03em;
+                 line-height: 0.98; margin: 64px 0 22px; }
+.auth-hero h1 .underline { background: rgba(190,242,100,0.45); padding: 0 6px;
+                            border-radius: 6px; }
+.auth-hero p { font-size: 18px; opacity: 0.95; max-width: 480px; line-height: 1.5; }
+.auth-hero ul { list-style: none; margin-top: 40px; margin-bottom: auto; }
+.auth-hero li { display: flex; gap: 14px; padding: 11px 0; font-size: 14.5px;
+                 opacity: 0.95; align-items: start; }
+.auth-hero li::before { content: "✦"; color: var(--lime); flex-shrink: 0;
+                         font-size: 16px; margin-top: 1px; }
+.testimonial { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.20);
+                border-radius: var(--radius-md); padding: 20px 22px;
+                backdrop-filter: blur(10px); max-width: 460px; }
+.testimonial .quote { font-family: 'Instrument Serif', serif; font-style: italic;
+                       font-size: 17px; line-height: 1.45; }
+.testimonial .who { font-size: 12.5px; margin-top: 14px; opacity: 0.88;
+                     display: flex; align-items: center; gap: 10px; }
+.testimonial .who .avatar { width: 26px; height: 26px; border-radius: 50%;
+                              background: linear-gradient(135deg,#BEF264,#65A30D);
+                              font-size: 11px; }
+
+.auth-form { display: flex; align-items: center; justify-content: center;
+              padding: 56px; background: var(--bg); }
+.auth-form-inner { width: 100%; max-width: 380px; }
+.brand-row { display: flex; align-items: center; gap: 10px; }
+.divider { display: flex; align-items: center; gap: 12px; color: var(--text-muted);
+            font-size: 12px; margin: 22px 0; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.oauth-btn { width: 100%; display: flex; align-items: center; justify-content: center;
+              gap: 10px; padding: 11px; border: 1px solid var(--border);
+              border-radius: 999px; background: var(--surface); font-weight: 500;
+              font-size: 14px; cursor: pointer; font-family: inherit;
+              transition: all 0.15s; }
+.oauth-btn:hover { background: var(--coral-soft); border-color: var(--coral); }
+.legal { font-size: 11.5px; color: var(--text-faint); text-align: center; margin-top: 22px; }
+.welcome-head { font-family: 'Instrument Serif', serif; font-style: italic;
+                 font-size: 44px; line-height: 1.0; margin-bottom: 6px;
+                 letter-spacing: -0.025em; }
+.welcome-head .accent { background: var(--gradient-sunset);
+                         -webkit-background-clip: text; background-clip: text;
+                         color: transparent; }
+@media (max-width: 900px) { .auth { grid-template-columns: 1fr; } .auth-hero { display: none; } }
+</style>
+</head>
+<body>
+<div class="auth">
+  <div class="auth-hero">
+    <div class="inner">
+      <div class="brand-row">
+        <div class="brand-mark">A</div>
+        <div class="brand-name" style="color:white;">AdProof</div>
+      </div>
+      <h1>Score every ad before<br/>you <span class="underline">ship it.</span></h1>
+      <p>Upload a creative, pick your audience and platform, and get a forecast you can defend to a client — backed by real benchmarks and an agent-based audience model.</p>
+      <ul>
+        <li>Forecast CTR, conversions, ROI and ROAS in p10–p90 bands</li>
+        <li>Compare ad formats across Meta, Google, LinkedIn, TikTok</li>
+        <li>Save company profiles and audience segments for re-use</li>
+        <li>Iterate on creatives without burning a cent of test budget</li>
+      </ul>
+      <div class="testimonial">
+        <div class="quote">"We caught two underperforming creatives before launch in the first week. Paid for itself before our second invoice."</div>
+        <div class="who"><div class="avatar">MR</div>Maya R., Head of Growth · DTC apparel brand</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-form">
+    <div class="auth-form-inner">
+      <div class="brand-row" style="margin-bottom: 36px;">
+        <div class="brand-mark">A</div>
+        <div class="brand-name">AdProof</div>
+      </div>
+      <div class="welcome-head">Welcome <span class="accent">back.</span></div>
+      <p class="muted" style="margin: 14px 0 26px;font-size:14.5px;">Sign in to continue to your workspace.</p>
+
+      <button class="oauth-btn">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.4h4.8c-.2 1.1-.8 2-1.8 2.6v2.2h2.9c1.7-1.5 2.7-3.8 2.7-6.4z" fill="#4285F4"/><path d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.2-3.8H.9v2.3C2.4 15.9 5.5 18 9 18z" fill="#34A853"/><path d="M3.8 10.7c-.2-.5-.3-1.1-.3-1.7s.1-1.2.3-1.7V5H.9C.3 6.2 0 7.6 0 9s.3 2.8.9 4l2.9-2.3z" fill="#FBBC05"/><path d="M9 3.6c1.3 0 2.5.5 3.4 1.4l2.6-2.6C13.5.9 11.4 0 9 0 5.5 0 2.4 2.1.9 5l2.9 2.3C4.6 5.1 6.6 3.6 9 3.6z" fill="#EA4335"/></svg>
+        Continue with Google
+      </button>
+      <button class="oauth-btn" style="margin-top:8px;">
+        <svg width="16" height="18" viewBox="0 0 24 24" fill="#000"><path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.65-2.323-7.33 0-4.31 2.797-6.59 5.552-6.59 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z"/></svg>
+        Continue with Apple
+      </button>
+
+      <div class="divider">or sign in with email</div>
+
+      <div class="field">
+        <label class="label">Work email</label>
+        <input type="email" class="input" placeholder="you@company.com">
+      </div>
+      <div class="field">
+        <label class="label" style="display:flex;justify-content:space-between;align-items:center;">
+          Password
+          <a href="#" style="font-size:12px;font-weight:500;">Forgot?</a>
+        </label>
+        <input type="password" class="input" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary btn-lg" style="width:100%">Sign in</button>
+
+      <p style="font-size:13.5px;text-align:center;color:var(--text-muted);margin-top:22px;">
+        New here? <a href="02-onboarding.html">Create an account →</a>
+      </p>
+      <p class="legal">By signing in you agree to our Terms and Privacy Policy.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AdProof — Mockup tour</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.tour { max-width: 1120px; margin: 0 auto; padding: 56px 36px;
+         position: relative; overflow: hidden; }
+.tour::before { content: ''; position: absolute; right: -200px; top: -180px;
+                  width: 580px; height: 580px; border-radius: 50%;
+                  background: radial-gradient(circle, rgba(255,94,26,0.18), transparent 65%);
+                  pointer-events: none; z-index: 0; }
+.tour::after { content: ''; position: absolute; left: -200px; bottom: -200px;
+                width: 520px; height: 520px; border-radius: 50%;
+                background: radial-gradient(circle, rgba(124,58,237,0.18), transparent 65%);
+                pointer-events: none; z-index: 0; }
+.tour-inner { position: relative; z-index: 1; }
+.tour-head { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+.tour h1 { font-family: 'Instrument Serif', serif; font-style: italic;
+            font-size: 62px; font-weight: 400; letter-spacing: -0.03em; line-height: 1.0; }
+.tour h1 .accent { background: var(--gradient-sunset);
+                    -webkit-background-clip: text; background-clip: text;
+                    color: transparent; }
+.tour .sub { color: var(--text-muted); font-size: 16px; max-width: 720px;
+              margin: 18px 0 32px; line-height: 1.5; }
+
+.flow-strip { display: flex; align-items: center; gap: 10px;
+               margin: 22px 0 40px; flex-wrap: wrap; font-size: 13px;
+               color: var(--text-muted); }
+.flow-strip .crumb { padding: 7px 14px; background: var(--surface);
+                       border: 1px solid var(--border); border-radius: 999px;
+                       font-weight: 500; color: var(--text); }
+.flow-strip .crumb.active { background: var(--gradient-sunset); color: white;
+                              border-color: transparent; box-shadow: var(--shadow-glow); }
+.flow-strip .arr { color: var(--text-faint); font-size: 14px; }
+
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 26px; }
+.tile { background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius-md); overflow: hidden;
+        display: flex; flex-direction: column; transition: all 0.18s;
+        text-decoration: none; color: var(--text); box-shadow: var(--shadow-sm); }
+.tile:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg);
+                text-decoration: none; border-color: var(--coral); }
+.tile .preview { aspect-ratio: 16/10; background: var(--bg-deep); position: relative;
+                  border-bottom: 1px solid var(--border); overflow: hidden; }
+.tile .preview iframe { width: 200%; height: 200%; transform: scale(0.5);
+                         transform-origin: top left; border: none; pointer-events: none; }
+.tile .body { padding: 20px 24px; }
+.tile .step-tag { display: inline-block; padding: 4px 11px; border-radius: 999px;
+                   font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+                   letter-spacing: 0.07em; margin-bottom: 10px; }
+.tile .step-tag.coral { background: var(--coral-soft); color: var(--coral); }
+.tile .step-tag.magenta { background: var(--magenta-soft); color: #831843; }
+.tile .step-tag.violet { background: var(--violet-soft); color: var(--violet); }
+.tile .step-tag.lime { background: var(--lime-soft); color: var(--lime-deep); }
+.tile h3 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 19px;
+            font-weight: 700; margin-bottom: 6px; letter-spacing: -0.015em; }
+.tile p { color: var(--text-muted); font-size: 13.5px; line-height: 1.55; }
+
+.note { background: linear-gradient(135deg, var(--violet-soft), var(--coral-soft));
+        border: 1px solid #C4B5FD;
+        border-radius: var(--radius); padding: 18px 22px; margin: 36px 0;
+        font-size: 14px; color: #5B21B6; line-height: 1.55; }
+.note strong { color: #4C1D95; }
+
+.brand-mark { font-size: 22px; width: 40px; height: 40px; }
+.legal-row { margin-top: 40px; padding-top: 26px; border-top: 1px solid var(--border);
+              font-size: 13px; color: var(--text-muted); line-height: 1.55; }
+.legal-row strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="tour">
+<div class="tour-inner">
+  <div class="tour-head">
+    <div class="brand-mark">A</div>
+    <h1>Ad<span class="accent">Proof</span></h1>
+    <span class="pill pill-coral" style="margin-left:10px;">Design preview · v0.2</span>
+  </div>
+  <p class="sub">Clickable preview of the actual product — the SaaS we'd build. Each screen below opens its own HTML mockup. Click through, feel the flow, then tell me yes / change-this before any backend wiring happens.</p>
+
+  <div class="flow-strip">
+    <div class="crumb active">1 · Sign in</div><span class="arr">→</span>
+    <div class="crumb active">2 · Set up workspace</div><span class="arr">→</span>
+    <div class="crumb active">3 · Dashboard</div><span class="arr">→</span>
+    <div class="crumb active">4 · New analysis</div><span class="arr">→</span>
+    <div class="crumb active">5 · Forecast</div>
+  </div>
+
+  <div class="grid">
+    <a class="tile" href="01-login.html" target="_blank">
+      <div class="preview"><iframe src="01-login.html"></iframe></div>
+      <div class="body">
+        <span class="step-tag coral">Screen 01</span>
+        <h3>Sign in / sign up</h3>
+        <p>Sunset-gradient hero with the brand pitch ("Score every ad before you ship it."), Google / Apple / email sign-in on the right.</p>
+      </div>
+    </a>
+
+    <a class="tile" href="02-onboarding.html" target="_blank">
+      <div class="preview"><iframe src="02-onboarding.html"></iframe></div>
+      <div class="body">
+        <span class="step-tag magenta">Screen 02</span>
+        <h3>Onboarding · Company profile</h3>
+        <p>Paste a free-text company description; we parse it into a structured profile (industry, business model, category, price position, tone) and surface it live in a gradient card.</p>
+      </div>
+    </a>
+
+    <a class="tile" href="03-dashboard.html" target="_blank">
+      <div class="preview"><iframe src="03-dashboard.html"></iframe></div>
+      <div class="body">
+        <span class="step-tag violet">Screen 03</span>
+        <h3>Dashboard</h3>
+        <p>Sidebar nav · workspace switcher · "Good evening, Debs." in display italic · gradient CTA card · four tinted metric cards · recent-analyses table with status pills · saved audiences · recommended next moves.</p>
+      </div>
+    </a>
+
+    <a class="tile" href="04-new-analysis.html" target="_blank">
+      <div class="preview"><iframe src="04-new-analysis.html"></iframe></div>
+      <div class="body">
+        <span class="step-tag lime">Screen 04</span>
+        <h3>New analysis · 5-step wizard</h3>
+        <p>The big one. Step 3 (Audience) ships with <strong>platform-native targeting filters</strong> — exactly mirroring Meta Ads Manager's Detailed Targeting (Interests · Behaviours · Demographics · Life events), Custom &amp; Lookalike audiences. Toggle to Google / LinkedIn / TikTok and the filter set adapts. Live reach estimate in the right rail.</p>
+      </div>
+    </a>
+
+    <a class="tile" href="05-results.html" target="_blank" style="grid-column: span 2;">
+      <div class="preview" style="aspect-ratio: 21/8"><iframe src="05-results.html"></iframe></div>
+      <div class="body">
+        <span class="step-tag coral">Screen 05 · the payoff</span>
+        <h3>Forecast · interactive scorecard</h3>
+        <p>Big italic ROAS number on a fresh-emerald gradient hero · glass-effect verdict grade · gradient-striped metric tiles · six tabbed live Plotly charts in brand palette · italic "Why this ad performs" narrative with what's-working / what's-holding-it-back / recommendations · sticky right-rail <strong>Edit &amp; re-run</strong> panel so you can tweak budget / format / audience without leaving the page. Plus Duplicate / Export PDF / Share / Compare-with-other-creatives.</p>
+      </div>
+    </a>
+  </div>
+
+  <div class="note">
+    <strong>Design language locked in this revision:</strong> warm cream paper background · sunset gradient (coral → magenta → violet) · fresh-emerald and lime accents · Instrument Serif italic for display headlines · Bricolage Grotesque for section titles · Inter for body · JetBrains Mono for numbers. Status pills, gradient buttons, gradient-text accents on key headlines.
+  </div>
+
+  <div class="note" style="background:linear-gradient(135deg,var(--lime-soft),var(--coral-soft));border-color:#A3E635;color:#3F6212;">
+    <strong>Platform-native filters confirmed in Step 4:</strong> Meta Ads Manager layout (Age slider · Gender · Location chips · Detailed Targeting grouped into Interests / Behaviours / Demographics → Life events · Connection &amp; Custom / Lookalike). Same wizard surfaces Google-Ads-native filters (affinity, in-market, life events, household income) when Google is picked, and LinkedIn-native filters (job title · function · seniority · company size · industry) when LinkedIn is picked.
+  </div>
+
+  <h2 class="h2" style="margin-top:40px;">Open each screen</h2>
+  <ul style="margin-top:14px;font-size:14.5px;list-style:none;display:flex;flex-direction:column;gap:8px;">
+    <li>→ <a href="01-login.html">01 — Sign in / sign up</a></li>
+    <li>→ <a href="02-onboarding.html">02 — Onboarding (company profile)</a></li>
+    <li>→ <a href="03-dashboard.html">03 — Dashboard</a></li>
+    <li>→ <a href="04-new-analysis.html">04 — New-analysis wizard (with platform filters)</a></li>
+    <li>→ <a href="05-results.html">05 — Forecast / scorecard</a></li>
+  </ul>
+
+  <div class="legal-row">
+    <strong>Approved if you say go:</strong> visual language above · 5-screen flow · platform-native targeting filters per ad platform · agent-based audience model behind the forecast (the simulator we already built) · LLM-parsed company / audience descriptions with heuristic fallback.
+    <br/><br/>
+    <strong>Open for change before I start coding:</strong> brand name (AdProof is a placeholder), exact colour palette intensity, screen order, whether to add a Settings or Compare-two-creatives screen as part of v1 (or push to v2), whether to wire Meta / Google / LinkedIn API integrations to pull real performance data into the forecast (v2 candidate).
+    <br/><br/>
+    <strong>Stack when you say go:</strong> FastAPI backend (already have the analytics engine in Python) + Next.js / React frontend so the SaaS feel matches these mockups end-to-end. Postgres for user / workspace / saved-audience persistence. Auth via Clerk or Supabase. Real deployment-ready in roughly a week of focused build.
+  </div>
+</div>
+</div>
+</body>
+</html>

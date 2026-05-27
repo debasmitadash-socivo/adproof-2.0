@@ -1,0 +1,55 @@
+# Keep the Docker image lean — exclude everything the FastAPI backend doesn't
+# need. The frontend (web/) deploys separately on Vercel.
+
+# Frontend
+web/
+
+# Mockups, legacy Gradio UI, reports
+mockups/
+app.py
+report.py
+report.html
+
+# Python virtual envs + caches
+.venv/
+.venv-preview/
+venv/
+env/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets (must come from Railway env vars in prod, never the file)
+.env
+.env.*
+data/.secrets.json
+data/.user_calibrations/
+
+# User-uploaded creatives (use object storage in prod, not container disk)
+data/raw/uploads/
+
+# Git / editor cruft
+.git/
+.gitignore
+.gitattributes
+.DS_Store
+.idea/
+.vscode/
+.claude/
+
+# Docs (don't need to be in the image)
+README.md
+DEPLOY.md
+CONTEXT.md
+*.md
+LICENSE
+
+# Tests + notebooks
+tests/
+notebooks/
+
+# CI
+.github/

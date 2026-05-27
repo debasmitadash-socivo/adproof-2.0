@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AdProof — Set up your workspace</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.onboard { min-height: 100vh; display: flex; flex-direction: column;
+            background: var(--bg); }
+.onboard-top { background: var(--bg); border-bottom: 1px solid var(--border);
+                padding: 16px 36px; display: flex; align-items: center; gap: 16px; }
+.brand-row { display: flex; align-items: center; gap: 10px; }
+.steps-bar { display: flex; gap: 6px; margin-left: 28px; }
+.steps-bar .step { padding: 6px 14px; border-radius: 999px; font-size: 12.5px;
+                    background: var(--border-soft); color: var(--text-muted);
+                    font-weight: 500; }
+.steps-bar .step.active { background: var(--gradient-sunset); color: white;
+                           font-weight: 600; box-shadow: var(--shadow-glow); }
+.steps-bar .step.done { background: var(--success-soft); color: #166534;
+                         font-weight: 600; }
+.skip-link { margin-left: auto; font-size: 13.5px; color: var(--text-muted); }
+.onboard-body { flex: 1; display: flex; justify-content: center;
+                 align-items: flex-start; padding: 56px 24px 80px;
+                 position: relative; overflow: hidden; }
+.onboard-body::before { content: ''; position: absolute; left: -150px; top: -200px;
+                         width: 600px; height: 600px; border-radius: 50%;
+                         background: radial-gradient(circle, rgba(255,94,26,0.16), transparent 65%);
+                         pointer-events: none; }
+.onboard-body::after { content: ''; position: absolute; right: -200px; bottom: -200px;
+                        width: 500px; height: 500px; border-radius: 50%;
+                        background: radial-gradient(circle, rgba(124,58,237,0.18), transparent 65%);
+                        pointer-events: none; }
+.onboard-card { width: 100%; max-width: 760px; background: var(--surface);
+                 border: 1px solid var(--border); border-radius: var(--radius-lg);
+                 padding: 40px 44px; box-shadow: var(--shadow-md);
+                 position: relative; z-index: 1; }
+.onboard-card .eyebrow { color: var(--coral); }
+.onboard-card h1 { font-family: 'Instrument Serif', serif; font-style: italic;
+                    font-size: 44px; line-height: 1.05; letter-spacing: -0.025em;
+                    margin: 10px 0 12px; }
+.onboard-card h1 .accent { background: var(--gradient-sunset);
+                            -webkit-background-clip: text; background-clip: text;
+                            color: transparent; }
+.onboard-card .sub { color: var(--text-muted); font-size: 15px; margin-bottom: 30px;
+                      line-height: 1.5; }
+
+.parsed-card { background: linear-gradient(135deg, var(--coral-soft), var(--magenta-soft));
+                border: 1px solid #FFCBA4;
+                border-radius: var(--radius); padding: 20px 22px; margin-top: 20px;
+                position: relative; overflow: hidden; }
+.parsed-card::before { content: ''; position: absolute; right: -60px; top: -60px;
+                        width: 180px; height: 180px; border-radius: 50%;
+                        background: radial-gradient(circle, rgba(124,58,237,0.18), transparent 65%);
+                        pointer-events: none; }
+.parsed-card .ptitle { font-size: 12px; color: var(--coral); font-weight: 700;
+                        text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
+                        display: flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
+.parsed-card .pgrid { display: grid; grid-template-columns: repeat(2, 1fr);
+                       gap: 10px 22px; font-size: 13.5px; position: relative; z-index: 1; }
+.parsed-card .pgrid span strong { color: var(--text); margin-right: 6px;
+                                    font-weight: 700; }
+
+.actions { display: flex; justify-content: space-between; margin-top: 32px;
+            padding-top: 24px; border-top: 1px solid var(--border-soft); }
+.example-chip { display: inline-flex; padding: 5px 12px; border: 1px solid var(--border);
+                 border-radius: 999px; font-size: 12.5px; color: var(--text-muted);
+                 cursor: pointer; margin-right: 6px; margin-top: 10px;
+                 background: var(--surface); transition: all 0.12s; }
+.example-chip:hover { background: var(--coral-soft); color: var(--coral);
+                       border-color: var(--coral); }
+</style>
+</head>
+<body>
+<div class="onboard">
+  <div class="onboard-top">
+    <div class="brand-row">
+      <div class="brand-mark">A</div>
+      <div class="brand-name">AdProof</div>
+    </div>
+    <div class="steps-bar">
+      <div class="step done">✓ Workspace</div>
+      <div class="step active">2 · Company</div>
+      <div class="step">3 · Audience</div>
+      <div class="step">4 · Invite team</div>
+    </div>
+    <a href="03-dashboard.html" class="skip-link">Skip for now →</a>
+  </div>
+
+  <div class="onboard-body">
+    <div class="onboard-card">
+      <div class="eyebrow">Step 2 of 4</div>
+      <h1>Tell us about <span class="accent">your company.</span></h1>
+      <p class="sub">A few sentences is enough. We'll parse it into a structured profile that powers every campaign analysis — you can edit it later.</p>
+
+      <div class="field">
+        <label class="label">Company description</label>
+        <textarea class="textarea" rows="5" placeholder="e.g. Lumen Skincare is a DTC premium skincare brand for women 25–40 who want clean ingredients and visible results. We compete in the $40–80 SKU range and sell mostly through Instagram and our own site.">Lumen Skincare is a DTC premium skincare brand for women 25–40 who want clean ingredients and visible results. We compete in the $40–80 SKU range and sell mostly through Instagram and our own site.</textarea>
+        <div class="help">
+          Try one of these:
+          <span class="example-chip">🧴 DTC apparel brand</span>
+          <span class="example-chip">💼 B2B SaaS for HR teams</span>
+          <span class="example-chip">🏋 Local fitness studio</span>
+          <span class="example-chip">☕ Premium coffee subscription</span>
+        </div>
+      </div>
+
+      <div class="parsed-card">
+        <div class="ptitle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          AI-parsed profile
+          <span class="pill pill-coral" style="margin-left:auto">✨ Claude</span>
+        </div>
+        <div class="pgrid">
+          <span><strong>Name</strong>Lumen Skincare</span>
+          <span><strong>Industry</strong>DTC premium skincare</span>
+          <span><strong>Model</strong>Direct-to-Consumer</span>
+          <span><strong>Category</strong>Beauty</span>
+          <span><strong>Price tier</strong>Premium ($40–80 AOV)</span>
+          <span><strong>Tone</strong>Aspirational, clean</span>
+          <span style="grid-column: span 2;"><strong>Value prop</strong>Clean-ingredient skincare with visible results for women 25–40.</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-ghost">← Back</button>
+        <button class="btn btn-primary btn-lg">Continue: describe your audience →</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

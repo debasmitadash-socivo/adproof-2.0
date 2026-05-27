@@ -1,0 +1,32 @@
+# AdProof Python dependencies (used by src/ analytics engine).
+# api/requirements.txt holds the FastAPI server's extra deps; install both:
+#   pip install -r requirements.txt
+#   pip install -r api/requirements.txt
+
+# --- Agent-based modelling ---
+mesa>=3.1            # ABM framework; gracefully optional (Python 3.11+ for full support)
+networkx>=3.3        # social graph for word-of-mouth influence
+
+# --- Data / numerics ---
+pandas>=2.2
+numpy>=1.26
+scipy>=1.13
+scikit-learn>=1.4    # ML extension point (calibration ships its own IRLS solver)
+
+# --- LLM clients (vision + text). Backend auto-falls-forward through whichever
+#     of these are configured, so only one is required to function. ---
+anthropic>=0.40      # Claude multimodal
+openai>=1.40         # OpenAI SDK ALSO used by Mistral / OpenRouter / xAI / Together
+                     #  via their OpenAI-compatible endpoints (single dependency)
+google-genai>=1.0    # Gemini (multi-model fallback chain)
+groq>=1.0            # Groq (Llama 4 Scout vision)
+
+# --- UI & visualisation ---
+plotly>=5.22         # figure JSON consumed by the Next.js frontend
+
+# --- Utilities ---
+Pillow>=10.3         # image decode / base64 encode for the vision APIs
+python-dotenv>=1.0   # load API keys from .env in local dev
+
+# --- Dev / testing ---
+pytest>=8.0

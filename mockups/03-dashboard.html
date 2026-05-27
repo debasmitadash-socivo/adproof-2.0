@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AdProof — Dashboard</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.greeting { display: flex; align-items: flex-end; gap: 24px; margin-bottom: 8px; }
+.greeting .hi { font-family: 'Instrument Serif', serif; font-style: italic;
+                 font-size: 52px; letter-spacing: -0.025em; line-height: 1.05; }
+.greeting .hi .accent { background: var(--gradient-sunset); -webkit-background-clip: text;
+                         background-clip: text; color: transparent; }
+.greeting .sub { color: var(--text-muted); margin-top: 6px; font-size: 14.5px; }
+
+.hero-cta { background: var(--gradient-sunset); color: white; position: relative;
+            border-radius: var(--radius-md); padding: 30px 32px; margin: 16px 0 28px;
+            display: flex; align-items: center; gap: 28px; overflow: hidden;
+            box-shadow: var(--shadow-glow); }
+.hero-cta::before { content: ''; position: absolute; inset: 0;
+                     background: var(--mesh-bg); opacity: 0.5;
+                     mix-blend-mode: soft-light; pointer-events: none; }
+.hero-cta::after { content: ''; position: absolute; right: -80px; top: -80px;
+                    width: 280px; height: 280px; border-radius: 50%;
+                    background: radial-gradient(circle, rgba(190,242,100,0.35), transparent 65%);
+                    pointer-events: none; }
+.hero-cta .body { position: relative; z-index: 1; flex: 1; }
+.hero-cta .body .eyebrow-light { font-size: 11.5px; font-weight: 700;
+                                  text-transform: uppercase; letter-spacing: 0.16em;
+                                  opacity: 0.85; }
+.hero-cta .body h2 { font-family: 'Instrument Serif', serif; font-style: italic;
+                      font-size: 36px; letter-spacing: -0.02em; margin: 6px 0;
+                      line-height: 1.05; }
+.hero-cta .body p { opacity: 0.92; font-size: 14.5px; max-width: 520px; }
+.hero-cta .btn { background: white; color: var(--coral); font-weight: 700;
+                  box-shadow: 0 6px 22px rgba(0,0,0,0.18); position: relative; z-index: 1; }
+.hero-cta .btn:hover { background: var(--bg); transform: translateY(-1px); }
+
+.metric { padding: 20px 22px; position: relative; overflow: hidden; }
+.metric .label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase;
+                  letter-spacing: 0.09em; font-weight: 700; }
+.metric .value { font-family: 'Instrument Serif', serif; font-style: italic;
+                  font-size: 38px; font-weight: 400; margin: 4px 0 0;
+                  letter-spacing: -0.025em; line-height: 1; }
+.metric .delta { font-size: 12.5px; color: var(--success); font-weight: 600;
+                  margin-top: 8px; display: flex; align-items: center; gap: 4px; }
+.metric .delta.down { color: var(--danger); }
+.metric.tinted-coral { background: linear-gradient(160deg, var(--coral-soft), var(--surface) 60%); }
+.metric.tinted-magenta { background: linear-gradient(160deg, var(--magenta-soft), var(--surface) 60%); }
+.metric.tinted-violet { background: linear-gradient(160deg, var(--violet-soft), var(--surface) 60%); }
+.metric.tinted-lime { background: linear-gradient(160deg, var(--lime-soft), var(--surface) 60%); }
+.metric .glyph { position: absolute; right: 16px; top: 16px; font-size: 22px; }
+
+.section-head { display: flex; align-items: center; justify-content: space-between;
+                 margin: 32px 0 14px; }
+.section-head h2 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px;
+                    font-weight: 700; letter-spacing: -0.015em; }
+.section-head .link { font-size: 13px; color: var(--coral); font-weight: 600; }
+
+.row-card { background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
+
+.thumb-creative { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; }
+.thumb-a { background: var(--gradient-sunset); }
+.thumb-b { background: linear-gradient(135deg, #EAB308, #E0218A); }
+.thumb-c { background: var(--gradient-fresh); }
+.thumb-d { background: linear-gradient(135deg, #38BDF8, #7C3AED); }
+.thumb-e { background: linear-gradient(135deg, #BEF264, #38BDF8); }
+
+.aud-tile { background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 16px;
+            display: flex; align-items: center; gap: 12px;
+            transition: all 0.15s; }
+.aud-tile:hover { border-color: var(--coral); box-shadow: var(--shadow); }
+.aud-tile .av-stack { display: flex; }
+.aud-tile .av-stack .av { width: 30px; height: 30px; border-radius: 50%;
+                           border: 2px solid var(--surface); margin-left: -8px; }
+.aud-tile .av-stack .av:first-child { margin-left: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">A</div>
+      <div class="brand-name">AdProof</div>
+    </div>
+    <div class="workspace">
+      <div class="ws-mark">L</div>
+      <div class="ws-name">Lumen Skincare</div>
+      <div class="caret">▾</div>
+    </div>
+    <div class="nav">
+      <a class="nav-item active">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a class="nav-item" href="04-new-analysis.html">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        New analysis
+      </a>
+      <a class="nav-item">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+        Campaigns <span class="badge">14</span>
+      </a>
+      <a class="nav-item">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Audiences <span class="badge">3</span>
+      </a>
+      <a class="nav-item">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+        Creatives
+      </a>
+      <div class="nav-section">Workspace</div>
+      <a class="nav-item">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l8-4 8 4v14"/></svg>
+        Company profile
+      </a>
+      <a class="nav-item">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33"/></svg>
+        Settings
+      </a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="avatar">DS</div>
+      <div class="user-info">
+        <div class="name">Debs Singh</div>
+        <div class="email">debs@lumen.co</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Search campaigns, creatives, audiences…
+        <span class="kbd">⌘K</span>
+      </div>
+      <div class="topbar-actions">
+        <span class="pill pill-coral"><span class="dot"></span>Pro plan</span>
+        <button class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
+        <button class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="greeting">
+        <div>
+          <div class="hi">Good evening, <span class="accent">Debs.</span></div>
+          <div class="sub">14 campaigns tested · 3 audience segments saved · workspace plan <strong style="color:var(--text)">Pro</strong></div>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn btn-secondary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New audience
+        </button>
+      </div>
+
+      <div class="hero-cta">
+        <div class="body">
+          <div class="eyebrow-light">Pre-flight check</div>
+          <h2>Score your next ad before you spend a cent.</h2>
+          <p>Upload a creative, pick a platform and audience, and get a defensible forecast — CTR, conversions, ROAS bands, and a "why this will work" written by the model.</p>
+        </div>
+        <button class="btn btn-lg" onclick="location.href='04-new-analysis.html'">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Start a new analysis
+        </button>
+      </div>
+
+      <div class="grid-4">
+        <div class="card metric tinted-coral">
+          <div class="glyph">📊</div>
+          <div class="label">Campaigns tested</div>
+          <div class="value">14</div>
+          <div class="delta">↑ 4 this week</div>
+        </div>
+        <div class="card metric tinted-magenta">
+          <div class="glyph">✨</div>
+          <div class="label">Avg forecast ROAS</div>
+          <div class="value">3.84×</div>
+          <div class="delta">↑ 0.6× vs last month</div>
+        </div>
+        <div class="card metric tinted-violet">
+          <div class="glyph">🚀</div>
+          <div class="label">Best · ROAS</div>
+          <div class="value">IG Reels</div>
+          <div class="delta">5.21× median</div>
+        </div>
+        <div class="card metric tinted-lime">
+          <div class="glyph">💸</div>
+          <div class="label">Test spend saved</div>
+          <div class="value">$8,400</div>
+          <div class="delta">caught pre-launch</div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <h2>Recent analyses</h2>
+        <a class="link" href="#">View all →</a>
+      </div>
+
+      <div class="row-card">
+        <table class="data">
+          <thead>
+            <tr>
+              <th>Creative</th>
+              <th>Platform / Format</th>
+              <th>Audience</th>
+              <th>Budget</th>
+              <th>ROAS (p50)</th>
+              <th>Verdict</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="row gap-sm"><div class="thumb-creative thumb-a"></div><div><div style="font-weight:600">Spring glow drop · v3</div><div class="muted" style="font-size:12px">"Limited offer — save 40%…"</div></div></div></td>
+              <td>Meta — Instagram<br/><span class="muted" style="font-size:12px">Reels · 9:16</span></td>
+              <td>Millennials · women</td>
+              <td>$15,000</td>
+              <td class="mono"><strong>5.21×</strong></td>
+              <td><span class="pill pill-success"><span class="dot"></span>Strong</span></td>
+              <td class="muted">2h ago</td>
+            </tr>
+            <tr>
+              <td><div class="row gap-sm"><div class="thumb-creative thumb-b"></div><div><div style="font-weight:600">Father's Day gift edit</div><div class="muted" style="font-size:12px">"For the dad who…"</div></div></div></td>
+              <td>Meta — Facebook<br/><span class="muted" style="font-size:12px">Feed · Single Image</span></td>
+              <td>Gen X · parents</td>
+              <td>$8,000</td>
+              <td class="mono"><strong>2.84×</strong></td>
+              <td><span class="pill pill-coral"><span class="dot"></span>Positive</span></td>
+              <td class="muted">Yesterday</td>
+            </tr>
+            <tr>
+              <td><div class="row gap-sm"><div class="thumb-creative thumb-c"></div><div><div style="font-weight:600">Tutorial — clean routine</div><div class="muted" style="font-size:12px">Video · 45s</div></div></div></td>
+              <td>TikTok<br/><span class="muted" style="font-size:12px">In-Feed · 9:16</span></td>
+              <td>Gen Z · skincare-curious</td>
+              <td>$5,000</td>
+              <td class="mono"><strong>4.10×</strong></td>
+              <td><span class="pill pill-success"><span class="dot"></span>Strong</span></td>
+              <td class="muted">2 days ago</td>
+            </tr>
+            <tr>
+              <td><div class="row gap-sm"><div class="thumb-creative thumb-d"></div><div><div style="font-weight:600">Wholesale pitch deck</div><div class="muted" style="font-size:12px">B2B retargeting</div></div></div></td>
+              <td>LinkedIn<br/><span class="muted" style="font-size:12px">Sponsored · Image</span></td>
+              <td>Retail buyers</td>
+              <td>$12,000</td>
+              <td class="mono"><strong>0.92×</strong></td>
+              <td><span class="pill pill-danger"><span class="dot"></span>Underperforming</span></td>
+              <td class="muted">3 days ago</td>
+            </tr>
+            <tr>
+              <td><div class="row gap-sm"><div class="thumb-creative thumb-e"></div><div><div style="font-weight:600">Cart abandoner retargeting</div><div class="muted" style="font-size:12px">"You left something behind"</div></div></div></td>
+              <td>Google — Display<br/><span class="muted" style="font-size:12px">Responsive</span></td>
+              <td>High-income · returning</td>
+              <td>$3,500</td>
+              <td class="mono"><strong>6.45×</strong></td>
+              <td><span class="pill pill-success"><span class="dot"></span>Strong</span></td>
+              <td class="muted">5 days ago</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="grid-2" style="margin-top: 28px;">
+        <div class="card">
+          <div class="card-title">Saved audiences</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="aud-tile">
+              <div class="av-stack">
+                <div class="av" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)"></div>
+                <div class="av" style="background:linear-gradient(135deg,#F472B6,#EC4899)"></div>
+                <div class="av" style="background:linear-gradient(135deg,#A78BFA,#8B5CF6)"></div>
+              </div>
+              <div style="flex:1"><strong>Millennials · women</strong><div class="muted" style="font-size:12.5px">237 personas · used in 8 campaigns</div></div>
+              <a class="link" style="font-size:13px">Edit →</a>
+            </div>
+            <div class="aud-tile">
+              <div class="av-stack">
+                <div class="av" style="background:linear-gradient(135deg,#34D399,#10B981)"></div>
+                <div class="av" style="background:linear-gradient(135deg,#FBBF24,#F59E0B)"></div>
+              </div>
+              <div style="flex:1"><strong>Gen Z · skincare-curious</strong><div class="muted" style="font-size:12.5px">161 personas · used in 3 campaigns</div></div>
+              <a class="link" style="font-size:13px">Edit →</a>
+            </div>
+            <div class="aud-tile">
+              <div class="av-stack">
+                <div class="av" style="background:linear-gradient(135deg,#C084FC,#A855F7)"></div>
+                <div class="av" style="background:linear-gradient(135deg,#60A5FA,#3B82F6)"></div>
+              </div>
+              <div style="flex:1"><strong>High-income · returning buyers</strong><div class="muted" style="font-size:12.5px">96 personas · used in 2 campaigns</div></div>
+              <a class="link" style="font-size:13px">Edit →</a>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:16px">+ New audience</button>
+        </div>
+        <div class="card">
+          <div class="card-title">Recommended next moves</div>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:12px;font-size:14px;">
+            <li class="row" style="align-items:start;gap:12px;">
+              <span class="pill pill-success" style="flex-shrink:0">✓</span>
+              <div><strong>Test a Reels version of "Father's Day gift edit"</strong><div class="muted" style="font-size:12.5px">Your Reels formats are outperforming Feed by 1.84× ROAS on average.</div></div>
+            </li>
+            <li class="row" style="align-items:start;gap:12px;">
+              <span class="pill pill-warning" style="flex-shrink:0">!</span>
+              <div><strong>"Wholesale pitch deck" is underperforming on LinkedIn</strong><div class="muted" style="font-size:12.5px">Try a more B2B-native tone — current copy reads consumer-y for that platform.</div></div>
+            </li>
+            <li class="row" style="align-items:start;gap:12px;">
+              <span class="pill pill-violet" style="flex-shrink:0">→</span>
+              <div><strong>Run a budget sensitivity on the cart-abandoner campaign</strong><div class="muted" style="font-size:12.5px">Higher daily spend may still scale efficiently — worth a test.</div></div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

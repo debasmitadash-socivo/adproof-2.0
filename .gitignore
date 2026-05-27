@@ -1,0 +1,100 @@
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+build/
+dist/
+.venv/
+.venv-preview/
+venv/
+env/
+.python-version
+
+# ============================================================================
+# Secrets — NEVER commit any of these
+# ============================================================================
+# Environment files
+.env
+.env.*
+!.env.example
+# Stored LLM API keys (Gemini / Groq / Mistral / OpenRouter / xAI / Together /
+# Anthropic / OpenAI). Loaded into os.environ on uvicorn startup so the user
+# doesn't have to re-paste after every restart. NEVER commit this file.
+data/.secrets.json
+data/.user_calibrations/
+# Generic credentials catch-all
+*.pem
+*.key
+*credentials*.json
+!.claude/launch.json
+secrets/
+.secrets/
+
+# ============================================================================
+# User data (per-customer uploads + generated artefacts)
+# ============================================================================
+data/raw/*
+!data/raw/.gitkeep
+data/personas/*.csv
+!data/personas/.gitkeep
+data/benchmarks/*.json
+!data/benchmarks/.gitkeep
+*.xlsx
+*.csv
+!src/**/*.csv
+!data/raw/synthetic_ctr.csv
+
+# ============================================================================
+# Node / Next.js / Frontend build
+# ============================================================================
+node_modules/
+.next/
+out/
+.vercel
+.turbo
+*.tsbuildinfo
+next-env.d.ts
+
+# ============================================================================
+# Claude Code local state (per-developer, not portable)
+# ============================================================================
+.claude/settings.local.json
+.claude/.local/
+
+# ============================================================================
+# Logs + temporary files
+# ============================================================================
+*.log
+/tmp/uvicorn.log
+/tmp/next-dev.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ============================================================================
+# OS / editor cruft
+# ============================================================================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+.ipynb_checkpoints/
+
+# ============================================================================
+# Lock files we don't ship
+# ============================================================================
+*.lock.txt

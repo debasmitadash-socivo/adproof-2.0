@@ -1,0 +1,601 @@
+ad_id,source,ad_text,impressions,clicks,ctr,emotional_appeal,scarcity,social_proof,relevance
+SYN00001,synthetic,Upgrade your everyday routine today.,33651,915,0.02719,0.338,0.187,0.271,0.3
+SYN00002,synthetic,An incredible experience designed for you.,64272,1651,0.02569,0.41,0.037,0.357,0.4
+SYN00003,synthetic,Trusted by millions. Try it free.,68034,1650,0.02425,0.526,0.188,0.594,0.333
+SYN00004,synthetic,An incredible experience designed for you.,52720,1142,0.02166,0.414,0.653,0.162,0.396
+SYN00005,synthetic,Discover something you'll genuinely love.,65461,2113,0.03228,0.564,0.226,0.588,0.156
+SYN00006,synthetic,"The award-winning choice, rated five stars.",23130,1114,0.04816,0.652,0.13,0.79,0.437
+SYN00007,synthetic,"Your best results, made easy and fast.",70682,1637,0.02316,0.419,0.561,0.436,0.656
+SYN00008,synthetic,Don't miss out -- this offer ends tonight.,51907,698,0.01345,0.223,0.585,0.035,0.406
+SYN00009,synthetic,Exclusive deal: get yours now.,13285,718,0.05405,0.498,0.604,0.69,0.359
+SYN00010,synthetic,"Proven results, guaranteed satisfaction.",12905,258,0.01999,0.706,0.546,0.267,0.412
+SYN00011,synthetic,Upgrade your everyday routine today.,23582,829,0.03515,0.249,0.836,0.289,0.409
+SYN00012,synthetic,Limited release -- only a few left this week.,8344,533,0.06388,0.438,0.175,0.72,0.645
+SYN00013,synthetic,Exclusive deal: get yours now.,24771,1300,0.05248,0.691,0.313,0.175,0.374
+SYN00014,synthetic,"The award-winning choice, rated five stars.",79498,2508,0.03155,0.335,0.574,0.08,0.375
+SYN00015,synthetic,"Your best results, made easy and fast.",21487,979,0.04556,0.508,0.596,0.349,0.563
+SYN00016,synthetic,Upgrade your everyday routine today.,52000,3062,0.05888,0.32,0.042,0.844,0.213
+SYN00017,synthetic,Limited release -- only a few left this week.,78269,742,0.00948,0.225,0.635,0.261,0.296
+SYN00018,synthetic,"The award-winning choice, rated five stars.",22498,448,0.01991,0.26,0.351,0.469,0.29
+SYN00019,synthetic,Trusted by millions. Try it free.,56605,2897,0.05118,0.478,0.576,0.375,0.695
+SYN00020,synthetic,An incredible experience designed for you.,37652,992,0.02635,0.428,0.418,0.43,0.415
+SYN00021,synthetic,"Proven results, guaranteed satisfaction.",24968,1182,0.04734,0.519,0.587,0.283,0.33
+SYN00022,synthetic,Join thousands of happy customers who already switched.,76156,1515,0.01989,0.243,0.223,0.289,0.289
+SYN00023,synthetic,Join thousands of happy customers who already switched.,53566,1616,0.03017,0.569,0.391,0.447,0.285
+SYN00024,synthetic,"Your best results, made easy and fast.",36781,682,0.01854,0.224,0.504,0.179,0.174
+SYN00025,synthetic,"Your best results, made easy and fast.",65531,1675,0.02556,0.516,0.249,0.602,0.419
+SYN00026,synthetic,Upgrade your everyday routine today.,72334,1495,0.02067,0.469,0.406,0.206,0.394
+SYN00027,synthetic,Discover something you'll genuinely love.,63174,1755,0.02778,0.143,0.517,0.838,0.122
+SYN00028,synthetic,"Proven results, guaranteed satisfaction.",69898,1788,0.02558,0.559,0.165,0.489,0.677
+SYN00029,synthetic,Limited release -- only a few left this week.,27794,1157,0.04163,0.365,0.245,0.667,0.284
+SYN00030,synthetic,An incredible experience designed for you.,29500,1449,0.04912,0.781,0.541,0.387,0.51
+SYN00031,synthetic,Discover something you'll genuinely love.,20916,809,0.03868,0.315,0.494,0.291,0.336
+SYN00032,synthetic,"Your best results, made easy and fast.",56592,1107,0.01956,0.713,0.079,0.281,0.494
+SYN00033,synthetic,Don't miss out -- this offer ends tonight.,64843,723,0.01115,0.24,0.35,0.453,0.099
+SYN00034,synthetic,Trusted by millions. Try it free.,53858,1232,0.02287,0.11,0.129,0.359,0.51
+SYN00035,synthetic,Don't miss out -- this offer ends tonight.,49138,5946,0.12101,0.63,0.49,0.614,0.571
+SYN00036,synthetic,Limited release -- only a few left this week.,62383,2063,0.03307,0.089,0.073,0.586,0.241
+SYN00037,synthetic,Save 30% when you order before midnight.,16972,312,0.01838,0.171,0.337,0.561,0.186
+SYN00038,synthetic,"Proven results, guaranteed satisfaction.",31176,1212,0.03888,0.659,0.211,0.6,0.336
+SYN00039,synthetic,Upgrade your everyday routine today.,57441,2065,0.03595,0.356,0.173,0.537,0.412
+SYN00040,synthetic,Trusted by millions. Try it free.,7022,120,0.01709,0.444,0.379,0.356,0.319
+SYN00041,synthetic,"Your best results, made easy and fast.",73138,2841,0.03884,0.591,0.364,0.238,0.092
+SYN00042,synthetic,Limited release -- only a few left this week.,16170,365,0.02257,0.568,0.112,0.284,0.293
+SYN00043,synthetic,Limited release -- only a few left this week.,63598,1658,0.02607,0.324,0.5,0.489,0.327
+SYN00044,synthetic,Exclusive deal: get yours now.,50474,1013,0.02007,0.075,0.367,0.236,0.384
+SYN00045,synthetic,Upgrade your everyday routine today.,68266,2847,0.0417,0.219,0.247,0.534,0.451
+SYN00046,synthetic,Upgrade your everyday routine today.,62682,1262,0.02013,0.258,0.643,0.161,0.538
+SYN00047,synthetic,Upgrade your everyday routine today.,42719,960,0.02247,0.657,0.303,0.516,0.761
+SYN00048,synthetic,Don't miss out -- this offer ends tonight.,61215,2554,0.04172,0.707,0.584,0.433,0.423
+SYN00049,synthetic,Exclusive deal: get yours now.,29680,331,0.01115,0.136,0.243,0.231,0.581
+SYN00050,synthetic,Join thousands of happy customers who already switched.,47943,820,0.0171,0.338,0.1,0.169,0.228
+SYN00051,synthetic,An incredible experience designed for you.,73460,4044,0.05505,0.773,0.415,0.75,0.173
+SYN00052,synthetic,Trusted by millions. Try it free.,9526,386,0.04052,0.351,0.332,0.45,0.675
+SYN00053,synthetic,Join thousands of happy customers who already switched.,30396,1032,0.03395,0.537,0.235,0.199,0.211
+SYN00054,synthetic,Upgrade your everyday routine today.,4331,197,0.04549,0.523,0.201,0.73,0.5
+SYN00055,synthetic,Discover something you'll genuinely love.,44138,3164,0.07168,0.504,0.543,0.701,0.046
+SYN00056,synthetic,Upgrade your everyday routine today.,63224,1675,0.02649,0.32,0.245,0.535,0.645
+SYN00057,synthetic,Limited release -- only a few left this week.,5968,129,0.02162,0.162,0.436,0.199,0.11
+SYN00058,synthetic,Discover something you'll genuinely love.,45301,1216,0.02684,0.462,0.528,0.28,0.59
+SYN00059,synthetic,An incredible experience designed for you.,34971,1341,0.03835,0.562,0.435,0.043,0.416
+SYN00060,synthetic,Exclusive deal: get yours now.,63268,1779,0.02812,0.103,0.92,0.202,0.539
+SYN00061,synthetic,Don't miss out -- this offer ends tonight.,19950,1284,0.06436,0.814,0.308,0.317,0.398
+SYN00062,synthetic,Save 30% when you order before midnight.,15534,284,0.01828,0.033,0.171,0.432,0.504
+SYN00063,synthetic,Save 30% when you order before midnight.,10290,449,0.04363,0.054,0.492,0.576,0.292
+SYN00064,synthetic,Don't miss out -- this offer ends tonight.,34371,1042,0.03032,0.158,0.448,0.24,0.523
+SYN00065,synthetic,Join thousands of happy customers who already switched.,40539,1066,0.0263,0.285,0.142,0.083,0.742
+SYN00066,synthetic,"Your best results, made easy and fast.",73776,2490,0.03375,0.395,0.418,0.135,0.531
+SYN00067,synthetic,An incredible experience designed for you.,38872,1110,0.02856,0.361,0.41,0.53,0.257
+SYN00068,synthetic,"Proven results, guaranteed satisfaction.",16213,687,0.04237,0.405,0.452,0.689,0.578
+SYN00069,synthetic,Upgrade your everyday routine today.,56824,1172,0.02063,0.263,0.447,0.31,0.217
+SYN00070,synthetic,Save 30% when you order before midnight.,7737,186,0.02404,0.743,0.142,0.426,0.194
+SYN00071,synthetic,Save 30% when you order before midnight.,29587,733,0.02477,0.284,0.214,0.672,0.369
+SYN00072,synthetic,"Your best results, made easy and fast.",53316,719,0.01349,0.345,0.555,0.333,0.364
+SYN00073,synthetic,Join thousands of happy customers who already switched.,22554,664,0.02944,0.162,0.106,0.328,0.429
+SYN00074,synthetic,Exclusive deal: get yours now.,48779,997,0.02044,0.367,0.883,0.555,0.434
+SYN00075,synthetic,Exclusive deal: get yours now.,37904,1345,0.03548,0.656,0.276,0.578,0.621
+SYN00076,synthetic,Save 30% when you order before midnight.,76306,3004,0.03937,0.747,0.174,0.348,0.385
+SYN00077,synthetic,"The award-winning choice, rated five stars.",25133,1255,0.04993,0.537,0.6,0.534,0.564
+SYN00078,synthetic,Discover something you'll genuinely love.,72798,1316,0.01808,0.424,0.571,0.235,0.743
+SYN00079,synthetic,Upgrade your everyday routine today.,51192,1436,0.02805,0.333,0.339,0.4,0.569
+SYN00080,synthetic,"Proven results, guaranteed satisfaction.",60706,2329,0.03837,0.544,0.325,0.431,0.474
+SYN00081,synthetic,An incredible experience designed for you.,15996,377,0.02357,0.275,0.356,0.213,0.399
+SYN00082,synthetic,Save 30% when you order before midnight.,4475,257,0.05743,0.51,0.197,0.238,0.669
+SYN00083,synthetic,"Your best results, made easy and fast.",59268,1334,0.02251,0.412,0.793,0.301,0.373
+SYN00084,synthetic,"The award-winning choice, rated five stars.",39989,674,0.01685,0.453,0.65,0.596,0.478
+SYN00085,synthetic,Join thousands of happy customers who already switched.,26781,1597,0.05963,0.664,0.577,0.636,0.574
+SYN00086,synthetic,Save 30% when you order before midnight.,71999,1614,0.02242,0.144,0.613,0.635,0.319
+SYN00087,synthetic,Limited release -- only a few left this week.,28140,362,0.01286,0.447,0.328,0.605,0.114
+SYN00088,synthetic,An incredible experience designed for you.,36391,831,0.02284,0.376,0.07,0.276,0.392
+SYN00089,synthetic,Don't miss out -- this offer ends tonight.,58763,3136,0.05337,0.505,0.121,0.767,0.496
+SYN00090,synthetic,Exclusive deal: get yours now.,77085,1126,0.01461,0.491,0.435,0.046,0.383
+SYN00091,synthetic,Upgrade your everyday routine today.,72221,6656,0.09216,0.456,0.131,0.58,0.824
+SYN00092,synthetic,Don't miss out -- this offer ends tonight.,53241,1366,0.02566,0.633,0.46,0.434,0.454
+SYN00093,synthetic,"Your best results, made easy and fast.",11500,351,0.03052,0.741,0.165,0.139,0.534
+SYN00094,synthetic,Don't miss out -- this offer ends tonight.,11428,202,0.01768,0.355,0.41,0.322,0.528
+SYN00095,synthetic,Exclusive deal: get yours now.,56350,1175,0.02085,0.26,0.316,0.426,0.122
+SYN00096,synthetic,"The award-winning choice, rated five stars.",42213,606,0.01436,0.086,0.216,0.153,0.129
+SYN00097,synthetic,Limited release -- only a few left this week.,13249,303,0.02287,0.784,0.437,0.358,0.706
+SYN00098,synthetic,Upgrade your everyday routine today.,56562,4229,0.07477,0.188,0.705,0.196,0.444
+SYN00099,synthetic,Discover something you'll genuinely love.,75557,2009,0.02659,0.332,0.75,0.492,0.387
+SYN00100,synthetic,Join thousands of happy customers who already switched.,8033,199,0.02477,0.377,0.174,0.507,0.348
+SYN00101,synthetic,Limited release -- only a few left this week.,66575,1979,0.02973,0.233,0.362,0.103,0.293
+SYN00102,synthetic,Limited release -- only a few left this week.,29538,1911,0.0647,0.349,0.402,0.412,0.69
+SYN00103,synthetic,Save 30% when you order before midnight.,33629,2320,0.06899,0.738,0.614,0.498,0.669
+SYN00104,synthetic,Limited release -- only a few left this week.,58215,574,0.00986,0.025,0.174,0.055,0.301
+SYN00105,synthetic,Discover something you'll genuinely love.,22009,682,0.03099,0.261,0.616,0.497,0.465
+SYN00106,synthetic,Don't miss out -- this offer ends tonight.,15094,225,0.01491,0.255,0.215,0.611,0.665
+SYN00107,synthetic,Save 30% when you order before midnight.,77217,3825,0.04954,0.497,0.415,0.721,0.404
+SYN00108,synthetic,Limited release -- only a few left this week.,29822,362,0.01214,0.154,0.465,0.474,0.206
+SYN00109,synthetic,"Your best results, made easy and fast.",16057,268,0.01669,0.254,0.268,0.178,0.459
+SYN00110,synthetic,Limited release -- only a few left this week.,56123,1239,0.02208,0.251,0.362,0.446,0.28
+SYN00111,synthetic,Trusted by millions. Try it free.,19687,717,0.03642,0.381,0.245,0.458,0.678
+SYN00112,synthetic,"The award-winning choice, rated five stars.",62716,2037,0.03248,0.303,0.557,0.545,0.673
+SYN00113,synthetic,"The award-winning choice, rated five stars.",8426,476,0.05649,0.208,0.187,0.725,0.544
+SYN00114,synthetic,Join thousands of happy customers who already switched.,42925,1705,0.03972,0.592,0.079,0.406,0.483
+SYN00115,synthetic,Save 30% when you order before midnight.,34027,1511,0.04441,0.671,0.596,0.439,0.377
+SYN00116,synthetic,Limited release -- only a few left this week.,76678,1837,0.02396,0.517,0.343,0.393,0.795
+SYN00117,synthetic,"Your best results, made easy and fast.",43138,2081,0.04824,0.719,0.24,0.364,0.095
+SYN00118,synthetic,Limited release -- only a few left this week.,74250,1310,0.01764,0.213,0.383,0.477,0.3
+SYN00119,synthetic,Trusted by millions. Try it free.,22136,1235,0.05579,0.519,0.418,0.216,0.383
+SYN00120,synthetic,Save 30% when you order before midnight.,39454,2455,0.06222,0.258,0.272,0.598,0.488
+SYN00121,synthetic,"Your best results, made easy and fast.",65664,2572,0.03917,0.563,0.455,0.473,0.387
+SYN00122,synthetic,"Your best results, made easy and fast.",15341,671,0.04374,0.412,0.296,0.43,0.502
+SYN00123,synthetic,Don't miss out -- this offer ends tonight.,74435,485,0.00652,0.501,0.186,0.188,0.137
+SYN00124,synthetic,An incredible experience designed for you.,62515,1296,0.02073,0.172,0.389,0.157,0.435
+SYN00125,synthetic,"Your best results, made easy and fast.",55119,3108,0.05639,0.611,0.259,0.608,0.547
+SYN00126,synthetic,"Proven results, guaranteed satisfaction.",21721,998,0.04595,0.665,0.017,0.75,0.445
+SYN00127,synthetic,Save 30% when you order before midnight.,65988,851,0.0129,0.033,0.545,0.476,0.202
+SYN00128,synthetic,An incredible experience designed for you.,67897,1705,0.02511,0.092,0.53,0.828,0.339
+SYN00129,synthetic,"The award-winning choice, rated five stars.",25531,306,0.01199,0.553,0.498,0.612,0.24
+SYN00130,synthetic,Don't miss out -- this offer ends tonight.,48210,1251,0.02595,0.301,0.229,0.184,0.421
+SYN00131,synthetic,Discover something you'll genuinely love.,7669,85,0.01108,0.378,0.375,0.422,0.267
+SYN00132,synthetic,"Proven results, guaranteed satisfaction.",33345,922,0.02765,0.113,0.141,0.299,0.16
+SYN00133,synthetic,Save 30% when you order before midnight.,14601,690,0.04726,0.42,0.301,0.476,0.425
+SYN00134,synthetic,"Your best results, made easy and fast.",45841,1439,0.03139,0.488,0.31,0.401,0.77
+SYN00135,synthetic,Limited release -- only a few left this week.,45260,1622,0.03584,0.578,0.568,0.574,0.168
+SYN00136,synthetic,Don't miss out -- this offer ends tonight.,44026,1506,0.03421,0.749,0.04,0.566,0.634
+SYN00137,synthetic,Upgrade your everyday routine today.,55140,1459,0.02646,0.088,0.639,0.246,0.459
+SYN00138,synthetic,"The award-winning choice, rated five stars.",74204,1607,0.02166,0.311,0.435,0.394,0.736
+SYN00139,synthetic,Upgrade your everyday routine today.,18148,589,0.03246,0.452,0.359,0.46,0.161
+SYN00140,synthetic,Save 30% when you order before midnight.,19505,335,0.01718,0.451,0.563,0.458,0.384
+SYN00141,synthetic,Discover something you'll genuinely love.,19587,382,0.0195,0.44,0.536,0.618,0.625
+SYN00142,synthetic,Save 30% when you order before midnight.,74468,1842,0.02474,0.299,0.283,0.182,0.595
+SYN00143,synthetic,"The award-winning choice, rated five stars.",10134,246,0.02427,0.282,0.579,0.218,0.509
+SYN00144,synthetic,Limited release -- only a few left this week.,5413,125,0.02309,0.286,0.408,0.221,0.337
+SYN00145,synthetic,Trusted by millions. Try it free.,15354,396,0.02579,0.116,0.398,0.616,0.767
+SYN00146,synthetic,An incredible experience designed for you.,62228,4330,0.06958,0.259,0.815,0.585,0.475
+SYN00147,synthetic,Discover something you'll genuinely love.,47631,1725,0.03622,0.381,0.761,0.235,0.609
+SYN00148,synthetic,Upgrade your everyday routine today.,73814,3727,0.05049,0.703,0.761,0.381,0.679
+SYN00149,synthetic,Upgrade your everyday routine today.,18730,492,0.02627,0.638,0.192,0.11,0.474
+SYN00150,synthetic,Trusted by millions. Try it free.,33342,1822,0.05465,0.723,0.569,0.134,0.638
+SYN00151,synthetic,Exclusive deal: get yours now.,45764,1311,0.02865,0.208,0.497,0.214,0.415
+SYN00152,synthetic,"Proven results, guaranteed satisfaction.",8626,357,0.04139,0.357,0.366,0.605,0.627
+SYN00153,synthetic,"The award-winning choice, rated five stars.",73727,2568,0.03483,0.69,0.243,0.52,0.095
+SYN00154,synthetic,Discover something you'll genuinely love.,64959,1262,0.01943,0.792,0.127,0.23,0.794
+SYN00155,synthetic,Limited release -- only a few left this week.,14069,162,0.01151,0.408,0.433,0.265,0.158
+SYN00156,synthetic,Upgrade your everyday routine today.,67900,1525,0.02246,0.171,0.486,0.166,0.373
+SYN00157,synthetic,An incredible experience designed for you.,37556,1118,0.02977,0.331,0.389,0.232,0.837
+SYN00158,synthetic,Discover something you'll genuinely love.,28891,835,0.0289,0.367,0.345,0.285,0.247
+SYN00159,synthetic,Discover something you'll genuinely love.,75853,2678,0.03531,0.477,0.298,0.444,0.722
+SYN00160,synthetic,"The award-winning choice, rated five stars.",42931,1565,0.03645,0.697,0.222,0.356,0.325
+SYN00161,synthetic,Save 30% when you order before midnight.,20493,233,0.01137,0.354,0.23,0.059,0.247
+SYN00162,synthetic,Exclusive deal: get yours now.,65329,1985,0.03038,0.739,0.301,0.175,0.436
+SYN00163,synthetic,An incredible experience designed for you.,58111,1314,0.02261,0.735,0.415,0.583,0.434
+SYN00164,synthetic,Trusted by millions. Try it free.,17787,715,0.0402,0.705,0.603,0.414,0.398
+SYN00165,synthetic,"The award-winning choice, rated five stars.",55157,542,0.00983,0.213,0.32,0.317,0.286
+SYN00166,synthetic,Trusted by millions. Try it free.,51431,2168,0.04215,0.566,0.52,0.47,0.571
+SYN00167,synthetic,"The award-winning choice, rated five stars.",24202,305,0.0126,0.131,0.735,0.272,0.381
+SYN00168,synthetic,"Your best results, made easy and fast.",36158,682,0.01886,0.171,0.21,0.581,0.278
+SYN00169,synthetic,Limited release -- only a few left this week.,67626,3371,0.04985,0.661,0.141,0.441,0.613
+SYN00170,synthetic,Trusted by millions. Try it free.,16430,526,0.03201,0.206,0.375,0.286,0.745
+SYN00171,synthetic,Upgrade your everyday routine today.,58619,1049,0.0179,0.175,0.254,0.803,0.643
+SYN00172,synthetic,Trusted by millions. Try it free.,67020,1627,0.02428,0.677,0.573,0.367,0.282
+SYN00173,synthetic,Don't miss out -- this offer ends tonight.,75129,1479,0.01969,0.359,0.556,0.617,0.574
+SYN00174,synthetic,Upgrade your everyday routine today.,28000,336,0.012,0.218,0.544,0.589,0.272
+SYN00175,synthetic,"Your best results, made easy and fast.",23528,478,0.02032,0.262,0.476,0.181,0.114
+SYN00176,synthetic,Join thousands of happy customers who already switched.,74950,2603,0.03473,0.678,0.539,0.269,0.163
+SYN00177,synthetic,Discover something you'll genuinely love.,38633,1018,0.02635,0.07,0.148,0.723,0.214
+SYN00178,synthetic,Upgrade your everyday routine today.,46807,1981,0.04232,0.73,0.402,0.3,0.442
+SYN00179,synthetic,Trusted by millions. Try it free.,42502,1708,0.04019,0.704,0.405,0.428,0.675
+SYN00180,synthetic,"Your best results, made easy and fast.",42617,859,0.02016,0.346,0.347,0.255,0.244
+SYN00181,synthetic,"The award-winning choice, rated five stars.",51090,865,0.01693,0.219,0.11,0.502,0.599
+SYN00182,synthetic,"Proven results, guaranteed satisfaction.",35594,563,0.01582,0.142,0.336,0.257,0.087
+SYN00183,synthetic,Don't miss out -- this offer ends tonight.,33187,886,0.0267,0.792,0.378,0.599,0.624
+SYN00184,synthetic,Don't miss out -- this offer ends tonight.,33851,569,0.01681,0.189,0.331,0.465,0.304
+SYN00185,synthetic,Limited release -- only a few left this week.,53535,1214,0.02268,0.144,0.233,0.501,0.296
+SYN00186,synthetic,"Your best results, made easy and fast.",65983,1880,0.02849,0.441,0.274,0.606,0.375
+SYN00187,synthetic,Trusted by millions. Try it free.,45745,4992,0.10913,0.783,0.2,0.429,0.457
+SYN00188,synthetic,Exclusive deal: get yours now.,55167,1109,0.0201,0.715,0.453,0.32,0.44
+SYN00189,synthetic,Don't miss out -- this offer ends tonight.,34804,681,0.01957,0.209,0.46,0.14,0.213
+SYN00190,synthetic,Join thousands of happy customers who already switched.,62574,1099,0.01756,0.314,0.499,0.592,0.428
+SYN00191,synthetic,Trusted by millions. Try it free.,33321,587,0.01762,0.09,0.083,0.622,0.231
+SYN00192,synthetic,Upgrade your everyday routine today.,35423,808,0.02281,0.161,0.712,0.784,0.119
+SYN00193,synthetic,Save 30% when you order before midnight.,7254,345,0.04756,0.487,0.715,0.514,0.412
+SYN00194,synthetic,Exclusive deal: get yours now.,23130,501,0.02166,0.433,0.472,0.192,0.409
+SYN00195,synthetic,An incredible experience designed for you.,59859,1250,0.02088,0.07,0.411,0.705,0.129
+SYN00196,synthetic,"Proven results, guaranteed satisfaction.",9688,194,0.02002,0.429,0.595,0.305,0.287
+SYN00197,synthetic,"The award-winning choice, rated five stars.",20246,183,0.00904,0.182,0.19,0.28,0.096
+SYN00198,synthetic,Trusted by millions. Try it free.,62802,1583,0.02521,0.19,0.623,0.496,0.695
+SYN00199,synthetic,Trusted by millions. Try it free.,70233,1369,0.01949,0.38,0.531,0.242,0.171
+SYN00200,synthetic,Join thousands of happy customers who already switched.,34976,958,0.02739,0.277,0.546,0.51,0.368
+SYN00201,synthetic,Exclusive deal: get yours now.,34331,1316,0.03833,0.78,0.312,0.314,0.366
+SYN00202,synthetic,Exclusive deal: get yours now.,42210,1585,0.03755,0.412,0.542,0.65,0.71
+SYN00203,synthetic,Limited release -- only a few left this week.,62301,1068,0.01714,0.196,0.117,0.535,0.065
+SYN00204,synthetic,An incredible experience designed for you.,39139,771,0.0197,0.616,0.6,0.155,0.781
+SYN00205,synthetic,Discover something you'll genuinely love.,16354,606,0.03706,0.354,0.064,0.578,0.615
+SYN00206,synthetic,Trusted by millions. Try it free.,36197,828,0.02287,0.533,0.455,0.328,0.431
+SYN00207,synthetic,"Your best results, made easy and fast.",22607,1123,0.04967,0.277,0.703,0.829,0.466
+SYN00208,synthetic,Join thousands of happy customers who already switched.,55660,2520,0.04527,0.486,0.203,0.323,0.409
+SYN00209,synthetic,Limited release -- only a few left this week.,13988,297,0.02123,0.079,0.679,0.516,0.163
+SYN00210,synthetic,"Your best results, made easy and fast.",49872,1043,0.02091,0.529,0.425,0.354,0.437
+SYN00211,synthetic,"Proven results, guaranteed satisfaction.",12999,354,0.02723,0.269,0.499,0.315,0.51
+SYN00212,synthetic,An incredible experience designed for you.,77848,2647,0.034,0.156,0.691,0.349,0.566
+SYN00213,synthetic,Save 30% when you order before midnight.,52284,1715,0.0328,0.453,0.09,0.644,0.758
+SYN00214,synthetic,"Proven results, guaranteed satisfaction.",13695,227,0.01658,0.133,0.461,0.335,0.177
+SYN00215,synthetic,"The award-winning choice, rated five stars.",76835,2452,0.03191,0.301,0.274,0.224,0.557
+SYN00216,synthetic,"Your best results, made easy and fast.",47160,2027,0.04298,0.499,0.503,0.548,0.506
+SYN00217,synthetic,Save 30% when you order before midnight.,49710,878,0.01766,0.611,0.071,0.279,0.137
+SYN00218,synthetic,"Your best results, made easy and fast.",7869,112,0.01423,0.486,0.346,0.621,0.211
+SYN00219,synthetic,"Your best results, made easy and fast.",17457,437,0.02503,0.203,0.409,0.512,0.057
+SYN00220,synthetic,Trusted by millions. Try it free.,65209,1079,0.01655,0.337,0.173,0.475,0.167
+SYN00221,synthetic,Discover something you'll genuinely love.,39005,944,0.0242,0.078,0.395,0.546,0.29
+SYN00222,synthetic,"Your best results, made easy and fast.",50455,1406,0.02787,0.335,0.352,0.701,0.128
+SYN00223,synthetic,Don't miss out -- this offer ends tonight.,79010,1298,0.01643,0.326,0.476,0.463,0.669
+SYN00224,synthetic,Discover something you'll genuinely love.,35985,941,0.02615,0.716,0.578,0.308,0.064
+SYN00225,synthetic,"Your best results, made easy and fast.",32329,1175,0.03635,0.353,0.478,0.655,0.284
+SYN00226,synthetic,Limited release -- only a few left this week.,64772,2018,0.03116,0.21,0.64,0.532,0.155
+SYN00227,synthetic,"Proven results, guaranteed satisfaction.",8083,246,0.03043,0.477,0.568,0.478,0.311
+SYN00228,synthetic,Limited release -- only a few left this week.,38035,414,0.01088,0.299,0.478,0.125,0.427
+SYN00229,synthetic,"Proven results, guaranteed satisfaction.",68819,3645,0.05297,0.521,0.436,0.537,0.398
+SYN00230,synthetic,An incredible experience designed for you.,20539,692,0.03369,0.35,0.44,0.366,0.524
+SYN00231,synthetic,Exclusive deal: get yours now.,26408,431,0.01632,0.435,0.273,0.055,0.727
+SYN00232,synthetic,Upgrade your everyday routine today.,39382,441,0.0112,0.31,0.073,0.025,0.072
+SYN00233,synthetic,Join thousands of happy customers who already switched.,8720,256,0.02936,0.379,0.557,0.268,0.464
+SYN00234,synthetic,Upgrade your everyday routine today.,8454,321,0.03797,0.341,0.571,0.06,0.709
+SYN00235,synthetic,Discover something you'll genuinely love.,22360,527,0.02357,0.534,0.593,0.413,0.211
+SYN00236,synthetic,"Proven results, guaranteed satisfaction.",72135,1694,0.02348,0.114,0.009,0.132,0.266
+SYN00237,synthetic,An incredible experience designed for you.,20080,220,0.01096,0.355,0.206,0.31,0.283
+SYN00238,synthetic,Trusted by millions. Try it free.,59283,1053,0.01776,0.389,0.356,0.339,0.368
+SYN00239,synthetic,"Proven results, guaranteed satisfaction.",35807,379,0.01058,0.753,0.348,0.193,0.184
+SYN00240,synthetic,Upgrade your everyday routine today.,61544,1414,0.02298,0.587,0.599,0.321,0.415
+SYN00241,synthetic,An incredible experience designed for you.,28425,1174,0.0413,0.295,0.302,0.308,0.338
+SYN00242,synthetic,Save 30% when you order before midnight.,70335,6130,0.08715,0.78,0.188,0.593,0.59
+SYN00243,synthetic,Trusted by millions. Try it free.,31554,1301,0.04123,0.417,0.682,0.725,0.38
+SYN00244,synthetic,An incredible experience designed for you.,63951,2420,0.03784,0.587,0.658,0.641,0.763
+SYN00245,synthetic,Trusted by millions. Try it free.,67018,1476,0.02202,0.595,0.287,0.178,0.218
+SYN00246,synthetic,Discover something you'll genuinely love.,36252,2223,0.06132,0.787,0.637,0.599,0.705
+SYN00247,synthetic,Don't miss out -- this offer ends tonight.,54353,821,0.0151,0.433,0.573,0.641,0.125
+SYN00248,synthetic,Discover something you'll genuinely love.,12135,240,0.01978,0.694,0.086,0.076,0.263
+SYN00249,synthetic,Don't miss out -- this offer ends tonight.,41224,1769,0.04291,0.231,0.258,0.302,0.457
+SYN00250,synthetic,Discover something you'll genuinely love.,31749,682,0.02148,0.677,0.446,0.556,0.213
+SYN00251,synthetic,"The award-winning choice, rated five stars.",76489,1802,0.02356,0.498,0.598,0.277,0.455
+SYN00252,synthetic,Join thousands of happy customers who already switched.,74924,2223,0.02967,0.438,0.386,0.597,0.257
+SYN00253,synthetic,"The award-winning choice, rated five stars.",63318,1513,0.0239,0.299,0.259,0.478,0.143
+SYN00254,synthetic,Trusted by millions. Try it free.,76079,1955,0.0257,0.718,0.238,0.524,0.38
+SYN00255,synthetic,"Proven results, guaranteed satisfaction.",78145,2376,0.03041,0.459,0.54,0.751,0.117
+SYN00256,synthetic,Limited release -- only a few left this week.,62126,2349,0.03781,0.446,0.301,0.61,0.332
+SYN00257,synthetic,Join thousands of happy customers who already switched.,48724,2565,0.05264,0.387,0.675,0.167,0.276
+SYN00258,synthetic,"Your best results, made easy and fast.",18741,506,0.027,0.05,0.635,0.244,0.694
+SYN00259,synthetic,Trusted by millions. Try it free.,65785,2231,0.03391,0.658,0.562,0.471,0.371
+SYN00260,synthetic,Join thousands of happy customers who already switched.,17972,923,0.05136,0.188,0.491,0.222,0.654
+SYN00261,synthetic,Save 30% when you order before midnight.,17260,418,0.02422,0.679,0.463,0.466,0.189
+SYN00262,synthetic,Upgrade your everyday routine today.,70742,1829,0.02585,0.631,0.633,0.463,0.727
+SYN00263,synthetic,Upgrade your everyday routine today.,11811,333,0.02819,0.434,0.3,0.161,0.45
+SYN00264,synthetic,Limited release -- only a few left this week.,13927,522,0.03748,0.155,0.833,0.412,0.234
+SYN00265,synthetic,Trusted by millions. Try it free.,42345,1075,0.02539,0.133,0.77,0.249,0.28
+SYN00266,synthetic,"Proven results, guaranteed satisfaction.",47978,1116,0.02326,0.429,0.029,0.31,0.412
+SYN00267,synthetic,Discover something you'll genuinely love.,6509,80,0.01229,0.396,0.193,0.44,0.503
+SYN00268,synthetic,Join thousands of happy customers who already switched.,32125,747,0.02325,0.098,0.431,0.639,0.181
+SYN00269,synthetic,Exclusive deal: get yours now.,20344,1121,0.0551,0.382,0.611,0.17,0.72
+SYN00270,synthetic,Save 30% when you order before midnight.,26254,339,0.01291,0.12,0.187,0.582,0.182
+SYN00271,synthetic,Limited release -- only a few left this week.,16926,361,0.02133,0.248,0.591,0.466,0.099
+SYN00272,synthetic,Limited release -- only a few left this week.,55158,1123,0.02036,0.445,0.263,0.422,0.221
+SYN00273,synthetic,"The award-winning choice, rated five stars.",39420,901,0.02286,0.101,0.442,0.314,0.811
+SYN00274,synthetic,Trusted by millions. Try it free.,76886,2030,0.0264,0.194,0.408,0.454,0.311
+SYN00275,synthetic,"The award-winning choice, rated five stars.",3639,106,0.02913,0.308,0.23,0.182,0.315
+SYN00276,synthetic,Discover something you'll genuinely love.,62877,2232,0.0355,0.503,0.462,0.302,0.51
+SYN00277,synthetic,"The award-winning choice, rated five stars.",73049,1420,0.01944,0.379,0.29,0.562,0.383
+SYN00278,synthetic,Exclusive deal: get yours now.,40434,600,0.01484,0.163,0.181,0.47,0.63
+SYN00279,synthetic,Trusted by millions. Try it free.,56850,1434,0.02522,0.369,0.056,0.503,0.184
+SYN00280,synthetic,Don't miss out -- this offer ends tonight.,36934,1439,0.03896,0.455,0.532,0.882,0.685
+SYN00281,synthetic,Discover something you'll genuinely love.,48817,2605,0.05336,0.205,0.424,0.291,0.539
+SYN00282,synthetic,"Your best results, made easy and fast.",72890,3399,0.04663,0.38,0.44,0.517,0.014
+SYN00283,synthetic,"Proven results, guaranteed satisfaction.",43827,2917,0.06656,0.756,0.177,0.22,0.448
+SYN00284,synthetic,Don't miss out -- this offer ends tonight.,47514,929,0.01955,0.194,0.347,0.755,0.291
+SYN00285,synthetic,An incredible experience designed for you.,78975,3025,0.0383,0.591,0.43,0.34,0.44
+SYN00286,synthetic,Upgrade your everyday routine today.,41241,1656,0.04015,0.811,0.274,0.387,0.167
+SYN00287,synthetic,"Proven results, guaranteed satisfaction.",16335,571,0.03496,0.211,0.717,0.097,0.616
+SYN00288,synthetic,Exclusive deal: get yours now.,55578,1569,0.02823,0.205,0.509,0.444,0.69
+SYN00289,synthetic,Trusted by millions. Try it free.,56351,2300,0.04082,0.637,0.371,0.161,0.207
+SYN00290,synthetic,Exclusive deal: get yours now.,21260,697,0.03278,0.236,0.457,0.78,0.457
+SYN00291,synthetic,"Your best results, made easy and fast.",59111,1653,0.02796,0.167,0.652,0.347,0.426
+SYN00292,synthetic,Save 30% when you order before midnight.,7907,103,0.01303,0.203,0.699,0.208,0.254
+SYN00293,synthetic,Don't miss out -- this offer ends tonight.,27640,1281,0.04635,0.712,0.662,0.393,0.363
+SYN00294,synthetic,Don't miss out -- this offer ends tonight.,68843,1301,0.0189,0.139,0.16,0.272,0.385
+SYN00295,synthetic,Limited release -- only a few left this week.,50548,994,0.01966,0.104,0.202,0.031,0.279
+SYN00296,synthetic,Join thousands of happy customers who already switched.,49759,1619,0.03254,0.344,0.154,0.383,0.646
+SYN00297,synthetic,Save 30% when you order before midnight.,50813,1722,0.03389,0.726,0.508,0.188,0.372
+SYN00298,synthetic,"Your best results, made easy and fast.",15695,496,0.0316,0.472,0.627,0.389,0.516
+SYN00299,synthetic,Limited release -- only a few left this week.,77021,3450,0.04479,0.449,0.303,0.695,0.435
+SYN00300,synthetic,An incredible experience designed for you.,25949,842,0.03245,0.8,0.298,0.647,0.208
+SYN00301,synthetic,Limited release -- only a few left this week.,63555,1100,0.01731,0.247,0.289,0.658,0.514
+SYN00302,synthetic,Exclusive deal: get yours now.,79224,2630,0.0332,0.473,0.17,0.412,0.339
+SYN00303,synthetic,Trusted by millions. Try it free.,21551,567,0.02631,0.195,0.805,0.388,0.707
+SYN00304,synthetic,"The award-winning choice, rated five stars.",51850,822,0.01585,0.401,0.339,0.143,0.522
+SYN00305,synthetic,"The award-winning choice, rated five stars.",6259,190,0.03036,0.514,0.586,0.481,0.802
+SYN00306,synthetic,Trusted by millions. Try it free.,51980,2673,0.05142,0.428,0.799,0.661,0.725
+SYN00307,synthetic,Limited release -- only a few left this week.,36958,1056,0.02857,0.445,0.737,0.457,0.246
+SYN00308,synthetic,Trusted by millions. Try it free.,8556,96,0.01122,0.217,0.16,0.859,0.242
+SYN00309,synthetic,"Your best results, made easy and fast.",54744,886,0.01618,0.175,0.358,0.398,0.104
+SYN00310,synthetic,Join thousands of happy customers who already switched.,77612,3116,0.04015,0.184,0.459,0.645,0.238
+SYN00311,synthetic,"Proven results, guaranteed satisfaction.",9397,270,0.02873,0.773,0.675,0.288,0.414
+SYN00312,synthetic,Don't miss out -- this offer ends tonight.,71744,1663,0.02318,0.278,0.411,0.316,0.392
+SYN00313,synthetic,Limited release -- only a few left this week.,67952,1857,0.02733,0.23,0.217,0.27,0.176
+SYN00314,synthetic,Don't miss out -- this offer ends tonight.,45179,1686,0.03732,0.585,0.338,0.219,0.407
+SYN00315,synthetic,"The award-winning choice, rated five stars.",72406,2973,0.04106,0.273,0.028,0.689,0.47
+SYN00316,synthetic,An incredible experience designed for you.,26822,203,0.00757,0.283,0.48,0.129,0.37
+SYN00317,synthetic,Discover something you'll genuinely love.,58445,2590,0.04432,0.317,0.556,0.188,0.205
+SYN00318,synthetic,Exclusive deal: get yours now.,56750,2726,0.04804,0.416,0.373,0.794,0.619
+SYN00319,synthetic,Exclusive deal: get yours now.,47697,4538,0.09514,0.565,0.618,0.632,0.417
+SYN00320,synthetic,Upgrade your everyday routine today.,67169,1074,0.01599,0.213,0.232,0.296,0.336
+SYN00321,synthetic,"The award-winning choice, rated five stars.",70474,1169,0.01659,0.753,0.566,0.477,0.206
+SYN00322,synthetic,Join thousands of happy customers who already switched.,63531,2430,0.03825,0.485,0.324,0.336,0.85
+SYN00323,synthetic,Discover something you'll genuinely love.,48305,1312,0.02716,0.278,0.269,0.604,0.488
+SYN00324,synthetic,Limited release -- only a few left this week.,78232,2630,0.03362,0.707,0.254,0.246,0.214
+SYN00325,synthetic,"Your best results, made easy and fast.",45778,2056,0.04491,0.636,0.543,0.2,0.404
+SYN00326,synthetic,Limited release -- only a few left this week.,52037,1622,0.03117,0.582,0.423,0.315,0.455
+SYN00327,synthetic,Don't miss out -- this offer ends tonight.,17538,661,0.03769,0.899,0.381,0.688,0.357
+SYN00328,synthetic,Discover something you'll genuinely love.,27734,1120,0.04038,0.641,0.521,0.131,0.466
+SYN00329,synthetic,Exclusive deal: get yours now.,72661,1745,0.02402,0.465,0.335,0.59,0.186
+SYN00330,synthetic,"Proven results, guaranteed satisfaction.",41340,1059,0.02562,0.616,0.38,0.35,0.283
+SYN00331,synthetic,Don't miss out -- this offer ends tonight.,42365,2232,0.05268,0.668,0.699,0.253,0.47
+SYN00332,synthetic,Discover something you'll genuinely love.,65856,3064,0.04653,0.072,0.184,0.686,0.658
+SYN00333,synthetic,Trusted by millions. Try it free.,28107,797,0.02836,0.077,0.219,0.189,0.243
+SYN00334,synthetic,Trusted by millions. Try it free.,23431,649,0.0277,0.167,0.693,0.556,0.502
+SYN00335,synthetic,Limited release -- only a few left this week.,3683,68,0.01846,0.581,0.596,0.677,0.571
+SYN00336,synthetic,"The award-winning choice, rated five stars.",20818,582,0.02796,0.291,0.306,0.453,0.526
+SYN00337,synthetic,Exclusive deal: get yours now.,42429,816,0.01923,0.112,0.266,0.87,0.257
+SYN00338,synthetic,Save 30% when you order before midnight.,58812,1679,0.02855,0.263,0.261,0.172,0.877
+SYN00339,synthetic,Upgrade your everyday routine today.,28343,530,0.0187,0.432,0.612,0.219,0.217
+SYN00340,synthetic,"Proven results, guaranteed satisfaction.",37220,1179,0.03168,0.55,0.318,0.512,0.391
+SYN00341,synthetic,Exclusive deal: get yours now.,20067,313,0.0156,0.234,0.227,0.648,0.238
+SYN00342,synthetic,Don't miss out -- this offer ends tonight.,65875,1395,0.02118,0.478,0.611,0.758,0.355
+SYN00343,synthetic,Don't miss out -- this offer ends tonight.,43413,2196,0.05058,0.47,0.159,0.745,0.356
+SYN00344,synthetic,"The award-winning choice, rated five stars.",14063,278,0.01977,0.786,0.349,0.522,0.172
+SYN00345,synthetic,"The award-winning choice, rated five stars.",49936,1509,0.03022,0.424,0.669,0.676,0.135
+SYN00346,synthetic,"Proven results, guaranteed satisfaction.",28848,1364,0.04728,0.958,0.497,0.115,0.28
+SYN00347,synthetic,"Proven results, guaranteed satisfaction.",69615,2758,0.03962,0.341,0.887,0.21,0.352
+SYN00348,synthetic,Discover something you'll genuinely love.,23643,827,0.03498,0.302,0.357,0.129,0.589
+SYN00349,synthetic,Save 30% when you order before midnight.,69584,2154,0.03096,0.557,0.363,0.42,0.25
+SYN00350,synthetic,Join thousands of happy customers who already switched.,56735,2330,0.04107,0.695,0.315,0.473,0.326
+SYN00351,synthetic,Upgrade your everyday routine today.,13423,489,0.03643,0.165,0.502,0.175,0.335
+SYN00352,synthetic,Discover something you'll genuinely love.,61468,1947,0.03168,0.218,0.423,0.518,0.388
+SYN00353,synthetic,"Your best results, made easy and fast.",58485,972,0.01662,0.425,0.497,0.346,0.628
+SYN00354,synthetic,Trusted by millions. Try it free.,38112,938,0.02461,0.552,0.228,0.385,0.494
+SYN00355,synthetic,An incredible experience designed for you.,15374,502,0.03265,0.145,0.535,0.486,0.313
+SYN00356,synthetic,"The award-winning choice, rated five stars.",39808,1030,0.02587,0.421,0.566,0.401,0.597
+SYN00357,synthetic,Join thousands of happy customers who already switched.,49863,2636,0.05286,0.745,0.425,0.381,0.134
+SYN00358,synthetic,"Proven results, guaranteed satisfaction.",13166,295,0.02241,0.437,0.263,0.116,0.293
+SYN00359,synthetic,An incredible experience designed for you.,29263,959,0.03277,0.481,0.716,0.155,0.506
+SYN00360,synthetic,"Your best results, made easy and fast.",57040,3189,0.05591,0.904,0.599,0.103,0.471
+SYN00361,synthetic,Upgrade your everyday routine today.,45571,1163,0.02552,0.52,0.513,0.223,0.263
+SYN00362,synthetic,Discover something you'll genuinely love.,79408,2456,0.03093,0.576,0.141,0.624,0.269
+SYN00363,synthetic,Don't miss out -- this offer ends tonight.,19688,700,0.03555,0.713,0.439,0.246,0.136
+SYN00364,synthetic,"Proven results, guaranteed satisfaction.",62899,1028,0.01634,0.538,0.508,0.318,0.333
+SYN00365,synthetic,"Your best results, made easy and fast.",35759,770,0.02153,0.351,0.271,0.474,0.187
+SYN00366,synthetic,Discover something you'll genuinely love.,20179,727,0.03603,0.568,0.268,0.376,0.229
+SYN00367,synthetic,"The award-winning choice, rated five stars.",76239,2168,0.02844,0.461,0.581,0.271,0.368
+SYN00368,synthetic,"The award-winning choice, rated five stars.",50980,3307,0.06487,0.395,0.419,0.469,0.793
+SYN00369,synthetic,Upgrade your everyday routine today.,44228,785,0.01775,0.598,0.249,0.452,0.483
+SYN00370,synthetic,Limited release -- only a few left this week.,25711,340,0.01322,0.058,0.352,0.578,0.417
+SYN00371,synthetic,An incredible experience designed for you.,70871,1896,0.02675,0.436,0.134,0.271,0.083
+SYN00372,synthetic,"The award-winning choice, rated five stars.",5323,202,0.03795,0.453,0.42,0.346,0.326
+SYN00373,synthetic,"Proven results, guaranteed satisfaction.",11865,445,0.03751,0.42,0.873,0.348,0.825
+SYN00374,synthetic,"The award-winning choice, rated five stars.",16846,461,0.02737,0.337,0.441,0.229,0.328
+SYN00375,synthetic,Exclusive deal: get yours now.,53281,1886,0.0354,0.332,0.505,0.048,0.554
+SYN00376,synthetic,Join thousands of happy customers who already switched.,10899,208,0.01908,0.233,0.379,0.473,0.371
+SYN00377,synthetic,Join thousands of happy customers who already switched.,64381,1644,0.02554,0.48,0.208,0.667,0.5
+SYN00378,synthetic,Don't miss out -- this offer ends tonight.,18086,540,0.02986,0.335,0.368,0.426,0.546
+SYN00379,synthetic,An incredible experience designed for you.,55088,1997,0.03625,0.059,0.357,0.364,0.614
+SYN00380,synthetic,Limited release -- only a few left this week.,64261,1073,0.0167,0.628,0.667,0.244,0.043
+SYN00381,synthetic,"Your best results, made easy and fast.",70651,1777,0.02515,0.592,0.27,0.653,0.049
+SYN00382,synthetic,Join thousands of happy customers who already switched.,25548,564,0.02208,0.448,0.608,0.09,0.319
+SYN00383,synthetic,Trusted by millions. Try it free.,8751,352,0.04022,0.291,0.259,0.628,0.691
+SYN00384,synthetic,"Your best results, made easy and fast.",61292,2316,0.03779,0.512,0.514,0.657,0.504
+SYN00385,synthetic,Don't miss out -- this offer ends tonight.,37550,753,0.02005,0.4,0.153,0.36,0.415
+SYN00386,synthetic,Save 30% when you order before midnight.,76062,2647,0.0348,0.198,0.514,0.224,0.267
+SYN00387,synthetic,Save 30% when you order before midnight.,17486,336,0.01922,0.298,0.278,0.521,0.347
+SYN00388,synthetic,Don't miss out -- this offer ends tonight.,47219,820,0.01737,0.192,0.103,0.526,0.166
+SYN00389,synthetic,"The award-winning choice, rated five stars.",12174,241,0.0198,0.339,0.227,0.444,0.906
+SYN00390,synthetic,Trusted by millions. Try it free.,40376,629,0.01558,0.248,0.466,0.098,0.26
+SYN00391,synthetic,Limited release -- only a few left this week.,3079,126,0.04092,0.696,0.445,0.682,0.173
+SYN00392,synthetic,Save 30% when you order before midnight.,60759,1485,0.02444,0.346,0.104,0.32,0.278
+SYN00393,synthetic,Limited release -- only a few left this week.,49576,1856,0.03744,0.098,0.484,0.523,0.631
+SYN00394,synthetic,Limited release -- only a few left this week.,10475,349,0.03332,0.47,0.354,0.069,0.581
+SYN00395,synthetic,Save 30% when you order before midnight.,41459,2692,0.06493,0.534,0.236,0.1,0.683
+SYN00396,synthetic,Discover something you'll genuinely love.,35972,664,0.01846,0.617,0.262,0.141,0.251
+SYN00397,synthetic,Limited release -- only a few left this week.,54870,892,0.01626,0.207,0.459,0.556,0.551
+SYN00398,synthetic,Limited release -- only a few left this week.,41409,854,0.02062,0.43,0.355,0.667,0.364
+SYN00399,synthetic,"Proven results, guaranteed satisfaction.",38341,597,0.01557,0.113,0.241,0.094,0.475
+SYN00400,synthetic,"Your best results, made easy and fast.",66990,831,0.0124,0.071,0.3,0.439,0.129
+SYN00401,synthetic,Trusted by millions. Try it free.,42968,1550,0.03607,0.481,0.238,0.7,0.523
+SYN00402,synthetic,Trusted by millions. Try it free.,65694,3090,0.04704,0.327,0.287,0.057,0.846
+SYN00403,synthetic,Limited release -- only a few left this week.,71171,4252,0.05974,0.78,0.125,0.678,0.247
+SYN00404,synthetic,Don't miss out -- this offer ends tonight.,68316,1465,0.02144,0.24,0.099,0.26,0.135
+SYN00405,synthetic,"Proven results, guaranteed satisfaction.",76577,7522,0.09823,0.426,0.246,0.726,0.912
+SYN00406,synthetic,Discover something you'll genuinely love.,56736,1595,0.02811,0.491,0.54,0.303,0.556
+SYN00407,synthetic,"Proven results, guaranteed satisfaction.",46255,713,0.01541,0.234,0.38,0.429,0.529
+SYN00408,synthetic,Exclusive deal: get yours now.,43852,2318,0.05286,0.432,0.479,0.33,0.733
+SYN00409,synthetic,"Your best results, made easy and fast.",18746,283,0.0151,0.284,0.367,0.214,0.661
+SYN00410,synthetic,Limited release -- only a few left this week.,66746,1279,0.01916,0.56,0.452,0.215,0.271
+SYN00411,synthetic,Don't miss out -- this offer ends tonight.,56382,1461,0.02591,0.389,0.244,0.328,0.157
+SYN00412,synthetic,"Proven results, guaranteed satisfaction.",70242,1969,0.02803,0.231,0.244,0.467,0.655
+SYN00413,synthetic,"Your best results, made easy and fast.",57014,1336,0.02343,0.292,0.367,0.638,0.228
+SYN00414,synthetic,An incredible experience designed for you.,39997,613,0.01533,0.244,0.665,0.311,0.204
+SYN00415,synthetic,"Your best results, made easy and fast.",25733,863,0.03354,0.231,0.197,0.66,0.737
+SYN00416,synthetic,Discover something you'll genuinely love.,78895,3145,0.03986,0.385,0.273,0.725,0.203
+SYN00417,synthetic,Exclusive deal: get yours now.,59488,1610,0.02706,0.349,0.289,0.462,0.342
+SYN00418,synthetic,Limited release -- only a few left this week.,70360,1855,0.02636,0.231,0.806,0.395,0.727
+SYN00419,synthetic,Discover something you'll genuinely love.,48045,735,0.0153,0.501,0.404,0.511,0.091
+SYN00420,synthetic,Limited release -- only a few left this week.,42306,993,0.02347,0.378,0.383,0.155,0.776
+SYN00421,synthetic,Don't miss out -- this offer ends tonight.,5641,117,0.02074,0.303,0.285,0.177,0.091
+SYN00422,synthetic,Exclusive deal: get yours now.,8335,204,0.02448,0.306,0.015,0.317,0.287
+SYN00423,synthetic,Exclusive deal: get yours now.,57420,872,0.01519,0.24,0.588,0.272,0.139
+SYN00424,synthetic,Join thousands of happy customers who already switched.,20285,279,0.01375,0.699,0.143,0.504,0.347
+SYN00425,synthetic,Trusted by millions. Try it free.,9314,370,0.03973,0.741,0.343,0.356,0.398
+SYN00426,synthetic,"Proven results, guaranteed satisfaction.",62782,1357,0.02161,0.64,0.143,0.792,0.164
+SYN00427,synthetic,"Proven results, guaranteed satisfaction.",50780,2030,0.03998,0.781,0.589,0.146,0.383
+SYN00428,synthetic,"Your best results, made easy and fast.",11558,206,0.01782,0.346,0.506,0.417,0.181
+SYN00429,synthetic,Join thousands of happy customers who already switched.,41489,737,0.01776,0.512,0.103,0.304,0.412
+SYN00430,synthetic,Discover something you'll genuinely love.,39174,868,0.02216,0.057,0.217,0.638,0.197
+SYN00431,synthetic,An incredible experience designed for you.,3285,236,0.07184,0.487,0.402,0.797,0.427
+SYN00432,synthetic,Don't miss out -- this offer ends tonight.,49573,1245,0.02511,0.396,0.031,0.197,0.146
+SYN00433,synthetic,"The award-winning choice, rated five stars.",33544,604,0.01801,0.085,0.046,0.083,0.382
+SYN00434,synthetic,Join thousands of happy customers who already switched.,70632,1737,0.02459,0.334,0.302,0.308,0.181
+SYN00435,synthetic,Don't miss out -- this offer ends tonight.,11910,204,0.01713,0.808,0.538,0.425,0.278
+SYN00436,synthetic,Discover something you'll genuinely love.,68227,1021,0.01496,0.21,0.317,0.199,0.454
+SYN00437,synthetic,Discover something you'll genuinely love.,3494,33,0.00944,0.636,0.613,0.302,0.178
+SYN00438,synthetic,Exclusive deal: get yours now.,61849,2226,0.03599,0.213,0.388,0.306,0.05
+SYN00439,synthetic,Upgrade your everyday routine today.,63259,3183,0.05032,0.705,0.314,0.636,0.042
+SYN00440,synthetic,Join thousands of happy customers who already switched.,34392,1058,0.03076,0.398,0.576,0.134,0.415
+SYN00441,synthetic,Exclusive deal: get yours now.,24602,688,0.02797,0.257,0.17,0.234,0.584
+SYN00442,synthetic,Exclusive deal: get yours now.,13953,353,0.0253,0.796,0.512,0.366,0.681
+SYN00443,synthetic,Save 30% when you order before midnight.,29175,804,0.02756,0.212,0.593,0.436,0.602
+SYN00444,synthetic,Exclusive deal: get yours now.,54562,3043,0.05577,0.407,0.309,0.633,0.26
+SYN00445,synthetic,Join thousands of happy customers who already switched.,58815,2446,0.04159,0.607,0.09,0.347,0.888
+SYN00446,synthetic,Upgrade your everyday routine today.,16959,336,0.01981,0.118,0.024,0.302,0.685
+SYN00447,synthetic,Save 30% when you order before midnight.,3857,37,0.00959,0.068,0.236,0.133,0.682
+SYN00448,synthetic,"Your best results, made easy and fast.",46221,1898,0.04106,0.429,0.283,0.396,0.224
+SYN00449,synthetic,Upgrade your everyday routine today.,47720,1308,0.02741,0.345,0.353,0.28,0.553
+SYN00450,synthetic,Join thousands of happy customers who already switched.,78512,928,0.01182,0.251,0.364,0.197,0.42
+SYN00451,synthetic,An incredible experience designed for you.,61622,1142,0.01853,0.665,0.278,0.266,0.232
+SYN00452,synthetic,Don't miss out -- this offer ends tonight.,45373,986,0.02173,0.746,0.216,0.207,0.752
+SYN00453,synthetic,Don't miss out -- this offer ends tonight.,48571,868,0.01787,0.456,0.157,0.202,0.157
+SYN00454,synthetic,Exclusive deal: get yours now.,52707,1275,0.02419,0.585,0.119,0.247,0.169
+SYN00455,synthetic,Join thousands of happy customers who already switched.,37783,925,0.02448,0.426,0.434,0.291,0.47
+SYN00456,synthetic,"Proven results, guaranteed satisfaction.",55173,1979,0.03587,0.538,0.583,0.239,0.259
+SYN00457,synthetic,"The award-winning choice, rated five stars.",18049,443,0.02454,0.339,0.175,0.574,0.239
+SYN00458,synthetic,Exclusive deal: get yours now.,66939,2786,0.04162,0.44,0.526,0.391,0.256
+SYN00459,synthetic,An incredible experience designed for you.,69349,1473,0.02124,0.219,0.276,0.143,0.57
+SYN00460,synthetic,Join thousands of happy customers who already switched.,36493,4031,0.11046,0.42,0.54,0.19,0.804
+SYN00461,synthetic,Join thousands of happy customers who already switched.,38163,730,0.01913,0.133,0.585,0.199,0.455
+SYN00462,synthetic,"Your best results, made easy and fast.",41308,1082,0.02619,0.336,0.398,0.96,0.447
+SYN00463,synthetic,"Your best results, made easy and fast.",65937,907,0.01376,0.162,0.142,0.306,0.404
+SYN00464,synthetic,Join thousands of happy customers who already switched.,16549,347,0.02097,0.257,0.131,0.389,0.39
+SYN00465,synthetic,Save 30% when you order before midnight.,29297,464,0.01584,0.535,0.351,0.07,0.581
+SYN00466,synthetic,"Proven results, guaranteed satisfaction.",50330,1198,0.0238,0.468,0.177,0.29,0.101
+SYN00467,synthetic,An incredible experience designed for you.,56392,928,0.01646,0.475,0.588,0.72,0.318
+SYN00468,synthetic,Join thousands of happy customers who already switched.,25773,449,0.01742,0.035,0.269,0.241,0.165
+SYN00469,synthetic,Trusted by millions. Try it free.,12022,186,0.01547,0.054,0.438,0.66,0.361
+SYN00470,synthetic,Limited release -- only a few left this week.,42087,945,0.02245,0.366,0.438,0.215,0.45
+SYN00471,synthetic,Discover something you'll genuinely love.,52168,1939,0.03717,0.346,0.71,0.378,0.412
+SYN00472,synthetic,Upgrade your everyday routine today.,62024,5846,0.09425,0.644,0.251,0.449,0.754
+SYN00473,synthetic,Don't miss out -- this offer ends tonight.,3228,55,0.01704,0.227,0.384,0.256,0.595
+SYN00474,synthetic,Join thousands of happy customers who already switched.,4352,70,0.01608,0.115,0.437,0.364,0.053
+SYN00475,synthetic,Join thousands of happy customers who already switched.,32760,777,0.02372,0.559,0.3,0.586,0.463
+SYN00476,synthetic,Join thousands of happy customers who already switched.,46421,1182,0.02546,0.351,0.302,0.658,0.676
+SYN00477,synthetic,Join thousands of happy customers who already switched.,3274,109,0.03329,0.944,0.214,0.711,0.524
+SYN00478,synthetic,Upgrade your everyday routine today.,16355,950,0.05809,0.786,0.479,0.322,0.705
+SYN00479,synthetic,"Your best results, made easy and fast.",35255,920,0.0261,0.405,0.47,0.544,0.495
+SYN00480,synthetic,"Proven results, guaranteed satisfaction.",24512,1782,0.0727,0.294,0.464,0.253,0.646
+SYN00481,synthetic,Save 30% when you order before midnight.,57711,2929,0.05075,0.576,0.763,0.742,0.457
+SYN00482,synthetic,An incredible experience designed for you.,5672,109,0.01922,0.388,0.458,0.221,0.431
+SYN00483,synthetic,"Your best results, made easy and fast.",71402,1618,0.02266,0.268,0.183,0.526,0.478
+SYN00484,synthetic,Save 30% when you order before midnight.,16048,353,0.022,0.797,0.336,0.293,0.273
+SYN00485,synthetic,Upgrade your everyday routine today.,36929,900,0.02437,0.15,0.133,0.245,0.215
+SYN00486,synthetic,An incredible experience designed for you.,78970,1164,0.01474,0.653,0.26,0.148,0.437
+SYN00487,synthetic,Upgrade your everyday routine today.,54025,1119,0.02071,0.42,0.732,0.583,0.279
+SYN00488,synthetic,Discover something you'll genuinely love.,79886,1667,0.02087,0.231,0.486,0.151,0.626
+SYN00489,synthetic,Upgrade your everyday routine today.,4514,219,0.04852,0.296,0.228,0.588,0.76
+SYN00490,synthetic,An incredible experience designed for you.,58428,2962,0.05069,0.485,0.777,0.591,0.184
+SYN00491,synthetic,Exclusive deal: get yours now.,8828,340,0.03851,0.571,0.134,0.434,0.069
+SYN00492,synthetic,Save 30% when you order before midnight.,50112,1896,0.03784,0.545,0.369,0.754,0.171
+SYN00493,synthetic,Save 30% when you order before midnight.,28098,823,0.02929,0.356,0.626,0.639,0.316
+SYN00494,synthetic,"Your best results, made easy and fast.",62829,2534,0.04033,0.314,0.601,0.091,0.702
+SYN00495,synthetic,"Your best results, made easy and fast.",12575,270,0.02147,0.452,0.171,0.439,0.644
+SYN00496,synthetic,"The award-winning choice, rated five stars.",72034,698,0.00969,0.111,0.206,0.599,0.156
+SYN00497,synthetic,"The award-winning choice, rated five stars.",40018,1399,0.03496,0.492,0.268,0.313,0.531
+SYN00498,synthetic,Join thousands of happy customers who already switched.,42986,614,0.01428,0.16,0.293,0.356,0.296
+SYN00499,synthetic,Save 30% when you order before midnight.,46975,1228,0.02614,0.234,0.512,0.468,0.316
+SYN00500,synthetic,Don't miss out -- this offer ends tonight.,5716,200,0.03499,0.744,0.218,0.359,0.287
+SYN00501,synthetic,Trusted by millions. Try it free.,26901,686,0.0255,0.279,0.303,0.269,0.406
+SYN00502,synthetic,An incredible experience designed for you.,57623,2115,0.0367,0.36,0.24,0.149,0.484
+SYN00503,synthetic,"Your best results, made easy and fast.",76983,3247,0.04218,0.213,0.445,0.784,0.385
+SYN00504,synthetic,An incredible experience designed for you.,78814,1952,0.02477,0.248,0.306,0.343,0.316
+SYN00505,synthetic,Don't miss out -- this offer ends tonight.,44249,1582,0.03575,0.591,0.307,0.484,0.848
+SYN00506,synthetic,"The award-winning choice, rated five stars.",22870,823,0.03599,0.367,0.682,0.277,0.712
+SYN00507,synthetic,"The award-winning choice, rated five stars.",39773,924,0.02323,0.229,0.099,0.559,0.64
+SYN00508,synthetic,"Your best results, made easy and fast.",38686,1120,0.02895,0.51,0.188,0.367,0.641
+SYN00509,synthetic,Save 30% when you order before midnight.,33587,3128,0.09313,0.625,0.423,0.634,0.379
+SYN00510,synthetic,An incredible experience designed for you.,30818,739,0.02398,0.161,0.199,0.446,0.293
+SYN00511,synthetic,Join thousands of happy customers who already switched.,69861,2289,0.03277,0.347,0.307,0.076,0.719
+SYN00512,synthetic,Upgrade your everyday routine today.,33065,939,0.0284,0.76,0.473,0.214,0.589
+SYN00513,synthetic,Discover something you'll genuinely love.,5252,186,0.03542,0.381,0.53,0.42,0.082
+SYN00514,synthetic,Upgrade your everyday routine today.,58547,1518,0.02593,0.115,0.336,0.353,0.198
+SYN00515,synthetic,Join thousands of happy customers who already switched.,54210,2516,0.04641,0.221,0.463,0.599,0.711
+SYN00516,synthetic,"The award-winning choice, rated five stars.",32137,1051,0.0327,0.533,0.244,0.594,0.312
+SYN00517,synthetic,Upgrade your everyday routine today.,51509,2093,0.04063,0.066,0.345,0.442,0.643
+SYN00518,synthetic,Join thousands of happy customers who already switched.,75463,3884,0.05147,0.776,0.428,0.294,0.367
+SYN00519,synthetic,"Your best results, made easy and fast.",74180,2623,0.03536,0.654,0.471,0.124,0.584
+SYN00520,synthetic,"The award-winning choice, rated five stars.",63803,1518,0.02379,0.572,0.414,0.214,0.266
+SYN00521,synthetic,"Proven results, guaranteed satisfaction.",47917,1608,0.03356,0.246,0.07,0.274,0.511
+SYN00522,synthetic,Limited release -- only a few left this week.,5128,86,0.01677,0.395,0.455,0.34,0.107
+SYN00523,synthetic,Trusted by millions. Try it free.,42440,1231,0.02901,0.496,0.779,0.369,0.598
+SYN00524,synthetic,Don't miss out -- this offer ends tonight.,66028,1820,0.02756,0.288,0.518,0.194,0.549
+SYN00525,synthetic,Don't miss out -- this offer ends tonight.,68056,1308,0.01922,0.729,0.161,0.399,0.657
+SYN00526,synthetic,Trusted by millions. Try it free.,62510,1870,0.02992,0.333,0.672,0.124,0.194
+SYN00527,synthetic,Upgrade your everyday routine today.,78960,1648,0.02087,0.462,0.474,0.183,0.522
+SYN00528,synthetic,An incredible experience designed for you.,42770,971,0.0227,0.348,0.604,0.352,0.355
+SYN00529,synthetic,Save 30% when you order before midnight.,11447,197,0.01721,0.239,0.25,0.223,0.226
+SYN00530,synthetic,Don't miss out -- this offer ends tonight.,41254,1348,0.03268,0.654,0.699,0.132,0.48
+SYN00531,synthetic,Save 30% when you order before midnight.,27540,745,0.02705,0.462,0.407,0.723,0.213
+SYN00532,synthetic,"The award-winning choice, rated five stars.",67335,1753,0.02603,0.212,0.465,0.484,0.375
+SYN00533,synthetic,Trusted by millions. Try it free.,62839,1223,0.01946,0.457,0.207,0.265,0.058
+SYN00534,synthetic,Exclusive deal: get yours now.,35708,1274,0.03568,0.831,0.311,0.503,0.623
+SYN00535,synthetic,"Proven results, guaranteed satisfaction.",32894,748,0.02274,0.254,0.662,0.524,0.362
+SYN00536,synthetic,Trusted by millions. Try it free.,15278,713,0.04667,0.512,0.611,0.397,0.319
+SYN00537,synthetic,"Your best results, made easy and fast.",6323,84,0.01328,0.378,0.43,0.707,0.464
+SYN00538,synthetic,"Your best results, made easy and fast.",27093,792,0.02923,0.587,0.372,0.194,0.622
+SYN00539,synthetic,Exclusive deal: get yours now.,21558,392,0.01818,0.512,0.004,0.329,0.138
+SYN00540,synthetic,Join thousands of happy customers who already switched.,23420,814,0.03476,0.37,0.232,0.624,0.528
+SYN00541,synthetic,Exclusive deal: get yours now.,79882,931,0.01165,0.287,0.306,0.254,0.211
+SYN00542,synthetic,Don't miss out -- this offer ends tonight.,55441,1400,0.02525,0.385,0.278,0.703,0.443
+SYN00543,synthetic,Don't miss out -- this offer ends tonight.,45457,1234,0.02715,0.896,0.3,0.335,0.232
+SYN00544,synthetic,Don't miss out -- this offer ends tonight.,16773,494,0.02945,0.168,0.268,0.334,0.098
+SYN00545,synthetic,An incredible experience designed for you.,67768,1923,0.02838,0.675,0.109,0.251,0.218
+SYN00546,synthetic,Trusted by millions. Try it free.,52647,924,0.01755,0.444,0.673,0.317,0.227
+SYN00547,synthetic,Limited release -- only a few left this week.,42640,955,0.0224,0.428,0.334,0.196,0.519
+SYN00548,synthetic,An incredible experience designed for you.,38879,1330,0.03421,0.269,0.231,0.516,0.274
+SYN00549,synthetic,Trusted by millions. Try it free.,45547,900,0.01976,0.232,0.319,0.578,0.61
+SYN00550,synthetic,"Proven results, guaranteed satisfaction.",67653,1541,0.02278,0.351,0.263,0.291,0.339
+SYN00551,synthetic,Exclusive deal: get yours now.,58449,1438,0.0246,0.225,0.136,0.739,0.29
+SYN00552,synthetic,Exclusive deal: get yours now.,40344,990,0.02454,0.254,0.129,0.504,0.675
+SYN00553,synthetic,Upgrade your everyday routine today.,54407,3038,0.05584,0.589,0.153,0.061,0.121
+SYN00554,synthetic,Don't miss out -- this offer ends tonight.,74594,1490,0.01997,0.188,0.273,0.351,0.415
+SYN00555,synthetic,Exclusive deal: get yours now.,28120,1126,0.04004,0.69,0.347,0.705,0.2
+SYN00556,synthetic,Exclusive deal: get yours now.,72336,1236,0.01709,0.22,0.439,0.26,0.417
+SYN00557,synthetic,"Your best results, made easy and fast.",49722,1458,0.02932,0.126,0.328,0.089,0.605
+SYN00558,synthetic,"Proven results, guaranteed satisfaction.",17267,604,0.03498,0.11,0.266,0.669,0.422
+SYN00559,synthetic,"Proven results, guaranteed satisfaction.",77455,1370,0.01769,0.118,0.274,0.375,0.357
+SYN00560,synthetic,Upgrade your everyday routine today.,55834,1065,0.01907,0.143,0.334,0.412,0.116
+SYN00561,synthetic,"Proven results, guaranteed satisfaction.",32716,589,0.018,0.511,0.229,0.121,0.392
+SYN00562,synthetic,Don't miss out -- this offer ends tonight.,19526,540,0.02766,0.906,0.313,0.501,0.618
+SYN00563,synthetic,"Your best results, made easy and fast.",73515,2783,0.03786,0.344,0.557,0.283,0.336
+SYN00564,synthetic,Join thousands of happy customers who already switched.,66394,1811,0.02728,0.8,0.425,0.331,0.376
+SYN00565,synthetic,Exclusive deal: get yours now.,6427,74,0.01151,0.371,0.425,0.809,0.366
+SYN00566,synthetic,Save 30% when you order before midnight.,51950,3538,0.0681,0.63,0.252,0.281,0.68
+SYN00567,synthetic,Discover something you'll genuinely love.,11825,180,0.01522,0.168,0.443,0.438,0.112
+SYN00568,synthetic,Save 30% when you order before midnight.,25647,819,0.03193,0.504,0.611,0.47,0.572
+SYN00569,synthetic,Exclusive deal: get yours now.,46737,3746,0.08015,0.374,0.728,0.682,0.734
+SYN00570,synthetic,Discover something you'll genuinely love.,22182,440,0.01984,0.31,0.473,0.168,0.317
+SYN00571,synthetic,Limited release -- only a few left this week.,42461,945,0.02226,0.279,0.225,0.325,0.363
+SYN00572,synthetic,Upgrade your everyday routine today.,36077,510,0.01414,0.36,0.451,0.091,0.367
+SYN00573,synthetic,Exclusive deal: get yours now.,47775,634,0.01327,0.232,0.364,0.314,0.522
+SYN00574,synthetic,Join thousands of happy customers who already switched.,64655,1974,0.03053,0.481,0.814,0.351,0.401
+SYN00575,synthetic,An incredible experience designed for you.,14949,584,0.03907,0.537,0.449,0.436,0.55
+SYN00576,synthetic,Upgrade your everyday routine today.,64304,1843,0.02866,0.138,0.194,0.377,0.559
+SYN00577,synthetic,"Proven results, guaranteed satisfaction.",20122,387,0.01923,0.312,0.661,0.365,0.174
+SYN00578,synthetic,Don't miss out -- this offer ends tonight.,5569,144,0.02586,0.179,0.492,0.609,0.138
+SYN00579,synthetic,Join thousands of happy customers who already switched.,37374,545,0.01458,0.567,0.016,0.267,0.647
+SYN00580,synthetic,"Proven results, guaranteed satisfaction.",26276,918,0.03494,0.511,0.48,0.113,0.51
+SYN00581,synthetic,Save 30% when you order before midnight.,17208,446,0.02592,0.638,0.467,0.234,0.023
+SYN00582,synthetic,Exclusive deal: get yours now.,35559,3200,0.08999,0.894,0.759,0.404,0.425
+SYN00583,synthetic,Don't miss out -- this offer ends tonight.,69901,1565,0.02239,0.553,0.167,0.239,0.192
+SYN00584,synthetic,Discover something you'll genuinely love.,48089,789,0.01641,0.535,0.349,0.377,0.092
+SYN00585,synthetic,Upgrade your everyday routine today.,59043,1546,0.02618,0.582,0.26,0.3,0.308
+SYN00586,synthetic,Save 30% when you order before midnight.,14513,395,0.02722,0.265,0.129,0.646,0.762
+SYN00587,synthetic,Upgrade your everyday routine today.,8838,282,0.03191,0.685,0.262,0.377,0.118
+SYN00588,synthetic,"Proven results, guaranteed satisfaction.",28816,968,0.03359,0.604,0.582,0.494,0.307
+SYN00589,synthetic,Limited release -- only a few left this week.,62630,1022,0.01632,0.382,0.374,0.673,0.258
+SYN00590,synthetic,Limited release -- only a few left this week.,71190,1122,0.01576,0.417,0.735,0.165,0.438
+SYN00591,synthetic,Limited release -- only a few left this week.,10834,242,0.02234,0.468,0.113,0.355,0.07
+SYN00592,synthetic,Exclusive deal: get yours now.,39694,2107,0.05308,0.607,0.579,0.409,0.309
+SYN00593,synthetic,Exclusive deal: get yours now.,33531,1484,0.04426,0.771,0.725,0.391,0.578
+SYN00594,synthetic,Trusted by millions. Try it free.,60299,2665,0.0442,0.861,0.247,0.448,0.304
+SYN00595,synthetic,Upgrade your everyday routine today.,18823,768,0.0408,0.175,0.713,0.117,0.649
+SYN00596,synthetic,"Your best results, made easy and fast.",40327,1080,0.02678,0.399,0.311,0.252,0.409
+SYN00597,synthetic,Exclusive deal: get yours now.,68435,1391,0.02033,0.268,0.512,0.502,0.343
+SYN00598,synthetic,Limited release -- only a few left this week.,38803,851,0.02193,0.197,0.598,0.166,0.215
+SYN00599,synthetic,An incredible experience designed for you.,63158,3069,0.04859,0.063,0.46,0.586,0.648
+SYN00600,synthetic,Upgrade your everyday routine today.,50888,1471,0.02891,0.056,0.134,0.567,0.465

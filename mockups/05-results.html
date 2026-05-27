@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AdProof — Forecast: Spring glow drop · v3</title>
+<link rel="stylesheet" href="shared.css">
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>
+.result-head { background: var(--bg); border-bottom: 1px solid var(--border);
+                padding: 20px 40px; display: flex; align-items: center; gap: 16px; }
+.result-head .crumb { font-size: 12.5px; color: var(--text-muted); margin-bottom: 4px; }
+.result-head .crumb a { color: var(--text-muted); }
+.result-head .t-title { font-family: 'Instrument Serif', serif; font-style: italic;
+                         font-size: 32px; letter-spacing: -0.022em; line-height: 1.05; }
+.result-head .t-title .accent { background: var(--gradient-sunset);
+                                 -webkit-background-clip: text; background-clip: text;
+                                 color: transparent; }
+.result-head .actions { margin-left: auto; display: flex; gap: 8px; }
+
+.layout { display: grid; grid-template-columns: 1fr 320px; gap: 28px;
+           padding: 28px 40px 64px; max-width: 1400px; margin: 0 auto; }
+
+.hero { background: var(--gradient-fresh); color: white; position: relative;
+        border-radius: var(--radius-md); padding: 32px 36px; margin-bottom: 22px;
+        display: flex; align-items: center; gap: 32px; overflow: hidden;
+        box-shadow: 0 16px 40px rgba(22,163,74,0.25); }
+.hero::before { content: ''; position: absolute; inset: 0; background: var(--mesh-bg);
+                 opacity: 0.5; mix-blend-mode: overlay; pointer-events: none; }
+.hero::after { content: ''; position: absolute; right: -80px; top: -100px;
+                width: 320px; height: 320px; border-radius: 50%;
+                background: radial-gradient(circle, rgba(255,255,255,0.35), transparent 65%);
+                pointer-events: none; }
+.hero .body { position: relative; z-index: 1; flex: 1; }
+.hero .label { font-size: 11.5px; opacity: 0.92; letter-spacing: 0.14em;
+                text-transform: uppercase; font-weight: 700; }
+.hero .value { font-family: 'Instrument Serif', serif; font-style: italic;
+                font-size: 96px; font-weight: 400; letter-spacing: -0.035em;
+                line-height: 0.95; margin-top: 6px; }
+.hero .sub { font-size: 15px; margin-top: 12px; opacity: 0.95; max-width: 440px;
+              line-height: 1.45; }
+.hero .roi-pill { display: inline-flex; align-items: center; gap: 8px;
+                   padding: 6px 14px; border-radius: 999px;
+                   background: rgba(255,255,255,0.22); font-size: 13px; font-weight: 600;
+                   backdrop-filter: blur(8px); margin-top: 14px; }
+.hero .gauge { position: relative; z-index: 1; }
+.grade { width: 144px; height: 144px; border-radius: 50%;
+          background: rgba(255,255,255,0.18); backdrop-filter: blur(8px);
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          border: 2px solid rgba(255,255,255,0.45); }
+.grade .letter { font-family: 'Instrument Serif', serif; font-style: italic;
+                  font-size: 78px; line-height: 0.85; margin-top: 6px; }
+.grade .lbl { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+               opacity: 0.88; font-weight: 700; }
+
+.context-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
+.ctx-card { background: var(--surface); border: 1px solid var(--border);
+            border-radius: 999px; padding: 8px 16px; font-size: 13px;
+            display: flex; align-items: center; gap: 10px; }
+.ctx-card .ctx-label { color: var(--text-muted); font-size: 11px; font-weight: 700;
+                        text-transform: uppercase; letter-spacing: 0.06em; }
+
+.metric-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+              margin-bottom: 22px; }
+.metric-card { background: var(--surface); border: 1px solid var(--border);
+                border-radius: var(--radius); padding: 18px 20px; position: relative;
+                overflow: hidden; }
+.metric-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+                        width: 4px; background: var(--gradient-sunset); }
+.metric-card.cnv::before { background: linear-gradient(180deg, #E0218A, #7C3AED); }
+.metric-card.rev::before { background: linear-gradient(180deg, #BEF264, #16A34A); }
+.metric-card.aov::before { background: linear-gradient(180deg, #38BDF8, #7C3AED); }
+.metric-card .label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase;
+                       letter-spacing: 0.08em; font-weight: 700; }
+.metric-card .value { font-family: 'Instrument Serif', serif; font-style: italic;
+                       font-size: 32px; line-height: 1; margin-top: 6px;
+                       letter-spacing: -0.022em; }
+.metric-card .range { font-size: 12px; color: var(--text-muted); margin-top: 6px;
+                       font-family: 'JetBrains Mono', monospace; }
+
+.tabs-bar { display: flex; gap: 6px; background: var(--bg-deep); padding: 4px;
+             border-radius: 12px; margin-bottom: 16px; width: max-content; }
+.tabs-bar .tab { padding: 9px 16px; border-radius: 8px; font-size: 13px;
+                  color: var(--text-muted); font-weight: 500; cursor: pointer; }
+.tabs-bar .tab.active { background: var(--surface); color: var(--text);
+                         box-shadow: var(--shadow-sm); font-weight: 600; }
+
+.chart-card { background: var(--surface); border: 1px solid var(--border);
+              border-radius: var(--radius); padding: 16px 18px; height: 320px; }
+.chart-card h3 { font-size: 13.5px; font-weight: 600; margin-bottom: 8px;
+                  color: var(--text); }
+
+.narrative h2 { font-family: 'Instrument Serif', serif; font-style: italic;
+                 font-size: 28px; font-weight: 400; margin: 28px 0 6px;
+                 letter-spacing: -0.022em; }
+.narrative .lead { color: var(--text-muted); font-size: 14px; margin-bottom: 16px; }
+.narrative h3 { font-size: 13px; font-weight: 700; text-transform: uppercase;
+                 letter-spacing: 0.08em; color: var(--text-muted);
+                 margin-top: 22px; margin-bottom: 10px; }
+.narrative ul { padding-left: 0; list-style: none;
+                 display: flex; flex-direction: column; gap: 8px; }
+.narrative li { background: var(--surface); border: 1px solid var(--border);
+                 border-radius: var(--radius-sm); padding: 12px 14px 12px 44px;
+                 font-size: 14px; line-height: 1.5; position: relative; }
+.narrative li::before { content: '→'; position: absolute; left: 16px; top: 10px;
+                         color: var(--coral); font-weight: 700; font-size: 18px; }
+.narrative li.good::before { content: '✓'; color: var(--success); }
+.narrative li.warn::before { content: '⚠'; color: var(--warning); }
+
+.side-panel { background: var(--surface); border: 1px solid var(--border);
+              border-radius: var(--radius); padding: 22px;
+              align-self: flex-start; position: sticky; top: 24px;
+              box-shadow: var(--shadow-sm); }
+.side-panel h3 { font-family: 'Bricolage Grotesque', sans-serif;
+                  font-size: 15px; font-weight: 700; margin-bottom: 16px;
+                  display: flex; align-items: center; gap: 8px;
+                  letter-spacing: -0.01em; }
+.side-panel .field { margin-bottom: 14px; }
+.side-panel .label { font-size: 12px; font-weight: 600; }
+.side-panel .help { font-size: 11.5px; }
+.side-panel input, .side-panel select { font-size: 13px; padding: 8px 12px; }
+
+.platform-icon { width: 26px; height: 26px; border-radius: 7px;
+                  display: inline-flex; align-items: center; justify-content: center;
+                  color: white; font-size: 11.5px; font-weight: 700;
+                  font-family: 'Bricolage Grotesque', sans-serif; }
+.icon-meta-ig { background: linear-gradient(135deg, #F59E0B, #EC4899, #8B5CF6); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">A</div><div class="brand-name">AdProof</div></div>
+    <div class="workspace"><div class="ws-mark">L</div><div class="ws-name">Lumen Skincare</div><div class="caret">▾</div></div>
+    <div class="nav">
+      <a class="nav-item" href="03-dashboard.html"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+      <a class="nav-item" href="04-new-analysis.html"><svg class="icon" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>New analysis</a>
+      <a class="nav-item active"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>Campaigns <span class="badge">14</span></a>
+      <a class="nav-item"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Audiences <span class="badge">3</span></a>
+      <a class="nav-item"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Creatives</a>
+      <div class="nav-section">Workspace</div>
+      <a class="nav-item"><svg class="icon" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l8-4 8 4v14"/></svg>Company profile</a>
+      <a class="nav-item"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>Settings</a>
+    </div>
+    <div class="sidebar-footer"><div class="avatar">DS</div><div class="user-info"><div class="name">Debs Singh</div><div class="email">debs@lumen.co</div></div></div>
+  </aside>
+
+  <div class="main">
+    <div class="result-head">
+      <div>
+        <div class="crumb"><a href="03-dashboard.html">Dashboard</a> · <a href="#">Campaigns</a> · Spring glow drop · v3</div>
+        <div class="t-title">Spring glow <span class="accent">drop · v3</span></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary">⎘ Duplicate</button>
+        <button class="btn btn-secondary">⇪ Export PDF</button>
+        <button class="btn btn-secondary">Share</button>
+        <button class="btn btn-primary">Run another version</button>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div>
+
+        <!-- HERO VERDICT -->
+        <div class="hero">
+          <div class="body">
+            <div class="label">Strong forecast</div>
+            <div class="value">5.21× ROAS</div>
+            <div class="sub">Median return <strong>+421%</strong>. p10–p90 band <strong>2.10× → 9.83×</strong>. This creative is likely to beat your Reels benchmark — by a lot.</div>
+            <div class="roi-pill">↑ 1.37× above the Instagram Reels CTR benchmark of 1.40%</div>
+          </div>
+          <div class="gauge">
+            <div class="grade">
+              <div class="lbl">Verdict</div>
+              <div class="letter">A</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONTEXT -->
+        <div class="context-row">
+          <div class="ctx-card"><span class="platform-icon icon-meta-ig">IG</span><span class="ctx-label">Platform</span>Meta · IG Reels</div>
+          <div class="ctx-card"><span class="ctx-label">Audience</span>Millennials · women — 237 personas</div>
+          <div class="ctx-card"><span class="ctx-label">Budget × days</span>$15,000 over 14 days</div>
+          <div class="ctx-card"><span class="ctx-label">Impressions</span>1.88M</div>
+        </div>
+
+        <!-- METRIC TILES -->
+        <div class="metric-row">
+          <div class="metric-card">
+            <div class="label">Predicted clicks</div>
+            <div class="value">22,810</div>
+            <div class="range">p10 17.1k · p90 30.3k</div>
+          </div>
+          <div class="metric-card cnv">
+            <div class="label">Conversions</div>
+            <div class="value">861</div>
+            <div class="range">p10 430 · p90 1,720</div>
+          </div>
+          <div class="metric-card rev">
+            <div class="label">Revenue</div>
+            <div class="value">$65,200</div>
+            <div class="range">p10 $40k · p90 $130k</div>
+          </div>
+          <div class="metric-card aov">
+            <div class="label">Mean AOV</div>
+            <div class="value">$75</div>
+            <div class="range">audience mean</div>
+          </div>
+        </div>
+
+        <!-- CHART TABS -->
+        <div class="tabs-bar">
+          <div class="tab active">Daily curve</div>
+          <div class="tab">ROI distribution</div>
+          <div class="tab">Click drivers</div>
+          <div class="tab">Sensitivity · budget</div>
+          <div class="tab">Sensitivity · reach</div>
+          <div class="tab">Visual scores</div>
+        </div>
+        <div class="grid-2">
+          <div class="chart-card"><h3>Daily clicks (p10–p90 envelope)</h3><div id="chart-daily" style="height:260px"></div></div>
+          <div class="chart-card"><h3>Click-logit drivers</h3><div id="chart-drivers" style="height:260px"></div></div>
+        </div>
+        <div class="grid-2" style="margin-top:14px">
+          <div class="chart-card"><h3>ROI distribution across 20 simulations</h3><div id="chart-roi" style="height:260px"></div></div>
+          <div class="chart-card"><h3>Visual scores (0–1)</h3><div id="chart-visual" style="height:260px"></div></div>
+        </div>
+
+        <!-- NARRATIVE -->
+        <div class="narrative">
+          <h2>Why this ad performs</h2>
+          <p class="lead">Generated from the per-agent logit decomposition + Reels benchmark comparison. Numbers in brackets are the mean logit contribution averaged across the simulated audience.</p>
+
+          <h3>What's working</h3>
+          <ul>
+            <li class="good">Psychology cues in the copy (+1.47) — emotional appeal, scarcity, social proof and relevance all firing on the same creative.</li>
+            <li class="good">Visual scores (+1.04) — strong attention capture, clean focal point, low edge clutter.</li>
+            <li class="good">Audience match (+0.28) — beauty category and Instagram channel align with the millennial-women segment.</li>
+          </ul>
+
+          <h3>What's holding it back</h3>
+          <ul>
+            <li class="warn">Ad fatigue (−0.39) builds over the 14-day flight — frequency climbs at 35% daily reach.</li>
+            <li>Word-of-mouth contributes only +0.01 — the network effect isn't being used yet.</li>
+          </ul>
+
+          <h3>Recommendations</h3>
+          <ul>
+            <li>Pair with a creator / UGC push to amplify the network effect and lift WoM above +0.10.</li>
+            <li>The p10 downside still lands at 2.10× — you can scale budget. Sensitivity suggests near-linear returns up to ~$40k spend.</li>
+            <li>Prepare a second creative to swap in after day 10 — fatigue starts costing meaningful clicks beyond that point.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SIDE PANEL: EDIT & RE-RUN -->
+      <aside class="side-panel">
+        <h3>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Edit &amp; re-run
+        </h3>
+        <div class="field">
+          <label class="label">Budget (USD)</label>
+          <input class="input" value="$15,000">
+          <div class="help">Total over the flight</div>
+        </div>
+        <div class="field">
+          <label class="label">Campaign days</label>
+          <input class="input" value="14">
+        </div>
+        <div class="field">
+          <label class="label">Daily reach</label>
+          <input class="input" value="35%">
+          <div class="help">Fraction of audience exposed per day</div>
+        </div>
+        <div class="field">
+          <label class="label">Platform · Format</label>
+          <select class="select"><option>Meta — Instagram · Reels</option><option>Meta — Instagram · Feed Image</option><option>Meta — Facebook · Reels</option><option>TikTok · In-Feed</option></select>
+        </div>
+        <div class="field">
+          <label class="label">Audience segment</label>
+          <select class="select"><option>Millennials · women</option><option>Gen Z · skincare-curious</option><option>High-income · returning</option></select>
+        </div>
+        <button class="btn btn-primary" style="width:100%">Re-run simulation</button>
+
+        <hr>
+
+        <h3>Compare with</h3>
+        <button class="btn btn-secondary btn-sm" style="width:100%;margin-bottom:6px;justify-content:flex-start">📊 Spring glow drop · v2</button>
+        <button class="btn btn-secondary btn-sm" style="width:100%;margin-bottom:6px;justify-content:flex-start">📊 Father's Day gift edit</button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start">+ Upload new creative</button>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<script>
+  const layoutBase = () => ({
+    font: { family: 'Inter, sans-serif', size: 11, color: '#1C1917' },
+    margin: {l:44, r:14, t:8, b:36}, paper_bgcolor: 'white', plot_bgcolor: 'white',
+    xaxis: { gridcolor: '#F1EADC', zeroline:false },
+    yaxis: { gridcolor: '#F1EADC', zeroline:false },
+    showlegend: false
+  });
+
+  // Daily curve with p10-p90 band
+  const days = Array.from({length:14}, (_,i)=>i+1);
+  const p50 = [1620,1690,1720,1680,1640,1600,1565,1535,1510,1480,1450,1420,1395,1370];
+  const p10 = p50.map(v=>v*0.72);
+  const p90 = p50.map(v=>v*1.32);
+  Plotly.newPlot('chart-daily', [
+    { x: days.concat(days.slice().reverse()), y: p90.concat(p10.slice().reverse()),
+      fill: 'toself', fillcolor: 'rgba(255,94,26,0.18)', line: {color: 'rgba(0,0,0,0)'}, hoverinfo: 'skip' },
+    { x: days, y: p50, mode: 'lines+markers', line: { color: '#FF5E1A', width: 2.5 }, marker:{size:6, color:'#E0218A'} }
+  ], {...layoutBase(), xaxis:{title:'Day',gridcolor:'#F1EADC',zeroline:false}, yaxis:{title:'Clicks',gridcolor:'#F1EADC',zeroline:false}}, {displayModeBar:false});
+
+  // Click drivers
+  Plotly.newPlot('chart-drivers', [{
+    x: [1.47, 1.04, 0.28, 0.01, -0.39], y: ['Psychology','Visual','Audience match','Word-of-mouth','Fatigue'],
+    type: 'bar', orientation: 'h',
+    marker: { color: ['#16A34A','#16A34A','#16A34A','#A8A29E','#DC2626'] },
+    text: ['+1.47','+1.04','+0.28','+0.01','−0.39'], textposition:'outside'
+  }], {...layoutBase(), xaxis:{title:'Logit contribution',gridcolor:'#F1EADC',zeroline:true,zerolinecolor:'#A8A29E'}, yaxis:{automargin:true}}, {displayModeBar:false});
+
+  // ROI distribution
+  const roi = [120,180,210,260,300,340,360,380,410,420,460,500,540,600,680,760,820];
+  Plotly.newPlot('chart-roi', [{
+    x: roi, type: 'histogram', xbins: { size: 60 }, marker:{ color:'#E0218A' }
+  }], {...layoutBase(), xaxis:{title:'ROI (%)',gridcolor:'#F1EADC',zeroline:false}, yaxis:{title:'Runs',gridcolor:'#F1EADC'}, shapes:[{type:'line',x0:0,x1:0,y0:0,y1:6,line:{color:'#DC2626',dash:'dot',width:1.5}},{type:'line',x0:421,x1:421,y0:0,y1:6,line:{color:'#16A34A',dash:'dash',width:1.5}}]}, {displayModeBar:false});
+
+  // Visual scores
+  Plotly.newPlot('chart-visual', [{
+    x: ['Emotional','Clarity','Attention','Relevance'],
+    y: [0.72,0.93,0.78,0.81], type: 'bar',
+    marker: { color: ['#FF5E1A','#E0218A','#7C3AED','#BEF264'] },
+    text: ['0.72','0.93','0.78','0.81'], textposition:'outside'
+  }], {...layoutBase(), yaxis:{range:[0,1.05],gridcolor:'#F1EADC',zeroline:false}}, {displayModeBar:false});
+</script>
+</body>
+</html>

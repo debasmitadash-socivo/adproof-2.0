@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AdProof — New analysis</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.wiz-head { background: var(--bg); border-bottom: 1px solid var(--border);
+            padding: 22px 40px 0; }
+.wiz-head .crumb { font-size: 12.5px; color: var(--text-muted); margin-bottom: 8px; }
+.wiz-head .crumb a { color: var(--text-muted); }
+.wiz-head .h-title { font-family: 'Instrument Serif', serif; font-style: italic;
+                      font-size: 38px; letter-spacing: -0.025em; line-height: 1.05; }
+.wiz-head .h-title .accent { background: var(--gradient-sunset);
+                              -webkit-background-clip: text; background-clip: text;
+                              color: transparent; }
+.steps { display: flex; gap: 4px; margin-top: 22px; }
+.step { flex: 1; padding: 14px 12px; border-bottom: 3px solid var(--border);
+         color: var(--text-muted); font-size: 13.5px; font-weight: 500;
+         display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.step .num { width: 24px; height: 24px; border-radius: 50%; background: var(--border);
+              color: white; display: flex; align-items: center; justify-content: center;
+              font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.step.active { border-bottom-color: var(--coral); color: var(--coral); font-weight: 600; }
+.step.active .num { background: var(--gradient-sunset); }
+.step.done { color: var(--success); }
+.step.done .num { background: var(--success); }
+.wiz-body { padding: 32px 40px; max-width: 1180px; margin: 0 auto;
+             display: grid; grid-template-columns: 1fr 300px; gap: 28px;
+             align-items: start; }
+
+.section-title { font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px;
+                  font-weight: 700; letter-spacing: -0.015em; margin: 6px 0 4px; }
+.section-sub { color: var(--text-muted); font-size: 14px; margin-bottom: 18px; }
+
+.platform-banner { display: flex; align-items: center; gap: 14px;
+                    background: var(--surface); border: 1px solid var(--border);
+                    border-radius: var(--radius); padding: 14px 18px; margin-bottom: 22px; }
+.platform-icon { width: 38px; height: 38px; border-radius: 9px;
+                  display: flex; align-items: center; justify-content: center;
+                  color: white; font-weight: 700; font-size: 14px; flex-shrink: 0;
+                  font-family: 'Bricolage Grotesque', sans-serif; }
+.icon-meta-ig { background: linear-gradient(135deg, #F59E0B, #EC4899, #8B5CF6); }
+.icon-meta-fb { background: linear-gradient(135deg, #4F46E5, #1E40AF); }
+.icon-google  { background: linear-gradient(135deg, #4285F4, #EA4335 50%, #FBBC05); }
+.icon-linkedin { background: #0A66C2; }
+.icon-tiktok  { background: linear-gradient(135deg, #25F4EE, #000, #FE2C55); }
+
+.method-tabs { display: flex; gap: 4px; background: var(--bg-deep); padding: 4px;
+                border-radius: 12px; margin-bottom: 18px; width: max-content; }
+.method-tabs .tab { padding: 9px 16px; border-radius: 8px; font-size: 13px;
+                     font-weight: 500; color: var(--text-muted); cursor: pointer; }
+.method-tabs .tab.active { background: var(--surface); color: var(--text);
+                            box-shadow: var(--shadow-sm); font-weight: 600; }
+
+.filter-card { background: var(--surface); border: 1px solid var(--border);
+                border-radius: var(--radius); padding: 18px 20px; margin-bottom: 14px; }
+.filter-card .filter-head { display: flex; align-items: center; justify-content: space-between;
+                              margin-bottom: 12px; }
+.filter-card .filter-head .name { font-weight: 600; font-size: 14px;
+                                    display: flex; align-items: center; gap: 8px; }
+.filter-card .filter-head .name .glyph { font-size: 16px; }
+.filter-card .filter-head .meta { font-size: 12.5px; color: var(--text-muted); }
+.range-row { display: flex; align-items: center; gap: 14px; }
+.range-input { flex: 1; height: 6px; background: linear-gradient(to right, var(--coral), var(--magenta) 50%, var(--violet));
+                border-radius: 3px; position: relative; }
+.range-input::before, .range-input::after { content: ''; position: absolute; top: -7px;
+                                              width: 20px; height: 20px; border-radius: 50%;
+                                              background: white; border: 3px solid var(--coral);
+                                              box-shadow: var(--shadow-sm); cursor: grab; }
+.range-input::before { left: 18%; }
+.range-input::after  { left: 64%; }
+.range-bounds { display: flex; justify-content: space-between; font-size: 12px;
+                 color: var(--text-muted); margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+        border-radius: 999px; border: 1px solid var(--border);
+        background: var(--surface); font-size: 13px; font-weight: 500;
+        color: var(--text); cursor: pointer; transition: all 0.12s; }
+.chip:hover { border-color: var(--coral); }
+.chip.selected { background: var(--coral-soft); border-color: var(--coral);
+                  color: var(--coral); font-weight: 600; }
+.chip.selected .x { color: var(--coral); }
+.chip .x { color: var(--text-faint); font-weight: 700; font-size: 14px; line-height: 1; }
+.chip-group-title { font-size: 12px; font-weight: 700; color: var(--text-muted);
+                     text-transform: uppercase; letter-spacing: 0.06em;
+                     margin: 12px 0 8px; }
+
+.combobox { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+             background: var(--bg); border: 1px solid var(--border);
+             border-radius: 999px; font-size: 13px; color: var(--text-muted);
+             margin-bottom: 12px; cursor: text; }
+.combobox:hover { border-color: var(--coral); }
+.combobox .icon { width: 14px; height: 14px; flex-shrink: 0; }
+
+.reach-est { background: var(--surface); border: 1px solid var(--border);
+              border-radius: var(--radius); padding: 22px;
+              position: sticky; top: 24px; box-shadow: var(--shadow-sm); }
+.reach-est .eyebrow { color: var(--violet); }
+.reach-est h3 { font-family: 'Instrument Serif', serif; font-style: italic;
+                 font-size: 36px; line-height: 1.0; margin: 6px 0 4px;
+                 letter-spacing: -0.025em; }
+.reach-est .range { color: var(--text-muted); font-size: 13px; }
+.reach-bar { height: 10px; border-radius: 999px;
+              background: var(--gradient-sunset); margin: 18px 0 6px;
+              position: relative; }
+.reach-bar::before { content: ''; position: absolute; left: 22%; width: 56%;
+                      top: -3px; bottom: -3px; background: rgba(255,255,255,0.55);
+                      border-radius: 999px; }
+.reach-meter { font-size: 12px; color: var(--text-muted); display: flex;
+                justify-content: space-between; font-family: 'JetBrains Mono', monospace; }
+.reach-list { margin-top: 18px; font-size: 13.5px; }
+.reach-list .row { padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
+.reach-list .row:last-child { border-bottom: none; }
+.reach-list .row .key { color: var(--text-muted); }
+.reach-list .row .val { font-weight: 600; margin-left: auto; }
+
+.wiz-actions { display: flex; justify-content: space-between; padding: 22px 40px;
+                border-top: 1px solid var(--border); background: var(--bg);
+                position: sticky; bottom: 0; }
+.platform-toggle { display: flex; gap: 6px; margin-bottom: 16px; }
+.platform-toggle .p-chip { display: inline-flex; align-items: center; gap: 8px;
+                            padding: 7px 14px; border-radius: 999px;
+                            border: 1px solid var(--border); background: var(--surface);
+                            font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.platform-toggle .p-chip:hover { border-color: var(--coral); }
+.platform-toggle .p-chip.active { background: var(--text); color: white; border-color: var(--text); }
+.platform-toggle .p-chip .platform-icon { width: 18px; height: 18px; font-size: 9px;
+                                            border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">A</div><div class="brand-name">AdProof</div></div>
+    <div class="workspace"><div class="ws-mark">L</div><div class="ws-name">Lumen Skincare</div><div class="caret">▾</div></div>
+    <div class="nav">
+      <a class="nav-item" href="03-dashboard.html"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+      <a class="nav-item active"><svg class="icon" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>New analysis</a>
+      <a class="nav-item"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>Campaigns <span class="badge">14</span></a>
+      <a class="nav-item"><svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Audiences <span class="badge">3</span></a>
+      <a class="nav-item"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>Creatives</a>
+      <div class="nav-section">Workspace</div>
+      <a class="nav-item"><svg class="icon" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l8-4 8 4v14"/></svg>Company profile</a>
+      <a class="nav-item"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>Settings</a>
+    </div>
+    <div class="sidebar-footer"><div class="avatar">DS</div><div class="user-info"><div class="name">Debs Singh</div><div class="email">debs@lumen.co</div></div></div>
+  </aside>
+
+  <div class="main">
+    <div class="wiz-head">
+      <div class="crumb"><a href="03-dashboard.html">Dashboard</a> · New analysis</div>
+      <div class="h-title">Score a new <span class="accent">ad campaign</span></div>
+      <div class="steps">
+        <div class="step done"><div class="num">1</div>Goal</div>
+        <div class="step done"><div class="num">2</div>Platform &amp; format</div>
+        <div class="step active"><div class="num">3</div>Audience</div>
+        <div class="step"><div class="num">4</div>Creative</div>
+        <div class="step"><div class="num">5</div>Run</div>
+      </div>
+    </div>
+
+    <div class="wiz-body">
+
+      <div>
+        <div class="platform-banner">
+          <div class="platform-icon icon-meta-ig">IG</div>
+          <div style="flex:1">
+            <div style="font-weight:600">Meta — Instagram · Reels</div>
+            <div class="muted" style="font-size:12.5px">Goal: Conversion · 9:16 vertical video</div>
+          </div>
+          <span class="pill pill-coral">Targeting filters: Meta-native</span>
+        </div>
+
+        <div class="eyebrow">Step 3 of 5</div>
+        <h2 class="section-title">Who's the audience?</h2>
+        <p class="section-sub">Pick a saved audience, describe one in words, or build it the way you would in Ads Manager — same filter set, structured the same way.</p>
+
+        <div class="method-tabs">
+          <div class="tab">Saved audience</div>
+          <div class="tab">Describe in words</div>
+          <div class="tab active">Build with filters</div>
+          <div class="tab">Upload customer list</div>
+        </div>
+
+        <div class="platform-toggle">
+          <span class="p-chip active"><span class="platform-icon icon-meta-ig">IG</span>Meta · IG</span>
+          <span class="p-chip"><span class="platform-icon icon-meta-fb">FB</span>Meta · FB</span>
+          <span class="p-chip"><span class="platform-icon icon-google">G</span>Google Ads</span>
+          <span class="p-chip"><span class="platform-icon icon-linkedin">in</span>LinkedIn</span>
+          <span class="p-chip"><span class="platform-icon icon-tiktok">TT</span>TikTok</span>
+        </div>
+        <p class="muted" style="font-size:12px;margin-bottom:18px;">Filter set adapts to the platform — we mirror what each ad platform actually offers.</p>
+
+        <!-- AGE -->
+        <div class="filter-card">
+          <div class="filter-head">
+            <div class="name"><span class="glyph">🎂</span>Age range</div>
+            <div class="meta mono">25 – 44</div>
+          </div>
+          <div class="range-row"><div class="range-input"></div></div>
+          <div class="range-bounds"><span>18</span><span>65+</span></div>
+        </div>
+
+        <!-- GENDER -->
+        <div class="filter-card">
+          <div class="filter-head"><div class="name"><span class="glyph">⚥</span>Gender</div></div>
+          <div class="chip-row">
+            <span class="chip selected">All</span>
+            <span class="chip">Women</span>
+            <span class="chip">Men</span>
+          </div>
+        </div>
+
+        <!-- LOCATION -->
+        <div class="filter-card">
+          <div class="filter-head">
+            <div class="name"><span class="glyph">📍</span>Location</div>
+            <div class="meta">Include / exclude regions, +radius</div>
+          </div>
+          <div class="combobox">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Search countries, regions, cities…
+          </div>
+          <div class="chip-row">
+            <span class="chip selected">United States <span class="x">×</span></span>
+            <span class="chip selected">United Kingdom <span class="x">×</span></span>
+            <span class="chip selected">Canada <span class="x">×</span></span>
+            <span class="chip selected">Australia <span class="x">×</span></span>
+            <span class="chip">+ Add location</span>
+          </div>
+        </div>
+
+        <!-- DETAILED TARGETING — Meta's actual category structure -->
+        <div class="filter-card">
+          <div class="filter-head">
+            <div class="name"><span class="glyph">🎯</span>Detailed targeting</div>
+            <div class="meta">Interests · Behaviours · Demographics</div>
+          </div>
+          <div class="combobox">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Search interests, behaviours, demographics…
+          </div>
+
+          <div class="chip-group-title">Interests — Beauty &amp; wellness</div>
+          <div class="chip-row">
+            <span class="chip selected">Skincare <span class="x">×</span></span>
+            <span class="chip selected">Cosmetics <span class="x">×</span></span>
+            <span class="chip selected">Beauty &amp; personal care <span class="x">×</span></span>
+            <span class="chip selected">Self-care <span class="x">×</span></span>
+            <span class="chip">+ Add interest</span>
+          </div>
+
+          <div class="chip-group-title">Interests — Fashion &amp; lifestyle</div>
+          <div class="chip-row">
+            <span class="chip selected">Fashion <span class="x">×</span></span>
+            <span class="chip selected">Lifestyle blogs <span class="x">×</span></span>
+            <span class="chip">Streetwear</span>
+            <span class="chip">Sustainable fashion</span>
+          </div>
+
+          <div class="chip-group-title">Behaviours — Purchasing</div>
+          <div class="chip-row">
+            <span class="chip selected">Engaged shoppers <span class="x">×</span></span>
+            <span class="chip selected">Online buyers (last 30 days) <span class="x">×</span></span>
+            <span class="chip">Premium brand affinity</span>
+          </div>
+
+          <div class="chip-group-title">Demographics — Life events</div>
+          <div class="chip-row">
+            <span class="chip">New parent (0–12 months)</span>
+            <span class="chip">Recently moved</span>
+            <span class="chip selected">In a relationship <span class="x">×</span></span>
+          </div>
+        </div>
+
+        <!-- CONNECTIONS -->
+        <div class="filter-card">
+          <div class="filter-head"><div class="name"><span class="glyph">🔗</span>Connection &amp; custom audiences</div></div>
+          <div class="chip-row">
+            <span class="chip">People who like Lumen Skincare's page</span>
+            <span class="chip">Excluded: existing customers</span>
+            <span class="chip selected">Lookalike — top 3% buyers (US) <span class="x">×</span></span>
+            <span class="chip">+ Custom audience</span>
+          </div>
+        </div>
+
+        <div class="callout-violet callout">
+          <strong>Filter set adapts to platform.</strong> Switch to Google Ads above and you'll see <em>affinity</em> &amp; <em>in-market</em> audiences instead. LinkedIn shows <em>job title</em>, <em>function</em>, <em>seniority</em>, <em>company size</em>. TikTok shows <em>creator categories</em> &amp; <em>video interactions</em>. Same filters, structured the way each platform actually structures them.
+        </div>
+      </div>
+
+      <!-- Sticky right-rail: live reach + segment match -->
+      <aside class="reach-est">
+        <div class="eyebrow">Estimated audience</div>
+        <h3>4.2M – 5.6M</h3>
+        <div class="range">monthly active reach in selected regions</div>
+
+        <div class="reach-bar"></div>
+        <div class="reach-meter"><span>Narrow</span><span>Specific</span><span>Broad</span></div>
+
+        <div class="reach-list">
+          <div class="row" style="display:flex"><span class="key">Persona match</span><span class="val">237 personas</span></div>
+          <div class="row" style="display:flex"><span class="key">Closest segment</span><span class="val pill pill-coral" style="padding:2px 10px">Millennials · women</span></div>
+          <div class="row" style="display:flex"><span class="key">Match confidence</span><span class="val">92%</span></div>
+          <div class="row" style="display:flex"><span class="key">Filters applied</span><span class="val">11</span></div>
+        </div>
+
+        <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:18px;justify-content:flex-start;gap:8px">
+          💾 Save as audience
+        </button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:flex-start;gap:8px">
+          ↺ Reset filters
+        </button>
+      </aside>
+
+    </div>
+
+    <div class="wiz-actions">
+      <button class="btn btn-secondary">← Back to platform</button>
+      <button class="btn btn-primary btn-lg">Continue to creative →</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

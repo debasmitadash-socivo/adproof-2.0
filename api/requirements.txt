@@ -1,0 +1,12 @@
+# API server (Python 3.11+)
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+python-multipart>=0.0.9
+
+# Gemini -- the recommended free-tier provider for this app (text + vision).
+google-genai>=0.4
+
+# Inherits everything in ../requirements.txt -- install both:
+#   pip install -r ../requirements.txt
+#   pip install -r requirements.txt
