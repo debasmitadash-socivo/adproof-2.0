@@ -6,6 +6,7 @@ import { Card, CardTitle } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { api } from '@/lib/api';
 import { useApp } from '@/lib/store';
+import { getSupabase } from '@/lib/supabase';
 
 // Provider catalogue — one place to add a new key field. The order here
 // matches the auto-fallback order in the backend: paid quality → free
@@ -77,6 +78,13 @@ export default function SettingsPage() {
     setKeysMsg('Cleared all keys.');
   }
 
+  async function signOut() {
+    const sb = getSupabase();
+    if (sb) await sb.auth.signOut();
+    setUser(null);
+    router.replace('/login');
+  }
+
   const connectedCount = status ? PROVIDERS.filter((p) => status[p.id]).length : 0;
 
   return (
@@ -95,8 +103,18 @@ export default function SettingsPage() {
           <div><label className="label">Name</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div><label className="label">Email</label><input className="input" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
         </div>
-        <div className="mt-4">
-          <Button onClick={() => setUser({ name: name.trim() || 'You', email: email.trim(), createdAt: user?.createdAt ?? Date.now() })}>Save profile</Button>
+        <div className="mt-4 flex items-center gap-3 flex-wrap">
+          <Button onClick={() => setUser({ name: name.trim() || 'You', email: email.trim(), createdAt: user?.createdAt ?? Date.now() })}>
+            Save profile
+          </Button>
+          <Button variant="ghost" onClick={signOut}>
+            Sign out
+          </Button>
+          {user?.email && (
+            <span className="text-[12.5px] text-ink-muted ml-auto">
+              Signed in as <code className="font-mono">{user.email}</code>
+            </span>
+          )}
         </div>
       </Card>
 

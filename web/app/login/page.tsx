@@ -1,29 +1,78 @@
 'use client';
-import Link from 'next/link';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { useApp } from '@/lib/store';
+import { getSupabase, supabaseAvailable } from '@/lib/supabase';
 
 export default function LoginPage() {
+  // Wrap the inner form in Suspense so useSearchParams() doesn't break
+  // static prerender on Vercel. Next.js requires this since 14.x.
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
-  const hydrated = useApp((s) => s.hydrated);
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get('next') || '/dashboard';
 
-  // If you've already onboarded on this browser, go straight to dashboard.
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  // If session exists (e.g. came back via /auth/callback), bounce to dashboard.
   useEffect(() => {
-    if (!hydrated) return;
-    const { user, companyProfile } = useApp.getState();
-    if (user && companyProfile) router.replace('/dashboard');
-  }, [hydrated, router]);
+    const sb = getSupabase();
+    if (!sb) return;
+    sb.auth.getSession().then(({ data }) => {
+      if (data.session) router.replace(nextPath);
+    });
+  }, [nextPath, router]);
 
-  function signIn() { router.push('/onboarding'); }
+  async function signInWithMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    setSubmitting(true);
+    try {
+      const sb = getSupabase();
+      if (!sb) {
+        setErr('Supabase not configured. See web/.env.local.');
+        return;
+      }
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const { error } = await sb.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+        },
+      });
+      if (error) {
+        setErr(error.message);
+        return;
+      }
+      setSent(true);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const supaOk = supabaseAvailable();
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
       {/* LEFT: gradient brand pitch */}
       <div className="hidden lg:flex relative overflow-hidden bg-gradient-sunset text-white p-16 flex-col">
         <div className="absolute inset-0 mesh-overlay" />
-        <div className="absolute -right-48 -bottom-48 w-[500px] h-[500px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(190,242,100,0.30), transparent 65%)' }} />
+        <div
+          className="absolute -right-48 -bottom-48 w-[500px] h-[500px] rounded-full pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(190,242,100,0.30), transparent 65%)' }}
+        />
         <div className="relative z-10 flex flex-col h-full">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-[9px] bg-white/20 backdrop-blur-md text-white font-display italic font-bold flex items-center justify-center">A</div>
@@ -58,35 +107,82 @@ export default function LoginPage() {
 
       {/* RIGHT: form */}
       <div className="flex items-center justify-center p-14 bg-bg">
-        <div className="w-full max-w-[380px]">
+        <div className="w-full max-w-[400px]">
           <div className="flex items-center gap-2.5 mb-9">
             <div className="w-8 h-8 rounded-[9px] bg-gradient-sunset text-white font-display italic font-bold flex items-center justify-center shadow-glow">A</div>
             <div className="font-heading font-bold text-[18px]">AdProof</div>
           </div>
-          <div className="display-italic text-[44px] leading-none">
-            Get <span className="gradient-text">started.</span>
-          </div>
-          <p className="text-ink-muted mt-3.5 mb-6 text-[14.5px]">
-            v1 keeps auth lightweight — your work persists locally in this browser. Real auth lands in v2.
-          </p>
 
-          <button className="w-full flex items-center justify-center gap-2.5 py-2.5 border border-border rounded-full bg-surface text-[14px] font-medium hover:bg-coral-soft hover:border-coral transition-colors opacity-60 cursor-not-allowed">
-            <svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.4h4.8c-.2 1.1-.8 2-1.8 2.6v2.2h2.9c1.7-1.5 2.7-3.8 2.7-6.4z" fill="#4285F4"/><path d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.2-3.8H.9v2.3C2.4 15.9 5.5 18 9 18z" fill="#34A853"/><path d="M3.8 10.7c-.2-.5-.3-1.1-.3-1.7s.1-1.2.3-1.7V5H.9C.3 6.2 0 7.6 0 9s.3 2.8.9 4l2.9-2.3z" fill="#FBBC05"/><path d="M9 3.6c1.3 0 2.5.5 3.4 1.4l2.6-2.6C13.5.9 11.4 0 9 0 5.5 0 2.4 2.1.9 5l2.9 2.3C4.6 5.1 6.6 3.6 9 3.6z" fill="#EA4335"/></svg>
-            Continue with Google · v2
-          </button>
+          {!sent ? (
+            <>
+              <div className="display-italic text-[44px] leading-none">
+                Sign in <span className="gradient-text">to AdProof.</span>
+              </div>
+              <p className="text-ink-muted mt-3.5 mb-6 text-[14.5px]">
+                We&apos;ll email you a one-time sign-in link. No password to remember.
+              </p>
 
-          <div className="flex items-center gap-3 text-ink-muted text-[12px] my-5">
-            <div className="flex-1 h-px bg-border" />
-            v1 — start fresh, no password
-            <div className="flex-1 h-px bg-border" />
-          </div>
+              {!supaOk && (
+                <div className="mb-5 p-3 rounded-md bg-warning-soft border border-warning/30 text-[12.5px] text-yellow-800">
+                  <strong>Auth not configured.</strong> NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY missing. Set them in <code className="font-mono">web/.env.local</code> (dev) or Vercel env vars (prod).
+                </div>
+              )}
 
-          <Button size="lg" className="w-full" onClick={signIn}>
-            Set up my workspace →
-          </Button>
-          <p className="text-[12.5px] text-center text-ink-muted mt-5">
-            Auth is stubbed in v1. Hit the button and you&apos;ll go through a 30-second onboarding (name + company).
-          </p>
+              <form onSubmit={signInWithMagicLink} className="space-y-3">
+                <div>
+                  <label htmlFor="email" className="label">Email</label>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    autoFocus
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input"
+                  />
+                </div>
+                <Button
+                  size="lg"
+                  className="w-full"
+                  disabled={submitting || !email.trim() || !supaOk}
+                  type="submit"
+                >
+                  {submitting ? 'Sending magic link…' : 'Email me a sign-in link →'}
+                </Button>
+              </form>
+
+              {err && (
+                <div className="mt-4 p-3 rounded-md bg-danger-soft border border-danger/30 text-[12.5px] text-red-800">
+                  {err}
+                </div>
+              )}
+
+              <p className="text-[12.5px] text-center text-ink-muted mt-7 leading-relaxed">
+                By signing in you agree to AdProof storing your email so we can identify your workspace. We don&apos;t share it with anyone.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="display-italic text-[40px] leading-tight">
+                Check your <span className="gradient-text">inbox.</span>
+              </div>
+              <p className="text-ink-muted mt-3.5 mb-6 text-[15px] leading-relaxed">
+                We sent a one-time sign-in link to <strong className="text-ink">{email}</strong>. Click it and you&apos;ll be signed in here automatically.
+              </p>
+              <div className="p-4 rounded-md bg-coral-soft border border-coral/30 text-[13px] text-ink leading-snug mb-5">
+                Didn&apos;t get the email? Check spam, or wait ~60 seconds — Supabase sometimes takes a moment to dispatch the first email.
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setSent(false); setEmail(''); }}
+              >
+                ← Use a different email
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
