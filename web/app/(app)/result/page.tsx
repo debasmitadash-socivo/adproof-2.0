@@ -59,8 +59,16 @@ export default function ResultPage() {
 
   const mc = result.mc;
   const insights = result.insights;
-  const verdictGradient = VERDICT_GRADIENT[insights.verdict_class] ?? VERDICT_GRADIENT.positive;
-  const grade = VERDICT_GRADE[insights.verdict_class] ?? 'B';
+  // Viability gate overrides everything: a creative that will be rejected
+  // (nudity/policy) or is fundamentally broken (0% coherence/brand) must NOT
+  // show a green Grade-A ROAS. The forecast assumes the ad runs.
+  const viability = result.viability;
+  const notRunnable = viability && viability.runnable === false;        // fatal
+  const forecastVoid = viability && viability.forecast_valid === false; // fatal OR severe
+  const verdictGradient = forecastVoid
+    ? VERDICT_GRADIENT.underperforming
+    : (VERDICT_GRADIENT[insights.verdict_class] ?? VERDICT_GRADIENT.positive);
+  const grade = forecastVoid ? '✕' : (VERDICT_GRADE[insights.verdict_class] ?? 'B');
   // The campaign currently shown is whichever one matches the result.
   // Show the rest as comparable.
   const comparables = savedCampaigns.filter((c) => c.result !== result).slice(0, 5);
@@ -150,6 +158,44 @@ export default function ResultPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-7">
         <div>
+          {/* VIABILITY GATE BANNER — fatal/severe creative problems void the
+              forecast. This sits ABOVE everything so a banned/broken ad can
+              never be mistaken for a green Grade-A result. */}
+          {forecastVoid && viability && (
+            <Card className={`mb-5 border-2 ${notRunnable ? '!bg-danger-soft !border-danger' : '!bg-warning-soft !border-warning'}`}>
+              <div className="flex items-start gap-3">
+                <div className="text-3xl">{notRunnable ? '⛔' : '⚠'}</div>
+                <div className="flex-1">
+                  <div className="font-heading font-bold text-[17px] mb-1">
+                    {notRunnable ? "This ad won't run" : 'Forecast void — broken creative'}
+                  </div>
+                  <div className="text-[13.5px] text-ink leading-snug mb-3">
+                    {viability.headline}
+                    {' '}The ROAS below assumes a compliant, coherent ad that actually goes live — it does <strong>not</strong> apply to this creative.
+                  </div>
+                  <div className="space-y-2">
+                    {viability.blockers.map((b, i) => (
+                      <div key={i} className="bg-surface border border-border rounded-md px-3.5 py-2.5">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <Pill tone={b.severity === 'fatal' ? 'danger' : 'warning'}>{b.severity === 'fatal' ? 'blocker' : 'severe'}</Pill>
+                          <strong className="text-[13.5px]">{b.label}</strong>
+                        </div>
+                        <div className="text-[13px] text-ink">{b.detail}</div>
+                        {b.flags && b.flags.length > 0 && (
+                          <ul className="mt-1.5 space-y-0.5">
+                            {b.flags.map((f, j) => (
+                              <li key={j} className="text-[12.5px] text-danger flex gap-1.5"><span>⚠</span>{f}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* DATA PROVENANCE BANNER — top-of-page honesty about what was measured vs guessed */}
           {result.visual && (
             <Card className={`mb-5 ${result.visual.is_heuristic ? '!bg-warning-soft !border-warning/40' : '!bg-lime-soft !border-lime-deep/30'}`}>
@@ -184,14 +230,24 @@ export default function ResultPage() {
             <div className="absolute inset-0 mesh-overlay" />
             <div className="absolute -right-20 -top-24 w-80 h-80 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.35), transparent 65%)' }} />
             <div className="relative z-10 flex-1">
-              <div className="text-[11.5px] font-bold uppercase tracking-[0.14em] opacity-92">{insights.verdict_class.replace('_', ' ')} forecast</div>
+              <div className="text-[11.5px] font-bold uppercase tracking-[0.14em] opacity-92">
+                {forecastVoid
+                  ? (notRunnable ? "Won't run — policy violation" : 'Forecast void — broken creative')
+                  : `${insights.verdict_class.replace('_', ' ')} forecast`}
+              </div>
               <div className="display-italic text-[96px] leading-none mt-1.5">
-                {mc.predicted_roas.p50.toFixed(2)}× <span className="text-[28px] font-sans not-italic align-top opacity-90">ROAS</span>
+                {forecastVoid ? (
+                  <span className="opacity-90">N/A <span className="text-[26px] font-sans not-italic align-middle line-through opacity-70">{mc.predicted_roas.p50.toFixed(2)}× ROAS</span></span>
+                ) : (
+                  <>{mc.predicted_roas.p50.toFixed(2)}× <span className="text-[28px] font-sans not-italic align-top opacity-90">ROAS</span></>
+                )}
               </div>
               <div className="text-[15px] mt-3 opacity-95 max-w-md">
-                Median return <strong>{(mc.predicted_roi.p50 * 100).toFixed(0)}%</strong>. p10–p90 band <strong>{mc.predicted_roas.p10.toFixed(2)}× → {mc.predicted_roas.p90.toFixed(2)}×</strong>.
+                {forecastVoid
+                  ? <>A ROAS forecast only applies to an ad that runs. Fix the issue{viability && viability.blockers.length > 1 ? 's' : ''} flagged above, then re-run for a real number.</>
+                  : <>Median return <strong>{(mc.predicted_roi.p50 * 100).toFixed(0)}%</strong>. p10–p90 band <strong>{mc.predicted_roas.p10.toFixed(2)}× → {mc.predicted_roas.p90.toFixed(2)}×</strong>.</>}
               </div>
-              {insights.benchmark_note && (
+              {!forecastVoid && insights.benchmark_note && (
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/22 backdrop-blur-md text-[13px] font-semibold mt-3.5">
                   {insights.benchmark_note}
                 </div>

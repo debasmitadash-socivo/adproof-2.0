@@ -208,7 +208,11 @@ export default function NewAnalysisPage() {
         roiP50: r.mc.predicted_roi.p50,
         ctrPct: (r.mc.sample_ctrs.reduce((a, b) => a + b, 0) /
                  Math.max(r.mc.sample_ctrs.length, 1)) * 100,
-        verdictClass: r.insights.verdict_class,
+        // A void forecast (banned / broken creative) must never read as a
+        // positive verdict on the dashboard — downgrade to underperforming.
+        verdictClass: (r.viability && r.viability.forecast_valid === false)
+          ? 'underperforming'
+          : r.insights.verdict_class,
       }));
 
       // Aggregate ROAS = mean across variants. ROI same.

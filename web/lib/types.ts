@@ -252,6 +252,20 @@ export interface SimulateResponse {
   data_sources: { label: string; value: string; note: string }[];
   confidence: { level: 'medium' | 'low_medium' | 'low'; blurb: string; heuristic_count: number };
   copy_critique?: CopyCritique[];
+  // Viability gate — fatal/severe creative problems void the forecast.
+  viability?: {
+    runnable: boolean;
+    forecast_valid: boolean;
+    blockers: {
+      severity: 'fatal' | 'severe';
+      kind: 'policy' | 'coherence' | 'brand';
+      label: string;
+      detail: string;
+      flags: string[];
+    }[];
+    headline: string;
+    verdict_class: string;
+  };
   // Honest channel economics (Phase 1) — break-even math on the user's real numbers.
   economics?: {
     currency: string;

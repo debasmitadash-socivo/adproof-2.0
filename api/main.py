@@ -1119,6 +1119,77 @@ def simulate(req: SimulateRequest) -> dict:
         plain = "Likely to lose money — don't ship as is."
         verdict_word = "underperforming"
 
+    # ----------------------------------------------------------------------
+    # VIABILITY GATE — the forecast assumes the ad actually RUNS. If the
+    # creative will be rejected (nudity/prohibited content) or is
+    # fundamentally broken (image has zero connection to the copy/brand), the
+    # ROAS is meaningless and MUST NOT be shown as a green "Grade A" result.
+    # This gate overrides the verdict so a nude image with B2B copy can never
+    # read as "6.25x — strong". A banned ad's real ROAS is £0.
+    # ----------------------------------------------------------------------
+    _v = result.get("visual")
+    _is_heur = bool(getattr(_v, "is_heuristic", True)) if _v else True
+    _ban = (getattr(_v, "ban_risk", None) or {}) if _v else {}
+    _ban_level = str(_ban.get("level", "unknown")).lower()
+    _coh = getattr(_v, "image_copy_coherence", None) if _v else None
+    _brand = getattr(_v, "brand_relevance", None) if _v else None
+
+    blockers: list = []
+    # FATAL — the ad will be rejected at upload / suspended. Only trust this
+    # when a real vision model (not the heuristic) made the call.
+    if not _is_heur and _ban_level == "high":
+        blockers.append({
+            "severity": "fatal", "kind": "policy",
+            "label": "Will be rejected — policy violation",
+            "detail": _ban.get("explanation")
+                      or "The image breaches platform advertising policy "
+                         "(e.g. nudity / prohibited content) and will be "
+                         "rejected or get the account suspended.",
+            "flags": _ban.get("flags", []),
+        })
+    # SEVERE — the creative is fundamentally mismatched; any forecast built on
+    # a benchmark CTR is fiction because nobody engages with an incoherent ad.
+    if not _is_heur and _coh is not None and _coh < 0.20:
+        blockers.append({
+            "severity": "severe", "kind": "coherence",
+            "label": "Image and copy don't match",
+            "detail": f"Image-copy coherence is {round(_coh*100)}%. The picture "
+                      "has effectively no relationship to what the copy says, "
+                      "so a benchmark-based CTR forecast doesn't apply.",
+            "flags": [],
+        })
+    if not _is_heur and _brand is not None and _brand < 0.20:
+        blockers.append({
+            "severity": "severe", "kind": "brand",
+            "label": "Image doesn't fit the brand",
+            "detail": f"Brand fit is {round(_brand*100)}%. The creative would "
+                      "damage brand credibility with this audience.",
+            "flags": [],
+        })
+
+    has_fatal = any(b["severity"] == "fatal" for b in blockers)
+    has_severe = any(b["severity"] == "severe" for b in blockers)
+    runnable = not has_fatal
+
+    if has_fatal:
+        # Void the forecast entirely.
+        verdict_word = "wont_run"
+        plain = ("This ad won't run — it breaches advertising policy. "
+                 "Fix the flagged issue before any forecast is meaningful.")
+    elif has_severe:
+        verdict_word = "broken_creative"
+        plain = ("Forecast void — the creative is fundamentally broken "
+                 "(image doesn't match the copy/brand). The ROAS below "
+                 "assumes a coherent ad and does NOT apply here.")
+
+    viability = {
+        "runnable": runnable,
+        "forecast_valid": not (has_fatal or has_severe),
+        "blockers": blockers,
+        "headline": plain,
+        "verdict_class": verdict_word,
+    }
+
     # Translate aggregate click factors (logit) to relative-contribution
     # percentages so the UI can show 'this drove +30% of clicks'.
     factors = mc_dict.get("aggregate_click_factors", {})
@@ -1299,6 +1370,7 @@ def simulate(req: SimulateRequest) -> dict:
         "factor_plain": factor_plain,
         "data_sources": data_sources,
         "economics": economics,
+        "viability": viability,
         "confidence": {
             "level": confidence,
             "blurb": confidence_blurb,
