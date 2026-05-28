@@ -80,12 +80,30 @@ export interface PolicyIssue {
 export interface PolicyCheckResponse {
   platform: string;
   format: string;
+  jurisdiction?: string;
+  regulator?: string;
   summary: string;
   overall_risk: 'low' | 'medium' | 'high' | 'unknown';
   policy_source_url: string;
   policies_consulted_year: string;
   issues: PolicyIssue[];
   grounding_sources: { title: string; uri: string }[];
+}
+
+// Market & cultural context (Phase 2) — grounded culture/season/recent-events.
+export interface MarketContextResponse {
+  geo: string;
+  industry: string;
+  as_of: string;
+  cached: boolean;
+  model: string;
+  context: {
+    cultural_notes?: string[];
+    seasonality?: { current_window?: string; advice?: string };
+    recent_events?: { event: string; use_as: 'leverage' | 'landmine'; note: string }[];
+    overall?: string;
+  };
+  sources: { title: string; uri: string }[];
 }
 
 export interface BenchmarkRefreshResponse {
@@ -204,6 +222,12 @@ export interface SimulateResponse {
     image_description?: string;
     image_copy_coherence?: number;
     image_copy_coherence_explanation?: string;
+    // Account-ban / appropriateness risk from the image (LLM only).
+    ban_risk?: {
+      level: 'none' | 'low' | 'medium' | 'high' | 'unknown';
+      flags: string[];
+      explanation: string;
+    };
     // When a non-heuristic provider was attempted but failed (quota, bad
     // key, network) and we degraded to the heuristic, this carries the
     // underlying error so the UI can show "Gemini failed: quota exhausted"
@@ -304,6 +328,8 @@ export interface SavedCampaign {
   originalRequests?: SimulateRequest[];
   // Lineage: if this is a re-run, points to the campaign id it was cloned from.
   rerunOfId?: string;
+  // Market & cultural context (Phase 2) — one grounded read per campaign.
+  marketContext?: MarketContextResponse | null;
 }
 
 export interface SavedAudience {

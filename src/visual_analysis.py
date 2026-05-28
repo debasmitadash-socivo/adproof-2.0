@@ -135,6 +135,11 @@ _RESPONSE_SHAPE = """\
   },
   "brand_relevance": <float 0-1>,
   "brand_relevance_explanation": "<2-3 sentences answering: does the image actually fit the brand category, product, and the ad copy? Be strict -- a generic stock photo for a niche product should score under 0.4.>",
+  "ban_risk": {
+    "level": "<none | low | medium | high>",
+    "flags": ["<specific things in the IMAGE that could get an ad account suspended or rejected: nudity / sexual content, shocking or violent imagery, alcohol/drugs/weapons, before-after body imagery, hateful symbols, deceptive/clickbait visuals, prohibited-category products, visible personal data. Empty array if clean.>"],
+    "explanation": "<1-2 sentences. If level is none, say the imagery looks policy-safe.>"
+  },
   "strengths": ["<short phrase>", "..."],
   "weaknesses": ["<short phrase>", "..."],
   "overall": "<2-3 sentence summary of how this creative is likely to perform>"
@@ -295,6 +300,12 @@ class VisualAnalysisResult:
     image_description: str = ""
     image_copy_coherence: float = 0.5
     image_copy_coherence_explanation: str = ""
+    # Account-ban / appropriateness risk from the IMAGE (LLM only). Heuristic
+    # mode can't see the picture so it returns level "unknown".
+    ban_risk: dict = field(default_factory=lambda: {
+        "level": "unknown", "flags": [],
+        "explanation": "Image not inspected (heuristic mode).",
+    })
     # When the chosen LLM failed and we fell back to the heuristic, this
     # carries the underlying error message so the UI can show "Gemini failed:
     # quota exhausted" instead of leaving the user guessing.
@@ -479,6 +490,18 @@ def _normalise_raw(parsed: dict) -> dict:
         coh = float(parsed.get("image_copy_coherence", 0.5))
     except (TypeError, ValueError):
         coh = 0.5
+    # Account-ban / appropriateness risk (multimodal models only).
+    br_raw = parsed.get("ban_risk") or {}
+    if not isinstance(br_raw, dict):
+        br_raw = {}
+    ban_level = str(br_raw.get("level", "none")).strip().lower()
+    if ban_level not in ("none", "low", "medium", "high"):
+        ban_level = "none"
+    ban_risk = {
+        "level": ban_level,
+        "flags": [str(f).strip() for f in (br_raw.get("flags") or [])][:8],
+        "explanation": str(br_raw.get("explanation", "")).strip(),
+    }
     return {
         "scores": parsed.get("scores", {}),
         "explanations": parsed.get("explanations", {}),
@@ -489,6 +512,7 @@ def _normalise_raw(parsed: dict) -> dict:
         "image_copy_coherence": max(0.0, min(1.0, coh)),
         "image_copy_coherence_explanation": str(
             parsed.get("image_copy_coherence_explanation", "")).strip(),
+        "ban_risk": ban_risk,
         "strengths": list(parsed.get("strengths", []))[:6],
         "weaknesses": list(parsed.get("weaknesses", []))[:6],
         "overall": str(parsed.get("overall", "")).strip(),
@@ -677,6 +701,12 @@ def _analyze_heuristic(rgb_image: Image.Image, ad_text: str,
             "GPT-4o key in /settings to verify the image actually depicts "
             "what the copy says."
         ),
+        "ban_risk": {
+            "level": "unknown", "flags": [],
+            "explanation": ("Image not inspected (heuristic mode) — can't "
+                            "screen for nudity/shocking/prohibited imagery. "
+                            "Connect a multimodal key for ban-risk screening."),
+        },
         "strengths": strengths,
         "weaknesses": weaknesses,
         "overall": ("Heuristic estimate from image colour/contrast statistics "
@@ -820,6 +850,10 @@ def analyze_ad(image_path: str | Path,
         image_copy_coherence=float(raw.get("image_copy_coherence", 0.5)),
         image_copy_coherence_explanation=str(
             raw.get("image_copy_coherence_explanation", "")),
+        ban_risk=raw.get("ban_risk") or {
+            "level": "unknown", "flags": [],
+            "explanation": "Image not inspected (heuristic mode).",
+        },
         provider_error=str(raw.get("_provider_error", "")),
     )
 

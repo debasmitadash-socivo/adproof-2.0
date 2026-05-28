@@ -589,6 +589,7 @@ class PolicyCheckRequest(BaseModel):
     cta: str = ""
     link: str = ""
     industry: Optional[str] = None
+    geo: str = "UK"                # advertiser's market → which regulator applies
 
 
 _PLATFORM_POLICY_HINT = {
@@ -599,6 +600,21 @@ _PLATFORM_POLICY_HINT = {
     "youtube": "Google Ads + YouTube ad policies",
     "linkedin": "LinkedIn Advertising Policies (linkedin.com/legal/ads-policy)",
     "tiktok": "TikTok For Business Advertising Policies (ads.tiktok.com/help/article/advertising-policies)",
+}
+
+# Map the advertiser's market to its advertising regulator(s) so the check
+# covers the LAW, not just the platform's house rules. AdProof is UK-based,
+# so UK is the most fleshed-out.
+_JURISDICTION_REGULATORS = {
+    "UK": "the UK ASA / CAP Code (asa.org.uk) — and the FCA for financial "
+          "promotions, MHRA for health claims, Gambling Commission for betting",
+    "US": "the US FTC Act / FTC endorsement & 'Made in USA' guides (ftc.gov), "
+          "plus FDA for health claims and state-level rules",
+    "EU": "EU consumer-protection + national advertising codes (e.g. UCPD), "
+          "EASA self-regulatory standards",
+    "Canada": "Ad Standards Canada (adstandards.ca) + the Competition Bureau",
+    "Australia": "Ad Standards Australia (adstandards.com.au) + ACCC",
+    "Global": "the platform's own global ad policies (no single regulator)",
 }
 
 
@@ -638,6 +654,8 @@ def policy_check(req: PolicyCheckRequest) -> dict:
 
     policy_source = _PLATFORM_POLICY_HINT.get(req.platform_id, "")
     industry_hint = f" The advertiser is in: {req.industry}." if req.industry else ""
+    geo = (req.geo or "UK").strip()
+    regulator = _JURISDICTION_REGULATORS.get(geo, _JURISDICTION_REGULATORS["Global"])
 
     creative_text = "\n".join(
         f"- {label}: {value}" for label, value in [
@@ -652,15 +670,18 @@ def policy_check(req: PolicyCheckRequest) -> dict:
     prompt = f"""You are a paid-media compliance reviewer.
 
 PLATFORM: {fmt.platform_name} / {fmt.name}
-POLICY SOURCE: {policy_source}
+PLATFORM POLICY SOURCE: {policy_source}
+ADVERTISER MARKET: {geo}
+APPLICABLE REGULATOR(S): {regulator}
 {industry_hint}
 
 TASK
-1. Use Google Search to read the CURRENT ({BENCHMARK_AS_OF}) advertising policy
-   documentation for this platform. Be specific to *this* year's rules --
-   policies were updated in 2025-2026 for AI-generated content, health
-   claims, financial services, and political content.
-2. Evaluate this ad copy against those rules:
+1. Use Google Search to read BOTH (a) the CURRENT ({BENCHMARK_AS_OF}) platform
+   advertising policy AND (b) the {geo} legal/regulator rules above. Many ads
+   pass platform rules but breach the law of the advertiser's country
+   (e.g. UK ASA substantiation + FCA financial-promotion rules differ from US
+   FTC). Check BOTH layers.
+2. Evaluate this ad copy against both the platform policy and {geo} regulation:
 
 {creative_text}
 
@@ -725,6 +746,8 @@ Be strict but fair. If the copy is clean, return issues: []."""
     return {
         "platform": fmt.platform_name,
         "format": fmt.name,
+        "jurisdiction": geo,
+        "regulator": regulator,
         "summary": parsed.get("summary", ""),
         "overall_risk": parsed.get("overall_risk", "unknown"),
         "policy_source_url": parsed.get("policy_source_url", ""),
@@ -732,6 +755,123 @@ Be strict but fair. If the copy is clean, return issues: []."""
         "issues": parsed.get("issues", []),
         "grounding_sources": grounding_urls[:5],
     }
+
+
+# ---------------------------------------------------------------------------
+# Market & cultural context (Gemini grounded) — the differentiator.
+# Culture + seasonality + recent events for {geo} × {industry} × {month}.
+# Cached by (geo, industry, year-month) so the 4 variants of one campaign —
+# and repeat campaigns the same month — reuse a single grounded call.
+# ---------------------------------------------------------------------------
+
+_MARKET_CONTEXT_CACHE: dict = {}
+_MARKET_CACHE_MAX = 128
+
+
+class MarketContextRequest(BaseModel):
+    geo: str = "UK"
+    industry: str = ""
+    product: str = ""              # what they sell, one line
+    company_description: str = ""
+
+
+@app.post("/api/market-context")
+def market_context(req: MarketContextRequest) -> dict:
+    """Web-grounded cultural / seasonal / recent-events read for the target
+    market. This is what makes the tool feel locally-aware instead of a
+    generic synthetic model: it flags tone norms for the geo, whether the ad
+    is timed for a real sales window, and any current events the copy could
+    leverage (or must avoid)."""
+    import os as _os
+    from datetime import datetime, timezone
+    key = _os.environ.get("GEMINI_API_KEY")
+    if not key:
+        raise HTTPException(
+            status_code=400,
+            detail="Connect a Gemini key in /settings for market & cultural context.",
+        )
+
+    geo = (req.geo or "UK").strip()
+    industry = (req.industry or "general consumer").strip()
+    now = datetime.now(timezone.utc)
+    month_key = now.strftime("%Y-%m")
+    cache_key = f"{geo.lower()}|{industry.lower()}|{month_key}"
+    if cache_key in _MARKET_CONTEXT_CACHE:
+        cached = dict(_MARKET_CONTEXT_CACHE[cache_key])
+        cached["cached"] = True
+        return cached
+
+    month_name = now.strftime("%B %Y")
+    prompt = f"""You are a {geo} advertising strategist. It is {month_name}.
+A business in "{industry}" ({req.product or req.company_description or 'see industry'})
+is about to run a paid ad to a {geo} audience.
+
+Use web search for anything current. Return ONLY this JSON (no prose):
+{{
+  "geo": "{geo}",
+  "as_of": "{month_name}",
+  "cultural_notes": ["<short, {geo}-specific tone/idiom/spelling norms to respect — e.g. avoid US-style hype, use 'colour' not 'color'>", "..."],
+  "seasonality": {{
+    "current_window": "<the relevant sales/seasonal window happening now or imminent in {geo}, or 'none notable'>",
+    "advice": "<one line: how to play it, or what to wait for>"
+  }},
+  "recent_events": [
+    {{"event": "<a current {geo} event/trend/news this category could intersect>", "use_as": "<leverage | landmine>", "note": "<one line why>"}}
+  ],
+  "overall": "<2-sentence verdict on whether the timing + cultural fit favour this ad right now in {geo}>"
+}}
+RULES: max 3 items per array. Keep EACH string under 18 words — terse phrases,
+not paragraphs (long output gets truncated). Be specific to {geo} and {month_name}."""
+
+    try:
+        # Bigger budget — grounded search consumes tokens, and a truncated
+        # reply means the JSON never closes and fails to parse.
+        response, model_used = _gemini_grounded_call(prompt, max_tokens=4096)
+    except Exception as exc:                          # noqa: BLE001
+        msg = str(exc)
+        status = 503 if "429" in msg or "RESOURCE_EXHAUSTED" in msg else 502
+        raise HTTPException(
+            status_code=status,
+            detail=f"Market-context check failed: {msg[:200]}.",
+        )
+
+    raw_text = response.text or ""
+    import re as _re
+    cleaned = _re.sub(r"^```(?:json)?\s*", "", raw_text.strip())
+    cleaned = _re.sub(r"\s*```$", "", cleaned)
+    s, e = cleaned.find("{"), cleaned.rfind("}")
+    parsed: dict = {}
+    if s != -1 and e != -1 and e > s:
+        try:
+            parsed = json.loads(cleaned[s:e + 1])
+        except json.JSONDecodeError:
+            parsed = {}
+
+    grounding_urls: list = []
+    try:
+        gm = response.candidates[0].grounding_metadata
+        if gm and gm.grounding_chunks:
+            for ch in gm.grounding_chunks:
+                if ch.web:
+                    grounding_urls.append({"title": ch.web.title or "",
+                                            "uri": ch.web.uri or ""})
+    except Exception:
+        pass
+
+    out = {
+        "geo": geo,
+        "industry": industry,
+        "as_of": month_name,
+        "context": parsed,
+        "sources": grounding_urls[:5],
+        "model": model_used,
+        "cached": False,
+    }
+    # Store (trim cache if needed).
+    if len(_MARKET_CONTEXT_CACHE) >= _MARKET_CACHE_MAX:
+        _MARKET_CONTEXT_CACHE.pop(next(iter(_MARKET_CONTEXT_CACHE)), None)
+    _MARKET_CONTEXT_CACHE[cache_key] = out
+    return out
 
 
 # ===========================================================================

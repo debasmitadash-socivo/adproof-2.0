@@ -353,6 +353,68 @@ export default function ResultPage() {
             );
           })()}
 
+          {/* MARKET & TIMING — grounded culture / seasonality / recent events */}
+          {campaign?.marketContext?.context && (() => {
+            const mc2 = campaign.marketContext!;
+            const c = mc2.context;
+            const hasAny = (c.cultural_notes?.length || c.recent_events?.length || c.seasonality?.current_window || c.overall);
+            if (!hasAny) return null;
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Market &amp; timing · {mc2.geo}</h2>
+                <p className="text-ink-muted text-[14px] mb-3">
+                  Live cultural, seasonal &amp; recent-events read for <strong>{mc2.geo}</strong> as of {mc2.as_of} — grounded on the web, not the synthetic model. This is what a local strategist would tell you.
+                </p>
+                <Card className="!bg-violet-soft !border-violet/30">
+                  {c.overall && <div className="text-[14.5px] text-ink leading-relaxed mb-4 italic">&ldquo;{c.overall}&rdquo;</div>}
+
+                  {c.cultural_notes && c.cultural_notes.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-1.5">Cultural fit · {mc2.geo}</div>
+                      <ul className="space-y-1">
+                        {c.cultural_notes.map((n, i) => (
+                          <li key={i} className="text-[13.5px] text-ink flex gap-2"><span className="text-violet">•</span>{n}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {c.seasonality?.current_window && (
+                    <div className="mb-4">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-1.5">Seasonality</div>
+                      <div className="text-[13.5px] text-ink">
+                        <strong>{c.seasonality.current_window}</strong>{c.seasonality.advice ? ` — ${c.seasonality.advice}` : ''}
+                      </div>
+                    </div>
+                  )}
+
+                  {c.recent_events && c.recent_events.length > 0 && (
+                    <div>
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-1.5">Recent events to {''}
+                        <span className="text-success">leverage</span> / <span className="text-danger">avoid</span></div>
+                      <ul className="space-y-1.5">
+                        {c.recent_events.map((e, i) => (
+                          <li key={i} className="text-[13.5px] text-ink flex gap-2 items-start">
+                            <Pill tone={e.use_as === 'leverage' ? 'success' : 'danger'}>{e.use_as}</Pill>
+                            <span><strong>{e.event}</strong>{e.note ? ` — ${e.note}` : ''}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {mc2.sources && mc2.sources.length > 0 && (
+                    <div className="text-[11.5px] text-ink-muted mt-3 pt-3 border-t border-violet/20">
+                      Sources: {mc2.sources.map((s, i) => (
+                        <span key={i}>{i > 0 ? ' · ' : ''}<a className="underline" href={s.uri} target="_blank" rel="noreferrer">{s.title || 'link'}</a></span>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </>
+            );
+          })()}
+
           {/* DRIVERS — plain English with bars, no logit */}
           {result.factor_plain && result.factor_plain.length > 0 && (<>
           <h2 className="display-italic text-[28px] mt-7 mb-2">What's driving this</h2>
@@ -436,6 +498,35 @@ export default function ResultPage() {
                     </div>
                   </div>
                 </div>
+              </Card>
+            </>
+          )}
+
+          {/* ACCOUNT-BAN RISK — could the image get the ad account suspended? */}
+          {result.visual?.ban_risk && result.visual.ban_risk.level !== 'unknown' && (
+            <>
+              <h2 className="display-italic text-[28px] mt-7 mb-2">Could this get your account banned?</h2>
+              <Card className={
+                result.visual.ban_risk.level === 'high' ? '!bg-danger-soft !border-danger/40'
+                : result.visual.ban_risk.level === 'medium' ? '!bg-warning-soft !border-warning/40'
+                : result.visual.ban_risk.level === 'low' ? '!bg-warning-soft/50 !border-warning/30'
+                : '!bg-lime-soft !border-lime-deep/30'}>
+                <div className="flex items-center gap-2.5 mb-2 flex-wrap">
+                  <Pill tone={result.visual.ban_risk.level === 'high' ? 'danger'
+                    : result.visual.ban_risk.level === 'medium' || result.visual.ban_risk.level === 'low' ? 'warning'
+                    : 'success'} dot>
+                    Ban risk: {result.visual.ban_risk.level}
+                  </Pill>
+                  <span className="text-[12px] text-ink-muted">image screened for nudity / shocking / prohibited content</span>
+                </div>
+                <div className="text-[14px] text-ink leading-relaxed">{result.visual.ban_risk.explanation}</div>
+                {result.visual.ban_risk.flags.length > 0 && (
+                  <ul className="mt-2.5 space-y-1">
+                    {result.visual.ban_risk.flags.map((f, i) => (
+                      <li key={i} className="text-[13.5px] text-danger flex gap-2"><span>⚠</span>{f}</li>
+                    ))}
+                  </ul>
+                )}
               </Card>
             </>
           )}
@@ -719,6 +810,7 @@ function PolicyCheckSection({ result }: { result: any }) {
         cta: '',
         link: '',
         industry: result.company?.industry,
+        geo: result.brief?.geo || result.economics?.geo || 'UK',
       });
       setData(r);
     } catch (e) {
@@ -761,6 +853,7 @@ function PolicyCheckSection({ result }: { result: any }) {
             <div className="flex items-center gap-3 flex-wrap mb-2">
               <Pill tone={riskTone as any} dot>Risk: {data.overall_risk}</Pill>
               <Pill tone="muted">{data.issues.length} issue{data.issues.length === 1 ? '' : 's'}</Pill>
+              {data.jurisdiction && <Pill tone="violet">⚖ {data.jurisdiction} law + platform</Pill>}
               <Pill tone="muted">checked against {data.policies_consulted_year} policy</Pill>
               <div className="flex-1" />
               <Button size="sm" variant="ghost" onClick={run} disabled={checking}>
@@ -768,6 +861,9 @@ function PolicyCheckSection({ result }: { result: any }) {
               </Button>
             </div>
             <div className="text-[14px] text-ink">{data.summary}</div>
+            {data.regulator && (
+              <div className="text-[12px] text-ink-muted mt-1.5">Regulator(s): {data.regulator}</div>
+            )}
             {data.policy_source_url && (
               <div className="text-[12px] mt-2">
                 Source: <a href={data.policy_source_url} target="_blank" rel="noreferrer" className="underline">{data.policy_source_url}</a>

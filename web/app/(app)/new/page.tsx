@@ -182,8 +182,21 @@ export default function NewAnalysisPage() {
         link: v.link,
       }));
 
-      // Run each variant. Concurrent to keep UX snappy.
-      const results = await Promise.all(originalRequests.map((req) => api.simulate(req)));
+      // Run each variant + fetch market/cultural context ONCE (it depends on
+      // geo + industry + month, not the creative — so one call covers all
+      // variants). Concurrent to keep UX snappy; market context is best-effort
+      // (a quota failure shouldn't block the forecast).
+      const marketContextP = api.marketContext({
+        geo,
+        industry: w.companyProfile?.industry || '',
+        product: w.companyProfile?.value_proposition || '',
+        company_description: w.companyDescription,
+      }).catch(() => null);
+
+      const [results, marketContext] = await Promise.all([
+        Promise.all(originalRequests.map((req) => api.simulate(req))),
+        marketContextP,
+      ]);
 
       const firstResult = results[0];
       const savedVariants: SavedVariantResult[] = results.map((r, i) => ({
@@ -228,6 +241,7 @@ export default function NewAnalysisPage() {
         result: firstResult,
         variants: savedVariants.length > 1 ? savedVariants : undefined,
         originalRequests,
+        marketContext,
       };
       w.addCampaign(campaign);
       w.setResult(firstResult);

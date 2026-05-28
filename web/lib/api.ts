@@ -4,6 +4,7 @@ import type {
   BenchmarkRefreshResponse,
   CompanyProfile,
   Platform,
+  MarketContextResponse,
   PolicyCheckResponse,
   ResearchProposal,
   SimulateRequest,
@@ -43,6 +44,11 @@ export const api = {
     }),
   researchCompany: (payload: { url?: string; description?: string; geo?: string }) =>
     request<ResearchProposal>('/api/research-company', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  marketContext: (payload: { geo: string; industry?: string; product?: string; company_description?: string }) =>
+    request<MarketContextResponse>('/api/market-context', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
@@ -91,7 +97,7 @@ export const api = {
   policyCheck: (payload: {
     platform_id: string; format_id: string;
     headline?: string; primary_text?: string; description?: string;
-    cta?: string; link?: string; industry?: string;
+    cta?: string; link?: string; industry?: string; geo?: string;
   }) =>
     request<PolicyCheckResponse>('/api/policy-check', {
       method: 'POST', body: JSON.stringify(payload),
