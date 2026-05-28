@@ -37,6 +37,16 @@ class CampaignBrief:
     # Optional explicit benchmark anchors (None = derive from format).
     target_ctr_override: float | None = None
     target_conversion_rate: float | None = 0.025
+    # --- Real economics (supplied by the advertiser; the honest inputs) ----
+    # Average order value / customer value in `currency`. When set, this is
+    # used DIRECTLY for revenue = conversions × avg_order_value — no synthetic
+    # guessing. This is what makes the $5-toy vs £50k-course distinction real.
+    avg_order_value: float | None = None
+    product_price: float | None = None     # optional, for display/context
+    currency: str = "GBP"                  # AdProof is UK-based → £ default
+    # Target market for this campaign. Drives per-geo benchmark grounding,
+    # currency, and the cultural/regulatory lens in LLM prompts.
+    geo: str = "UK"
 
     def __post_init__(self):
         if self.objective not in _VALID_OBJECTIVES:
@@ -45,6 +55,10 @@ class CampaignBrief:
         self.days = int(max(self.days, 1))
         self.daily_reach = float(min(max(self.daily_reach, 0.05), 1.0))
         self.n_runs = int(max(self.n_runs, 5))
+        if self.avg_order_value is not None:
+            self.avg_order_value = float(max(self.avg_order_value, 0.0)) or None
+        self.currency = (self.currency or "GBP").upper()
+        self.geo = (self.geo or "UK").strip() or "UK"
 
     @property
     def format(self) -> AdFormat:

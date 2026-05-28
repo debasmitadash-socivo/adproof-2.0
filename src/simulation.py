@@ -206,6 +206,7 @@ def monte_carlo(personas,
                 avg_connections: int = 6,
                 cpm_override: float | None = None,
                 aov_multiplier: float = 1.0,
+                aov_override: float | None = None,
                 ) -> MonteCarloResults:
     """Run the model many times and produce a campaign forecast with bands."""
     channel = channel or ad.channel
@@ -240,13 +241,21 @@ def monte_carlo(personas,
     # so the UI can still chart the realised spread.
     arr_conv = np.asarray(sample_conv_expected, dtype=float)
     valid_aovs = [a for a in aovs if a > 0]
-    mean_aov = float(np.mean(valid_aovs)) if valid_aovs else 0.0
-    # Personas are B2C-flavoured (~$80 mean). For B2B SaaS / agency /
-    # professional services, a single converted "buyer" represents a much
-    # larger contract value, so we scale the mean AOV up. Multiplier is
-    # supplied by the caller from CompanyProfile (business_model + category).
-    if aov_multiplier and aov_multiplier != 1.0:
-        mean_aov *= float(aov_multiplier)
+    synthetic_mean_aov = float(np.mean(valid_aovs)) if valid_aovs else 0.0
+
+    # AOV resolution — honesty hierarchy:
+    #   1. aov_override (the user's REAL average order value / customer value)
+    #      wins outright. This is the accurate path: revenue = conversions ×
+    #      the number the advertiser actually told us, not a synthetic guess.
+    #   2. Otherwise fall back to the synthetic persona mean × a crude
+    #      business-model multiplier. Clearly inferior; only used when the
+    #      user hasn't supplied their economics.
+    if aov_override is not None and aov_override > 0:
+        mean_aov = float(aov_override)
+    else:
+        mean_aov = synthetic_mean_aov
+        if aov_multiplier and aov_multiplier != 1.0:
+            mean_aov *= float(aov_multiplier)
 
     # Scale sample rates to the real campaign volume.
     pred_clicks = arr_ctr * total_imp

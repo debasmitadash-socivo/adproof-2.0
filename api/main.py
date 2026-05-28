@@ -199,6 +199,11 @@ class SimulateRequest(BaseModel):
     daily_reach: float = 0.35
     n_runs: int = 20
     target_conversion_rate: float = 0.025
+    # --- Real economics (the honest inputs that replace synthetic AOV) -----
+    avg_order_value: Optional[float] = None   # customer value in `currency`
+    product_price: Optional[float] = None
+    currency: str = "GBP"                     # UK-based default
+    geo: str = "UK"                           # target market for this campaign
     # Creative
     image_path: Optional[str] = None
     video_path: Optional[str] = None
@@ -786,6 +791,10 @@ def simulate(req: SimulateRequest) -> dict:
         budget=req.budget, days=req.days,
         daily_reach=req.daily_reach, n_runs=req.n_runs,
         target_conversion_rate=req.target_conversion_rate,
+        avg_order_value=req.avg_order_value,
+        product_price=req.product_price,
+        currency=req.currency,
+        geo=req.geo,
     )
     assets = CreativeAssets(
         image_path=req.image_path, video_path=req.video_path,
@@ -839,6 +848,46 @@ def simulate(req: SimulateRequest) -> dict:
          for k, v in factor_items],
         key=lambda x: -x["share"],
     )
+
+    # ----------------------------------------------------------------------
+    # HONEST CHANNEL ECONOMICS — the reframe.
+    # Instead of presenting a synthetic "predicted ROAS" as fact, we show the
+    # marketer the actual break-even math against THEIR economics:
+    #   "At your £X order value and Y% conversion, you need a Z% CTR to break
+    #    even. The benchmark is B%, we model your creative at M%."
+    # Every number here is either the advertiser's own input, a grounded
+    # benchmark, or the modelled CTR — no invented revenue.
+    # ----------------------------------------------------------------------
+    imps = max(mc_dict.get("total_impressions", 0), 1)
+    conv_rate = max(float(req.target_conversion_rate or 0.0), 1e-9)
+    aov_used = float(mc_dict.get("mean_aov", 0.0) or 0.0)
+    aov_is_real = brief.avg_order_value is not None and brief.avg_order_value > 0
+    # CTR needed so revenue (= imps × CTR × conv × AOV) exactly equals budget.
+    denom = imps * conv_rate * aov_used
+    break_even_ctr = (brief.budget / denom) if denom > 0 else None
+    headroom = ((sample_ctr / break_even_ctr)
+                if break_even_ctr and break_even_ctr > 0 else None)
+    economics = {
+        "currency": req.currency,
+        "geo": req.geo,
+        "avg_order_value": round(aov_used, 2),
+        "avg_order_value_source": "your figure" if aov_is_real else "estimated (no figure supplied)",
+        "product_price": req.product_price,
+        "conversion_rate": conv_rate,
+        "budget": brief.budget,
+        "impressions": imps,
+        "modelled_ctr": sample_ctr,
+        "benchmark_ctr": fmt_bench_ctr,
+        "break_even_ctr": break_even_ctr,
+        "clears_break_even": (sample_ctr >= break_even_ctr) if break_even_ctr else None,
+        "headroom_x": round(headroom, 2) if headroom else None,
+        # Honest verdict on the ECONOMICS (not a revenue promise):
+        "verdict": (
+            "comfortable" if headroom and headroom >= 1.5
+            else "marginal" if headroom and headroom >= 1.0
+            else "shortfall" if headroom else "unknown"
+        ),
+    }
 
     # Plain-English data provenance / confidence breakdown.
     visual_obj = result["visual"]
@@ -895,9 +944,15 @@ def simulate(req: SimulateRequest) -> dict:
                    + (f"It described what it saw as: \"{visual_obj.image_description[:160]}…\"" if visual_obj and visual_obj.image_description else ""))
                   if visual_source not in ("heuristic", "none")
                   else "Heuristic: image colour + contrast statistics + copy keywords. Does NOT 'understand' what's in the picture. Connect a Gemini key for true multimodal scoring.")},
+        {"label": "Order value (AOV)",
+         "value": (f"{req.currency} {aov_used:,.0f} — your figure" if aov_is_real
+                   else f"{req.currency} {aov_used:,.0f} — estimated"),
+         "note": ("Revenue = conversions × this value. Because you supplied your real order value, the break-even math below is grounded in YOUR economics, not a synthetic guess."
+                  if aov_is_real
+                  else "No order value supplied — we estimated from your category, which is a weak guess. Enter your real average order value for accurate break-even math.")},
         {"label": "Calibration",
          "value": "synthetic CTR dataset (replaceable)",
-         "note": "Psychology-rule weights fitted on a generated dataset, not your past performance. v1.1 will let you upload Meta/Google/LinkedIn CSV exports to recalibrate against YOUR campaigns."},
+         "note": "Psychology-rule weights fitted on a generated dataset, not your past performance. Upload your Meta/Google/LinkedIn CSV exports (coming) to recalibrate against YOUR campaigns."},
     ]
 
     # Confidence rating: stricter when key inputs are heuristic.
@@ -960,6 +1015,7 @@ def simulate(req: SimulateRequest) -> dict:
         },
         "factor_plain": factor_plain,
         "data_sources": data_sources,
+        "economics": economics,
         "confidence": {
             "level": confidence,
             "blurb": confidence_blurb,

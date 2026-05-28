@@ -369,10 +369,22 @@ def run_wizard_simulation(profile: CompanyProfile,
     ad_text_combined = _best_ad_text(assets)
     image_path = _resolve_creative_for_visual(assets)
 
+    # Geo-aware lens: tell the vision model which market this ad is for so it
+    # flags tone / spelling / cultural mismatches for that audience (e.g. US
+    # exclamation-mark hype reads as cringe to a UK audience; "color" vs
+    # "colour"; references that don't translate across markets).
+    geo = getattr(brief, "geo", "UK") or "UK"
+    audience_hint = (
+        f"{match.rationale or match.segment}. "
+        f"Target market: {geo}. Evaluate this creative specifically for a "
+        f"{geo} audience — flag any tone, spelling, idiom, or cultural "
+        f"references that won't land (or could offend) in {geo}."
+    )
+
     _step(0.15, "Scoring the creative on the four visual dimensions...")
     visual = (analyze_ad(image_path, ad_text_combined,
                          provider=visual_provider,
-                         audience_hint=match.rationale or match.segment,
+                         audience_hint=audience_hint,
                          brand_category=profile.product_category,
                          brand_industry=profile.industry)
               if image_path else None)
@@ -395,7 +407,10 @@ def run_wizard_simulation(profile: CompanyProfile,
         # Re-run with the broader "all" segment as a graceful fallback.
         audience = filter_personas(personas, "all")
 
-    aov_mult = _aov_multiplier_for_profile(profile)
+    # Economics: the advertiser's REAL average order value wins. Only fall
+    # back to the crude category multiplier when they haven't told us.
+    aov_override = brief.avg_order_value
+    aov_mult = 1.0 if aov_override else _aov_multiplier_for_profile(profile)
 
     _step(0.45,
           f"Running Monte Carlo: {brief.n_runs} runs x {brief.days} days...")
@@ -408,6 +423,7 @@ def run_wizard_simulation(profile: CompanyProfile,
         target_conversion_rate=brief.target_conversion_rate,
         cpm_override=brief.effective_cpm,
         aov_multiplier=aov_mult,
+        aov_override=aov_override,
     )
 
     _step(0.78, "Running sensitivity sweeps (budget + reach)...")
@@ -421,7 +437,8 @@ def run_wizard_simulation(profile: CompanyProfile,
                      "target_ctr": brief.effective_target_ctr,
                      "target_conversion_rate": brief.target_conversion_rate,
                      "cpm_override": brief.effective_cpm,
-                     "aov_multiplier": aov_mult},
+                     "aov_multiplier": aov_mult,
+                     "aov_override": aov_override},
         n_runs=small_runs,
     )
     reach_sweep = sensitivity_sweep(
@@ -432,7 +449,8 @@ def run_wizard_simulation(profile: CompanyProfile,
                      "target_ctr": brief.effective_target_ctr,
                      "target_conversion_rate": brief.target_conversion_rate,
                      "cpm_override": brief.effective_cpm,
-                     "aov_multiplier": aov_mult},
+                     "aov_multiplier": aov_mult,
+                     "aov_override": aov_override},
         n_runs=small_runs,
     )
 
