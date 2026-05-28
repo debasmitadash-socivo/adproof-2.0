@@ -11,6 +11,31 @@ export interface CompanyProfile {
   price_position: string;
   brand_tone: string;
   source: 'llm' | 'heuristic' | 'empty';
+  // --- Economics + market (Phase 1). Optional so old saved profiles still parse.
+  website?: string;
+  location?: string;            // primary market, e.g. "UK", "US", "London"
+  avg_order_value?: number;     // customer value in `currency`
+  product_price?: number;
+  currency?: string;            // ISO-ish: GBP | USD | EUR ...
+}
+
+// AI-proposed economics from /api/research-company — an ESTIMATE to confirm.
+export interface ResearchProposal {
+  proposed: {
+    company_name?: string;
+    industry?: string;
+    business_model?: string;
+    what_they_sell?: string;
+    price_point?: string;
+    estimated_avg_order_value?: number;
+    currency?: string;
+    location?: string;
+    confidence?: 'low' | 'medium' | 'high';
+    reasoning?: string;
+  };
+  model: string;
+  sources: { title: string; uri: string }[];
+  disclaimer: string;
 }
 
 export interface AudienceMatch {
@@ -108,6 +133,11 @@ export interface SimulateRequest {
   daily_reach: number;
   n_runs: number;
   target_conversion_rate: number;
+  // Real economics + market (Phase 1)
+  avg_order_value?: number | null;
+  product_price?: number | null;
+  currency?: string;
+  geo?: string;
   image_path?: string | null;
   video_path?: string | null;
   headline: string;
@@ -198,6 +228,23 @@ export interface SimulateResponse {
   data_sources: { label: string; value: string; note: string }[];
   confidence: { level: 'medium' | 'low_medium' | 'low'; blurb: string; heuristic_count: number };
   copy_critique?: CopyCritique[];
+  // Honest channel economics (Phase 1) — break-even math on the user's real numbers.
+  economics?: {
+    currency: string;
+    geo: string;
+    avg_order_value: number;
+    avg_order_value_source: string;   // "your figure" | "estimated (no figure supplied)"
+    product_price?: number | null;
+    conversion_rate: number;
+    budget: number;
+    impressions: number;
+    modelled_ctr: number;
+    benchmark_ctr: number;
+    break_even_ctr: number | null;
+    clears_break_even: boolean | null;
+    headroom_x: number | null;
+    verdict: 'comfortable' | 'marginal' | 'shortfall' | 'unknown';
+  };
 }
 
 // ---------- locally-persisted account data ----------

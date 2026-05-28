@@ -291,6 +291,68 @@ export default function ResultPage() {
           </Card>
           )}
 
+          {/* CHANNEL ECONOMICS — the honest break-even math on the user's real
+              numbers. Shown alongside the ROAS estimate, not instead of it. */}
+          {result.economics && (() => {
+            const e = result.economics!;
+            const cur = e.currency || 'GBP';
+            const tone = e.verdict === 'comfortable' ? 'success'
+              : e.verdict === 'marginal' ? 'warning' : 'danger';
+            const bg = e.verdict === 'comfortable' ? '!bg-lime-soft !border-lime-deep/30'
+              : e.verdict === 'marginal' ? '!bg-warning-soft !border-warning/40'
+              : '!bg-danger-soft !border-danger/40';
+            const pct = (x: number | null | undefined) =>
+              x == null ? '—' : `${(x * 100).toFixed(x < 0.001 ? 4 : 2)}%`;
+            const verdictLine = e.verdict === 'comfortable'
+              ? 'The maths works with room to spare.'
+              : e.verdict === 'marginal'
+                ? 'The maths is tight — break-even is plausible but not guaranteed.'
+                : e.verdict === 'shortfall'
+                  ? 'The maths falls short — the modelled CTR is below what you need to break even.'
+                  : 'Not enough economics to judge.';
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Will the maths work?</h2>
+                <p className="text-ink-muted text-[14px] mb-3">
+                  The break-even math on <strong>your</strong> economics — not a synthetic guess. This is the number to trust more than the ROAS estimate above.
+                </p>
+                <Card className={bg}>
+                  <div className="flex items-center gap-3 flex-wrap mb-3">
+                    <Pill tone={tone as any} dot>{e.verdict}</Pill>
+                    <span className="text-[14.5px] font-semibold text-ink">{verdictLine}</span>
+                    <span className="ml-auto text-[12px] text-ink-muted">market: {e.geo}</span>
+                  </div>
+                  <div className="text-[14px] text-ink leading-relaxed mb-4">
+                    At your <strong>{cur} {e.avg_order_value.toLocaleString()}</strong> order value
+                    {' '}({e.avg_order_value_source}) and <strong>{(e.conversion_rate * 100).toFixed(1)}%</strong> conversion,
+                    you need a <strong>{pct(e.break_even_ctr)}</strong> click-through rate to break even.
+                    We model your creative at <strong>{pct(e.modelled_ctr)}</strong>
+                    {' '}(benchmark {pct(e.benchmark_ctr)}).
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { label: 'Break-even CTR', value: pct(e.break_even_ctr), sub: 'what you need' },
+                      { label: 'Modelled CTR', value: pct(e.modelled_ctr), sub: 'what we expect' },
+                      { label: 'Headroom', value: e.headroom_x != null ? `${e.headroom_x}×` : '—', sub: e.headroom_x != null && e.headroom_x >= 1 ? 'above break-even' : 'below break-even' },
+                      { label: 'Order value', value: `${cur} ${e.avg_order_value.toLocaleString()}`, sub: e.avg_order_value_source },
+                    ].map((m) => (
+                      <div key={m.label} className="bg-surface border border-border rounded-md px-3.5 py-3">
+                        <div className="text-[11px] text-ink-muted uppercase tracking-[0.06em] font-bold">{m.label}</div>
+                        <div className="display-italic text-[24px] leading-none mt-1">{m.value}</div>
+                        <div className="text-[11.5px] text-ink-muted mt-1">{m.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {e.avg_order_value_source !== 'your figure' && (
+                    <div className="mt-3 text-[12.5px] text-yellow-800">
+                      ⚠ This used an <strong>estimated</strong> order value. Set your real figure on the <Link href="/company" className="underline">company profile</Link> for accurate break-even maths.
+                    </div>
+                  )}
+                </Card>
+              </>
+            );
+          })()}
+
           {/* DRIVERS — plain English with bars, no logit */}
           {result.factor_plain && result.factor_plain.length > 0 && (<>
           <h2 className="display-italic text-[28px] mt-7 mb-2">What's driving this</h2>

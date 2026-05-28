@@ -5,22 +5,87 @@ import { Card, CardTitle } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { api } from '@/lib/api';
 import { useApp } from '@/lib/store';
+import type { CompanyProfile } from '@/lib/types';
+
+const CURRENCIES = ['GBP', 'USD', 'EUR', 'CAD', 'AUD'];
+const MARKETS = ['UK', 'US', 'EU', 'Canada', 'Australia', 'Global'];
 
 export default function CompanyPage() {
   const desc = useApp((s) => s.companyDescription);
   const profile = useApp((s) => s.companyProfile);
   const setDesc = useApp((s) => s.setCompanyDescription);
   const setProfile = useApp((s) => s.setCompanyProfile);
+
   const [text, setText] = useState(desc);
   const [parsing, setParsing] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  // Economics + market fields (local mirror of the profile's optional fields).
+  const [website, setWebsite] = useState(profile?.website ?? '');
+  const [location, setLocation] = useState(profile?.location ?? 'UK');
+  const [currency, setCurrency] = useState(profile?.currency ?? 'GBP');
+  const [aov, setAov] = useState<string>(profile?.avg_order_value != null ? String(profile.avg_order_value) : '');
+  const [price, setPrice] = useState<string>(profile?.product_price != null ? String(profile.product_price) : '');
+
+  const [researching, setResearching] = useState(false);
+  const [researchMsg, setResearchMsg] = useState<string | null>(null);
+  const [researchSources, setResearchSources] = useState<{ title: string; uri: string }[]>([]);
+
+  function persist(patch: Partial<CompanyProfile>) {
+    const base: CompanyProfile = profile ?? {
+      raw_description: text, company_name: '', industry: '', business_model: 'b2c',
+      product_category: 'general', value_proposition: '', target_customer_summary: '',
+      price_position: 'mid', brand_tone: 'neutral', source: 'heuristic',
+    };
+    setProfile({ ...base, ...patch });
+    setSavedAt(Date.now());
+  }
 
   async function reparse() {
     setParsing(true);
     try {
       const p = await api.parseCompany(text);
-      setProfile(p); setDesc(text); setSavedAt(Date.now());
+      // Preserve the economics fields the user already set.
+      setProfile({ ...p, website, location, currency,
+        avg_order_value: aov ? Number(aov) : undefined,
+        product_price: price ? Number(price) : undefined });
+      setDesc(text);
+      setSavedAt(Date.now());
     } finally { setParsing(false); }
+  }
+
+  async function analyzeWebsite() {
+    setResearching(true); setResearchMsg(null); setResearchSources([]);
+    try {
+      const r = await api.researchCompany({
+        url: website.trim() || undefined,
+        description: text.trim() || undefined,
+        geo: location,
+      });
+      const p = r.proposed || {};
+      // Pre-fill — user confirms/edits. Never silently authoritative.
+      if (p.estimated_avg_order_value != null) setAov(String(p.estimated_avg_order_value));
+      if (p.currency) setCurrency(p.currency);
+      if (p.location) setLocation(p.location);
+      setResearchSources(r.sources || []);
+      setResearchMsg(
+        `${p.confidence ? p.confidence.toUpperCase() + ' confidence — ' : ''}` +
+        `${p.reasoning || 'Estimated from public data.'} ` +
+        `(${p.industry || 'industry n/a'}, ${p.price_point || 'price n/a'}). ` +
+        `Confirm or correct the numbers below — your figures drive the forecast, not ours.`,
+      );
+    } catch (e) {
+      setResearchMsg(`Couldn't auto-research: ${(e as Error).message}. Enter your numbers manually below.`);
+    } finally { setResearching(false); }
+  }
+
+  function saveEconomics() {
+    persist({
+      website: website.trim(),
+      location, currency,
+      avg_order_value: aov ? Number(aov) : undefined,
+      product_price: price ? Number(price) : undefined,
+    });
   }
 
   return (
@@ -29,27 +94,109 @@ export default function CompanyPage() {
         Your <span className="gradient-text">company profile</span>
       </div>
       <p className="text-ink-muted mt-1.5 text-[14.5px] mb-6">
-        This profile drives every campaign analysis — what category we put you in, what audiences we suggest, and the tone we critique your creative against. Edit it any time.
+        This drives every analysis — your category, the audiences we suggest, the market we score for, and the economics that make the forecast real instead of synthetic.
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-7">
-        <Card>
-          <CardTitle>Description</CardTitle>
-          <textarea
-            className="input min-h-[200px]"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="What does your company do? Who buys from you? What's your price position?"
-          />
-          <div className="flex items-center gap-3 mt-4">
-            <Button onClick={reparse} disabled={parsing || text.trim().length < 10}>
-              {parsing ? 'Re-parsing…' : '✨ Re-parse profile'}
-            </Button>
-            {savedAt && <div className="text-success text-[13px] font-semibold">Saved · {new Date(savedAt).toLocaleTimeString()}</div>}
-          </div>
-        </Card>
+        <div className="space-y-5">
+          <Card>
+            <CardTitle>What you do</CardTitle>
+            <textarea
+              className="input min-h-[160px]"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="What does your company do? Who buys from you? What's your price position?"
+            />
+            <div className="flex items-center gap-3 mt-4">
+              <Button onClick={reparse} disabled={parsing || text.trim().length < 10}>
+                {parsing ? 'Re-parsing…' : '✨ Re-parse profile'}
+              </Button>
+              {savedAt && <div className="text-success text-[13px] font-semibold">Saved · {new Date(savedAt).toLocaleTimeString()}</div>}
+            </div>
+          </Card>
 
-        <Card>
+          <Card>
+            <CardTitle>Economics &amp; market</CardTitle>
+            <p className="text-[13px] text-ink-muted mb-4">
+              The single biggest driver of forecast accuracy. A £5 product and a £5,000 course need wildly different math — so we use <strong>your</strong> real numbers, not a guess. Paste your site and let the AI propose figures, then correct them.
+            </p>
+
+            <div className="space-y-3.5">
+              <div>
+                <label className="label">Website</label>
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1 font-mono text-[13px]"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://yourcompany.com"
+                  />
+                  <Button variant="secondary" onClick={analyzeWebsite} disabled={researching || (!website.trim() && text.trim().length < 10)}>
+                    {researching ? 'Researching…' : '✨ Analyze'}
+                  </Button>
+                </div>
+                <div className="help">AI reads your site/description and proposes economics for you to confirm.</div>
+              </div>
+
+              {researchMsg && (
+                <div className="text-[12.5px] bg-violet-soft border border-violet/30 rounded-md p-3 text-ink leading-snug">
+                  <strong className="text-violet">AI estimate:</strong> {researchMsg}
+                  {researchSources.length > 0 && (
+                    <div className="mt-1.5 text-ink-muted">
+                      Sources: {researchSources.map((s, i) => (
+                        <span key={i}>{i > 0 ? ' · ' : ''}<a className="underline" href={s.uri} target="_blank" rel="noreferrer">{s.title || 'link'}</a></span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Primary market</label>
+                  <select className="input" value={location} onChange={(e) => setLocation(e.target.value)}>
+                    {MARKETS.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Currency</label>
+                  <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                    {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Avg order / customer value</label>
+                  <input
+                    className="input font-mono"
+                    type="number" min="0" inputMode="decimal"
+                    value={aov}
+                    onChange={(e) => setAov(e.target.value)}
+                    placeholder="e.g. 250"
+                  />
+                  <div className="help">What one converted customer is worth ({currency}).</div>
+                </div>
+                <div>
+                  <label className="label">Product price <span className="text-ink-faint font-normal">(optional)</span></label>
+                  <input
+                    className="input font-mono"
+                    type="number" min="0" inputMode="decimal"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="e.g. 250"
+                  />
+                  <div className="help">Sticker price, if different from AOV.</div>
+                </div>
+              </div>
+
+              <Button onClick={saveEconomics} disabled={!aov}>Save economics</Button>
+            </div>
+          </Card>
+        </div>
+
+        <Card className="self-start">
           <CardTitle>Parsed profile</CardTitle>
           {profile ? (
             <div className="space-y-2 text-[13.5px]">
@@ -59,7 +206,10 @@ export default function CompanyPage() {
               <div><strong>Category:</strong> {profile.product_category}</div>
               <div><strong>Price position:</strong> {profile.price_position}</div>
               <div><strong>Brand tone:</strong> {profile.brand_tone}</div>
-              {profile.value_proposition && <div><strong>Value prop:</strong> {profile.value_proposition}</div>}
+              <div className="pt-2 mt-1 border-t border-border-soft" />
+              <div><strong>Market:</strong> {profile.location || location}</div>
+              <div><strong>Avg order value:</strong> {profile.avg_order_value != null ? `${profile.currency || currency} ${profile.avg_order_value.toLocaleString()}` : <span className="text-warning">not set — forecast will estimate</span>}</div>
+              {profile.value_proposition && <div className="pt-2 border-t border-border-soft mt-2"><strong>Value prop:</strong> {profile.value_proposition}</div>}
               <div className="pt-2 border-t border-border-soft mt-3">
                 <Pill tone={profile.source === 'llm' ? 'coral' : 'muted'}>
                   Parsed via {profile.source === 'llm' ? '✨ LLM' : 'keyword heuristic'}

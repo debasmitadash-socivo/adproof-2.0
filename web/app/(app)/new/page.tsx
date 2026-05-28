@@ -45,6 +45,15 @@ export default function NewAnalysisPage() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Per-campaign economics + market — default from the company profile,
+  // overridable for this run (e.g. test a US push for one product). Initialised
+  // once from the saved company profile.
+  const cp = w.companyProfile;
+  const [geo, setGeo] = useState<string>(cp?.location || 'UK');
+  const [currency, setCurrency] = useState<string>(cp?.currency || 'GBP');
+  const [aov, setAov] = useState<string>(cp?.avg_order_value != null ? String(cp.avg_order_value) : '');
+  const [convRate, setConvRate] = useState<string>('2.5');   // % — user-facing
+
   useEffect(() => {
     api.platforms().then((d) => setPlatforms(d.platforms)).catch(() => setPlatforms([]));
   }, []);
@@ -147,7 +156,13 @@ export default function NewAnalysisPage() {
         days: w.days,
         daily_reach: w.dailyReach,
         n_runs: w.nRuns,
-        target_conversion_rate: 0.025,
+        // Real economics + market for THIS campaign (defaults from company
+        // profile, overridable on the Run step). Conversion rate is entered
+        // as a percentage in the UI; convert to a fraction here.
+        target_conversion_rate: Math.max(Number(convRate) || 2.5, 0.01) / 100,
+        avg_order_value: aov ? Number(aov) : null,
+        currency,
+        geo,
         // 'auto' picks the strongest provider with a key: Claude > OpenAI >
         // Gemini > heuristic. If you've set a Gemini key in /settings the
         // multimodal model will actually look at the image.
@@ -581,7 +596,7 @@ export default function NewAnalysisPage() {
             <p className="text-ink-muted text-[14px] mb-5">Final spend and pacing, then we hand it to the simulator.</p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="label">Budget (USD)</label>
+                <label className="label">Budget ({currency})</label>
                 <input className="input" type="number" value={w.budget} onChange={(e) => w.setBudget(+e.target.value)} />
                 <div className="help">Total over the flight</div>
               </div>
@@ -610,6 +625,62 @@ export default function NewAnalysisPage() {
                 <div className="help">Independent simulations, used to build the confidence band.</div>
               </div>
             </div>
+
+            {/* Economics + market — the inputs that make the forecast real. */}
+            <div className="mt-6 pt-5 border-t border-border">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-heading text-[15px] font-bold tracking-tight">Economics &amp; market</h3>
+                <HelpHint label="Why this matters">
+                  A £5 product and a £5,000 course with the same budget have completely different break-even maths. We use <em>your</em> real numbers instead of a synthetic guess. These default from your company profile — override them to test a different market or product here.
+                </HelpHint>
+              </div>
+              <p className="text-ink-muted text-[13px] mb-3">
+                {cp?.avg_order_value != null
+                  ? <>Defaults pulled from your company profile. Override for this campaign if needed.</>
+                  : <>You haven&apos;t set economics on your <a href="/company" className="underline text-coral">company profile</a> yet — enter them here so the forecast is grounded in real numbers, not a guess.</>}
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Target market</label>
+                  <select className="input" value={geo} onChange={(e) => setGeo(e.target.value)}>
+                    {['UK', 'US', 'EU', 'Canada', 'Australia', 'Global'].map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <div className="help">Drives benchmarks, currency &amp; the cultural lens.</div>
+                </div>
+                <div>
+                  <label className="label">Currency</label>
+                  <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                    {['GBP', 'USD', 'EUR', 'CAD', 'AUD'].map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Avg order / customer value</label>
+                  <input className="input font-mono" type="number" min={0} inputMode="decimal"
+                         value={aov} onChange={(e) => setAov(e.target.value)} placeholder="e.g. 250" />
+                  <div className="help">{aov ? `${currency} ${Number(aov).toLocaleString()} per customer` : 'What one customer is worth'}</div>
+                </div>
+                <div>
+                  <label className="label">
+                    Expected conversion rate
+                    <HelpHint label="Conversion rate">
+                      Of the people who click your ad, what % actually buy / convert on your landing page? If you don&apos;t know, 2–3% is a typical starting point for cold traffic. This is the single biggest lever on whether the maths works.
+                    </HelpHint>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input className="input font-mono" type="number" min={0.1} max={100} step={0.1} inputMode="decimal"
+                           value={convRate} onChange={(e) => setConvRate(e.target.value)} />
+                    <span className="text-ink-muted text-[14px]">%</span>
+                  </div>
+                  <div className="help">Clicks → customers. Typical cold traffic: 2–3%.</div>
+                </div>
+              </div>
+              {!aov && (
+                <div className="mt-3 text-[12.5px] text-yellow-800 bg-warning-soft border border-warning/30 rounded-md p-2.5">
+                  No order value set — the forecast will fall back to a rough category estimate. Enter your real figure for grounded break-even maths.
+                </div>
+              )}
+            </div>
+
             {error && <div className="mt-4 text-[13px] text-danger bg-danger-soft border border-danger/30 rounded-md p-3">{error}</div>}
           </Card>
           <Card>
@@ -620,7 +691,9 @@ export default function NewAnalysisPage() {
               <div><strong>Format:</strong> {format?.name ?? '—'}</div>
               <div><strong>Audience:</strong> {audienceMethod === 'saved' ? (w.audienceSegment ?? '—') : audienceMethod === 'words' ? (w.audienceDescription ? w.audienceDescription.slice(0, 60) + '…' : '—') : 'filters'}</div>
               <div><strong>Creative:</strong> {w.imagePath ? '✓ uploaded' : '— not uploaded'}</div>
-              <div><strong>Budget:</strong> ${w.budget.toLocaleString()} / {w.days} days</div>
+              <div><strong>Market:</strong> {geo}</div>
+              <div><strong>Budget:</strong> {currency} {w.budget.toLocaleString()} / {w.days} days</div>
+              <div><strong>Order value:</strong> {aov ? `${currency} ${Number(aov).toLocaleString()}` : <span className="text-warning">not set</span>} · {convRate}% conv</div>
             </div>
           </Card>
         </div>

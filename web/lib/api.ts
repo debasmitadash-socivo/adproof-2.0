@@ -5,6 +5,7 @@ import type {
   CompanyProfile,
   Platform,
   PolicyCheckResponse,
+  ResearchProposal,
   SimulateRequest,
   SimulateResponse,
   UploadResponse,
@@ -39,6 +40,11 @@ export const api = {
     request<AudienceMatch>('/api/match-audience', {
       method: 'POST',
       body: JSON.stringify({ description }),
+    }),
+  researchCompany: (payload: { url?: string; description?: string; geo?: string }) =>
+    request<ResearchProposal>('/api/research-company', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
   simulate: (req: SimulateRequest) =>
     request<SimulateResponse>('/api/simulate', {
