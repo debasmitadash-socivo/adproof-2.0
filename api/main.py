@@ -750,6 +750,149 @@ def match_audience_endpoint(req: MatchAudienceRequest) -> dict:
     return match.to_dict()
 
 
+# ---------------------------------------------------------------------------
+# Website research → proposed economics (Gemini grounded). The AI's estimate
+# is a PREFILL the user confirms/corrects — never treated as truth.
+# ---------------------------------------------------------------------------
+
+class ResearchCompanyRequest(BaseModel):
+    url: Optional[str] = None
+    description: str = ""
+    geo: str = "UK"
+
+
+def _is_safe_public_url(raw: str) -> tuple[bool, str]:
+    """SSRF guard. Only allow http(s) URLs pointing at public hosts. Blocks
+    localhost, private ranges, and the cloud metadata endpoint so a malicious
+    user can't make our server fetch internal services."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    try:
+        u = urlparse(raw if "://" in raw else f"https://{raw}")
+    except Exception:
+        return False, "Could not parse URL."
+    if u.scheme not in ("http", "https"):
+        return False, "Only http/https URLs are allowed."
+    host = u.hostname or ""
+    if not host:
+        return False, "URL has no host."
+    if host.lower() in ("localhost", "metadata.google.internal"):
+        return False, "Refusing to fetch internal host."
+    # Resolve and reject private / loopback / link-local / reserved IPs.
+    try:
+        for fam, _, _, _, sockaddr in socket.getaddrinfo(host, None):
+            ip = ipaddress.ip_address(sockaddr[0])
+            if (ip.is_private or ip.is_loopback or ip.is_link_local
+                    or ip.is_reserved or ip.is_multicast
+                    or ip.is_unspecified):
+                return False, "URL resolves to a non-public address."
+    except Exception:
+        # DNS failure — let it through to the grounded call, which will just
+        # find nothing rather than hitting an internal service.
+        pass
+    return True, ""
+
+
+@app.post("/api/research-company")
+def research_company(req: ResearchCompanyRequest) -> dict:
+    """Use Gemini + web grounding to research a business from its URL and/or
+    description, and PROPOSE economics (industry, price point, likely average
+    order value, location). Everything returned is an *estimate for the user
+    to confirm* — the UI must let them edit it. We never feed these numbers
+    into a forecast without the user accepting them first.
+    """
+    import os as _os
+    key = _os.environ.get("GEMINI_API_KEY")
+    if not key:
+        raise HTTPException(
+            status_code=400,
+            detail="Connect a Gemini key in /settings to auto-research a business.",
+        )
+
+    url = (req.url or "").strip()
+    if url:
+        ok, why = _is_safe_public_url(url)
+        if not ok:
+            raise HTTPException(status_code=400, detail=f"Unsafe URL: {why}")
+
+    site_hint = f"Their website: {url}\n" if url else ""
+    desc_hint = f"They describe themselves as: \"{req.description.strip()}\"\n" if req.description.strip() else ""
+    if not site_hint and not desc_hint:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide a website URL or a description to research.",
+        )
+
+    prompt = f"""You are a marketing analyst. Estimate the economics of this
+business so we can pre-fill a form. The user will confirm/correct your numbers.
+
+{site_hint}{desc_hint}Primary market: {req.geo}
+
+Use web search to look up the specific business if a URL/name is given. If you
+can't find the exact business, STILL estimate based on the business TYPE and
+the {req.geo} market — do not return nulls just because you can't find the
+exact company. Always give your best category-level estimate.
+
+Return ONLY this JSON, nothing else. Keep "reasoning" to ONE short sentence so
+the JSON stays small:
+{{
+  "company_name": "<name or empty string>",
+  "industry": "<concise industry>",
+  "business_model": "<b2c | b2b | dtc | saas | marketplace | services>",
+  "what_they_sell": "<one short line>",
+  "price_point": "<low | mid | premium | luxury>",
+  "estimated_avg_order_value": <number in local currency>,
+  "currency": "<GBP | USD | EUR | ...>",
+  "location": "<primary market>",
+  "confidence": "<low | medium | high>",
+  "reasoning": "<ONE short sentence on how you estimated the order value>"
+}}"""
+
+    try:
+        response, model_used = _gemini_grounded_call(prompt, max_tokens=1600)
+    except Exception as exc:                          # noqa: BLE001
+        msg = str(exc)
+        status = 503 if "429" in msg or "RESOURCE_EXHAUSTED" in msg else 502
+        raise HTTPException(
+            status_code=status,
+            detail=(f"Research failed: {msg[:240]}. The user can still enter "
+                    "their economics manually."),
+        )
+
+    raw_text = response.text or ""
+    import re as _re
+    cleaned = _re.sub(r"^```(?:json)?\s*", "", raw_text.strip())
+    cleaned = _re.sub(r"\s*```$", "", cleaned)
+    start, end = cleaned.find("{"), cleaned.rfind("}")
+    parsed: dict = {}
+    if start != -1 and end != -1 and end > start:
+        try:
+            parsed = json.loads(cleaned[start:end + 1])
+        except json.JSONDecodeError:
+            parsed = {}
+
+    grounding_urls: list = []
+    try:
+        gm = response.candidates[0].grounding_metadata
+        if gm and gm.grounding_chunks:
+            for ch in gm.grounding_chunks:
+                if ch.web:
+                    grounding_urls.append({"title": ch.web.title or "",
+                                            "uri": ch.web.uri or ""})
+    except Exception:
+        pass
+
+    return {
+        "proposed": parsed,                # ESTIMATE — UI must let user edit
+        "model": model_used,
+        "sources": grounding_urls[:5],
+        "disclaimer": "These are AI estimates from public web data. Confirm or "
+                      "correct them — your real numbers drive the forecast, not ours.",
+    }
+
+
 # ===========================================================================
 # Main simulation
 # ===========================================================================
