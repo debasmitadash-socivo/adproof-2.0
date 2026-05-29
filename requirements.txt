@@ -12,6 +12,7 @@ pandas>=2.2
 numpy>=1.26
 scipy>=1.13
 scikit-learn>=1.4    # ML extension point (calibration ships its own IRLS solver)
+openpyxl>=3.1        # read .xlsx ad-performance exports (Path B ingest)
 
 # --- LLM clients (vision + text). Backend auto-falls-forward through whichever
 #     of these are configured, so only one is required to function. ---
