@@ -204,6 +204,7 @@ class SimulateRequest(BaseModel):
     # from their ad history, override the generic format benchmarks. ---------
     target_ctr: Optional[float] = None
     cpm_override: Optional[float] = None
+    reachable_audience: Optional[int] = None   # opt-in budget saturation
     # --- Real economics (the honest inputs that replace synthetic AOV) -----
     avg_order_value: Optional[float] = None   # customer value in `currency`
     product_price: Optional[float] = None
@@ -1110,6 +1111,7 @@ def simulate(req: SimulateRequest) -> dict:
         target_conversion_rate=req.target_conversion_rate,
         target_ctr_override=req.target_ctr,
         cpm_override=req.cpm_override,
+        reachable_audience=req.reachable_audience,
         avg_order_value=req.avg_order_value,
         product_price=req.product_price,
         currency=req.currency,

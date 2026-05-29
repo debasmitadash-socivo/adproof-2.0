@@ -66,6 +66,7 @@ export default function NewAnalysisPage() {
   const [currency, setCurrency] = useState<string>(cp?.currency || 'GBP');
   const [aov, setAov] = useState<string>(cp?.avg_order_value != null ? String(cp.avg_order_value) : '');
   const [convRate, setConvRate] = useState<string>('2.5');   // % — user-facing
+  const [reachAudience, setReachAudience] = useState<string>('');   // opt-in saturation
 
   useEffect(() => {
     api.platforms().then((d) => setPlatforms(d.platforms)).catch(() => setPlatforms([]));
@@ -195,6 +196,8 @@ export default function NewAnalysisPage() {
         // Calibrated click + cost benchmarks (null = fall back to generic).
         target_ctr: calCtr,
         cpm_override: calCpm,
+        // Opt-in budget saturation (assumption-based; blank = linear).
+        reachable_audience: reachAudience ? Math.round(Number(reachAudience)) : null,
         avg_order_value: aov ? Number(aov) : null,
         currency,
         geo,
@@ -728,6 +731,17 @@ export default function NewAnalysisPage() {
                     <span className="text-ink-muted text-[14px]">%</span>
                   </div>
                   <div className="help">Clicks → customers. Typical cold traffic: 2–3%.</div>
+                </div>
+                <div>
+                  <label className="label">
+                    Reachable audience <span className="text-ink-faint font-normal">(optional)</span>
+                    <HelpHint label="Reachable audience">
+                      Roughly how many real people you can realistically reach with this targeting. If set, the forecast models diminishing returns — pour more budget into the same audience and ROAS falls as you re-show the same people. It&apos;s a modelling assumption, not from your data. Leave blank to keep the forecast linear in budget.
+                    </HelpHint>
+                  </label>
+                  <input className="input font-mono" type="number" min={0} inputMode="numeric"
+                         value={reachAudience} onChange={(e) => setReachAudience(e.target.value)} placeholder="e.g. 200000" />
+                  <div className="help">Blank = no saturation. Set it to see budget have diminishing returns.</div>
                 </div>
               </div>
               {!aov && (

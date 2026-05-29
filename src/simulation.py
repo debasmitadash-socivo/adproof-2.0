@@ -28,6 +28,7 @@ as decision-support ranges, not committed forecasts.
 """
 from __future__ import annotations
 
+import math
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -134,6 +135,8 @@ class MonteCarloResults:
     daily_records_per_run: list = field(default_factory=list)
     # Mean logit contributions across runs, for the explanation module.
     aggregate_click_factors: dict = field(default_factory=dict)
+    # Budget-saturation accounting (empty unless a reachable audience is set).
+    saturation: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -207,10 +210,39 @@ def monte_carlo(personas,
                 cpm_override: float | None = None,
                 aov_multiplier: float = 1.0,
                 aov_override: float | None = None,
+                reachable_audience: int | None = None,
                 ) -> MonteCarloResults:
-    """Run the model many times and produce a campaign forecast with bands."""
+    """Run the model many times and produce a campaign forecast with bands.
+
+    ``reachable_audience`` enables budget saturation: if set, raw impressions
+    are passed through a log diminishing-returns curve so that pouring more
+    budget into the SAME finite audience yields fewer incremental clicks
+    (frequency rises, marginal value falls). This is a deliberate MODELLING
+    ASSUMPTION (a standard reach/frequency curve), not a figure calibrated from
+    the advertiser's data — the caller is responsible for labelling it as such.
+    Left None, the forecast scales linearly with budget (no saturation).
+    """
     channel = channel or ad.channel
-    total_imp = budget_to_impressions(budget, channel, cpm_override=cpm_override)
+    raw_imp = budget_to_impressions(budget, channel, cpm_override=cpm_override)
+    # Budget saturation (assumption-based, opt-in). effective = N·ln(1 + I/N):
+    # ~linear while impressions are small vs the audience, strongly diminishing
+    # once they exceed it.
+    saturation: dict = {}
+    if reachable_audience and reachable_audience > 0:
+        N = float(reachable_audience)
+        effective_imp = int(round(N * math.log1p(raw_imp / N)))
+        reach = N * (1.0 - math.exp(-raw_imp / N))
+        saturation = {
+            "reachable_audience": int(N),
+            "raw_impressions": int(raw_imp),
+            "effective_impressions": effective_imp,
+            "efficiency": round(effective_imp / raw_imp, 3) if raw_imp else 1.0,
+            "est_frequency": round(raw_imp / reach, 2) if reach else None,
+            "assumption": True,
+        }
+    else:
+        effective_imp = raw_imp
+    total_imp = raw_imp          # impressions the budget actually buys (reported)
 
     sample_ctr, sample_conv, sample_conv_expected = [], [], []
     sample_buy, aovs = [], []
@@ -257,8 +289,10 @@ def monte_carlo(personas,
         if aov_multiplier and aov_multiplier != 1.0:
             mean_aov *= float(aov_multiplier)
 
-    # Scale sample rates to the real campaign volume.
-    pred_clicks = arr_ctr * total_imp
+    # Scale sample rates to the real campaign volume. Clicks use EFFECTIVE
+    # impressions (after saturation); the reported impression count stays at
+    # what the budget actually buys.
+    pred_clicks = arr_ctr * effective_imp
     pred_conversions = pred_clicks * arr_conv
     pred_revenue = pred_conversions * mean_aov
     pred_roi = (pred_revenue - budget) / budget if budget > 0 else \
@@ -288,6 +322,7 @@ def monte_carlo(personas,
         predicted_roas=_dist(pred_roas, ndigits=3),
         daily_records_per_run=daily_records,
         aggregate_click_factors=aggregated_factors,
+        saturation=saturation,
     )
 
 

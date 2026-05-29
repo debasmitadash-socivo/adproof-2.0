@@ -351,6 +351,20 @@ export default function ResultPage() {
           </Card>
           )}
 
+          {/* BUDGET SATURATION — only when the user supplied a reachable audience */}
+          {mc.saturation && mc.saturation.assumption && (
+            <Card className="mt-4 !bg-bg-deep !border-border">
+              <div className="text-[13px] text-ink leading-snug">
+                <strong>Diminishing returns applied (assumption).</strong> At this budget you&apos;d show the ad to your{' '}
+                {mc.saturation.reachable_audience.toLocaleString()}-person audience about{' '}
+                <strong>{mc.saturation.est_frequency}×</strong> each, so only ~{Math.round(mc.saturation.efficiency * 100)}% of
+                the {(mc.saturation.raw_impressions / 1_000_000).toFixed(2)}M impressions count as fresh reach. The forecast
+                reflects that — more budget on the same audience earns less. This is a modelling assumption (a standard
+                reach/frequency curve), <em>not</em> calibrated from your data; change the reachable-audience number to adjust it.
+              </div>
+            </Card>
+          )}
+
           {/* CHANNEL ECONOMICS — the honest break-even math on the user's real
               numbers. Shown alongside the ROAS estimate, not instead of it. */}
           {result.economics && (() => {

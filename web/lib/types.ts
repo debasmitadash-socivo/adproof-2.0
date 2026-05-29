@@ -168,6 +168,8 @@ export interface SimulateRequest {
   // generic format benchmarks when they've uploaded their ad history.
   target_ctr?: number | null;
   cpm_override?: number | null;
+  // Opt-in budget saturation (assumption-based): realistically reachable people.
+  reachable_audience?: number | null;
 }
 
 // ---------- Path B: real-data ingest + per-account calibration ----------
@@ -255,6 +257,14 @@ export interface SimulateResponse {
     predicted_roi: DistBand;
     predicted_roas: DistBand;
     aggregate_click_factors: Record<string, number>;
+    saturation?: {
+      reachable_audience: number;
+      raw_impressions: number;
+      effective_impressions: number;
+      efficiency: number;
+      est_frequency: number | null;
+      assumption: boolean;
+    };
   };
   insights: {
     verdict_class: 'strong' | 'positive' | 'break_even' | 'underperforming';

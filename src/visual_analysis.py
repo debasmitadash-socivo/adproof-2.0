@@ -409,6 +409,15 @@ _VISION_PROVIDERS = (
     "claude", "openai", "gemini", "groq",
     "mistral", "openrouter", "xai", "together",
 )
+
+# Score-consistency switch. Different providers rate the same image on
+# different scales, so a "0.8" from Gemini isn't a "0.8" from Groq. When True
+# (default), an 'auto' run pins scoring to ONE provider (keeping that
+# provider's own same-prompt model rotation) and degrades to heuristic — i.e.
+# an honest "couldn't analyse" block — rather than scoring on a different
+# scale. Set False to restore full cross-provider fallback (max availability,
+# less comparable scores). An explicit provider choice is always honoured.
+PIN_VISION_PROVIDER = True
 _VISION_KEY_ENV = {
     "claude":     "ANTHROPIC_API_KEY",
     "openai":     "OPENAI_API_KEY",
@@ -763,6 +772,11 @@ def analyze_ad(image_path: str | Path,
     fallback_order = [p for p in fallback_order
                       if p == provider or p == "heuristic"
                       or _get_key(_VISION_KEY_ENV.get(p, "")) is not None]
+    # Pin scoring to one provider for scale-consistency (see PIN_VISION_PROVIDER).
+    # The chosen provider keeps its own internal model rotation; we just don't
+    # cross over to a different provider's scale for the score.
+    if PIN_VISION_PROVIDER and provider == "auto" and chosen != "heuristic":
+        fallback_order = [chosen, "heuristic"]
 
     vision_dispatch = {
         "claude":     lambda: (_analyze_claude_with_brand(

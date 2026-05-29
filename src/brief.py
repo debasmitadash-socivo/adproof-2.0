@@ -40,6 +40,10 @@ class CampaignBrief:
     target_ctr_override: float | None = None
     cpm_override: float | None = None
     target_conversion_rate: float | None = 0.025
+    # Budget saturation (opt-in, assumption-based): the realistically reachable
+    # audience for this targeting. When set, the forecast applies diminishing
+    # returns as budget grows. None = no saturation (linear in budget).
+    reachable_audience: int | None = None
     # --- Real economics (supplied by the advertiser; the honest inputs) ----
     # Average order value / customer value in `currency`. When set, this is
     # used DIRECTLY for revenue = conversions × avg_order_value — no synthetic
