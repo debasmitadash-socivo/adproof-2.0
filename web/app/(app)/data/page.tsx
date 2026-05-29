@@ -79,7 +79,7 @@ export default function DataPage() {
     setBusy(true); setError(null);
     try {
       const nAds = result.calibration.overall?.n_ads ?? result.report.n_rows_kept;
-      await saveCalibration(result.calibration, nAds, file?.name);
+      await saveCalibration(result.calibration, nAds, result.backtest, file?.name);
       const n = await insertOutcomes(result.rows, file?.name);
       setExisting(result.calibration);
       setSaved(`Saved. Your forecasts now use your real benchmarks (${n.toLocaleString()} ads stored).`);
@@ -155,6 +155,42 @@ export default function DataPage() {
                   <li key={i} className="text-[12.5px] text-ink-muted flex gap-2"><span className="text-warning">⚠</span>{w}</li>
                 ))}
               </ul>
+            )}
+          </Card>
+
+          {/* DECAY WARNING — only when there are real per-period dates */}
+          {result.calibration.trend && result.calibration.trend.direction !== 'flat' && (
+            <Card className={`mb-4 ${result.calibration.trend.direction === 'down' ? '!bg-warning-soft !border-warning/40' : '!bg-lime-soft !border-lime-deep/40'}`}>
+              <div className="text-[13.5px] text-ink">
+                <strong>{result.calibration.trend.direction === 'down' ? '⚠ Your click-through is trending down.' : '↑ Your click-through is trending up.'}</strong>{' '}
+                Older ads averaged {pct(result.calibration.trend.older_ctr)} CTR; recent ones {pct(result.calibration.trend.recent_ctr)}
+                {' '}({result.calibration.trend.change_pct >= 0 ? '+' : ''}{Math.round(result.calibration.trend.change_pct * 100)}%).
+                We calibrate on your recent data so the forecast tracks where you are now, not where you were.
+              </div>
+            </Card>
+          )}
+
+          {/* ACCURACY BACKTEST — the proof */}
+          <Card className="mb-4 !bg-bg-deep !border-border">
+            <div className="text-[11.5px] font-bold uppercase tracking-[0.1em] text-ink-muted mb-2">Accuracy check (backtest)</div>
+            {result.backtest.usable ? (
+              <>
+                <div className="text-[14px] text-ink mb-2">
+                  Calibrated on your older ads, we predicted the click-through of <strong>{result.backtest.n_test}</strong> held-out
+                  ads we hadn&apos;t seen: predicted <strong>{pct(result.backtest.agg_predicted_ctr)}</strong> vs
+                  actual <strong>{pct(result.backtest.agg_actual_ctr)}</strong>
+                  {result.backtest.agg_abs_pct_error != null && <> — off by <strong>{Math.round(result.backtest.agg_abs_pct_error * 100)}%</strong></>}.
+                </div>
+                <div className="text-[13px] text-ink-muted">
+                  Per-ad: within ±30% on {Math.round((result.backtest.within_30pct ?? 0) * 100)}% of ads
+                  (median error {Math.round((result.backtest.median_abs_pct_error ?? 0) * 100)}%).
+                </div>
+                <div className="text-[11.5px] text-ink-faint mt-2">{result.backtest.note}</div>
+              </>
+            ) : (
+              <div className="text-[13.5px] text-ink-muted">
+                <strong>Can&apos;t backtest over time yet.</strong> {result.backtest.reason}
+              </div>
             )}
           </Card>
 

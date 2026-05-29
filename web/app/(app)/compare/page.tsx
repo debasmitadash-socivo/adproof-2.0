@@ -8,7 +8,7 @@ import { useApp } from '@/lib/store';
 import { analyzeVariants, type VariantMetrics } from '@/lib/compare';
 
 const VERDICT_TONE: Record<string, 'success' | 'coral' | 'warning' | 'danger'> = {
-  strong: 'success', positive: 'coral', break_even: 'warning', underperforming: 'danger',
+  strong: 'success', positive: 'coral', break_even: 'warning', underperforming: 'danger', void: 'danger',
 };
 
 // Matrix rows. `kind` controls formatting + which direction is "better".

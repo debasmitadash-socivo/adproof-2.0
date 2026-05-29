@@ -286,27 +286,141 @@ def _agg(df: pd.DataFrame) -> dict:
     return out
 
 
-def calibrate(df: pd.DataFrame, currency: str = "GBP") -> dict:
-    """Per-platform + overall real benchmarks, impression-weighted."""
-    if df.empty or "impressions" not in df:
+def _weighted_ctr(g: pd.DataFrame) -> float | None:
+    imp = g["impressions"].sum()
+    return float(g["clicks"].sum() / imp) if imp else None
+
+
+# A time analysis is only meaningful with several distinct dates — many ad
+# exports stamp every row with the report's single date range, which would
+# otherwise masquerade as "time" when it's really just row order.
+_MIN_DISTINCT_DATES = 6
+
+
+def _trend(d: pd.DataFrame) -> dict | None:
+    """Older-half vs recent-half click-through — the performance-decay signal."""
+    if "_date" not in d or d["_date"].notna().sum() < 10 \
+            or d["_date"].nunique() < _MIN_DISTINCT_DATES:
+        return None
+    dd = d[d["_date"].notna()].sort_values("_date")
+    cut = len(dd) // 2
+    older, recent = _weighted_ctr(dd.iloc[:cut]), _weighted_ctr(dd.iloc[cut:])
+    if not older or not recent:
+        return None
+    change = (recent - older) / older
+    return {
+        "older_ctr": round(older, 5), "recent_ctr": round(recent, 5),
+        "change_pct": round(change, 3),
+        "direction": "down" if change < -0.05 else "up" if change > 0.05 else "flat",
+    }
+
+
+def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120) -> dict:
+    """Per-platform + overall real benchmarks, impression-weighted.
+
+    Calibrates on RECENT data when dates allow (click-rates decay over time, so
+    old ads mislead the forecast), falling back to all history when sparse.
+    Also returns a trend signal so the UI can warn about decay.
+    """
+    if df.empty or "impressions" not in df.columns:
         return {"currency": currency, "overall": {}, "by_platform": {}, "usable": False}
-    df = df.copy()
-    df["_platform"] = df.apply(_platform_key, axis=1)
-    by_platform = {}
-    for plat, grp in df.groupby("_platform"):
-        by_platform[str(plat)] = _agg(grp)
+    d = df.copy()
+    d["_platform"] = d.apply(_platform_key, axis=1)
+    d["_date"] = (pd.to_datetime(d["date_start"], errors="coerce")
+                  if "date_start" in d.columns else pd.NaT)
+
+    used, window = d, "all available ads"
+    if d["_date"].notna().sum() >= 20 and d["_date"].nunique() >= _MIN_DISTINCT_DATES:
+        recent = d[d["_date"] >= d["_date"].max() - pd.Timedelta(days=recent_days)]
+        if len(recent) >= 20:                       # enough recent data to trust
+            used, window = recent, f"most recent {recent_days} days ({len(recent)} ads)"
+
+    by_platform = {str(plat): _agg(grp) for plat, grp in used.groupby("_platform")}
     return {
         "currency": currency,
-        "overall": _agg(df),
+        "overall": _agg(used),
         "by_platform": by_platform,
         "usable": True,
+        "window": window,
+        "trend": _trend(d),
+    }
+
+
+def backtest(df: pd.DataFrame, min_ads: int = 12) -> dict:
+    """Time-split validation: calibrate on the older ads, predict the newer
+    ones, compare predicted vs ACTUAL click-through.
+
+    This is the honest accuracy proof. We can only backtest what the exports
+    actually contain: click-through (and CPM). We predict each held-out ad's
+    CTR from the per-platform rate learned on the EARLIER ads — exactly what
+    the forecast's calibrated anchor does — then measure the error. Because the
+    split is by date, this also captures performance drift over time ('ads get
+    harder'). Per-ad creative effects and ROAS need creative files + conversion
+    data, which these exports lack — so we don't claim to backtest those.
+    """
+    if df.empty or "real_ctr" not in df.columns or "date_start" not in df.columns:
+        return {"usable": False, "reason": "Need dated ads with click data to backtest."}
+    d = df.copy()
+    d["_date"] = pd.to_datetime(d["date_start"], errors="coerce")
+    d = d[d["_date"].notna() & d["real_ctr"].notna() & (d["impressions"] > 0)]
+    if len(d) < min_ads:
+        return {"usable": False,
+                "reason": f"Need at least {min_ads} dated ads to backtest; have {len(d)}."}
+    if d["_date"].nunique() < _MIN_DISTINCT_DATES:
+        return {"usable": False,
+                "reason": ("This export uses a single reporting period (one date for "
+                           "every ad), so we can't validate accuracy over time. "
+                           "Re-export with a daily or weekly date breakdown to enable "
+                           "the backtest.")}
+    d = d.sort_values("_date")
+    d["_platform"] = d.apply(_platform_key, axis=1)
+    cut = int(len(d) * 0.7)
+    train, test = d.iloc[:cut], d.iloc[cut:]
+
+    base: dict[str, float] = {}
+    for plat, g in train.groupby("_platform"):
+        imp = g["impressions"].sum()
+        if imp:
+            base[str(plat)] = float(g["clicks"].sum() / imp)
+    train_overall = float(train["clicks"].sum() / max(train["impressions"].sum(), 1))
+
+    preds, acts, imps, errs = [], [], [], []
+    for _, r in test.iterrows():
+        pred = base.get(str(r["_platform"]), train_overall)
+        act = float(r["real_ctr"])
+        if act > 0 and pred and pred > 0:
+            preds.append(pred); acts.append(act)
+            imps.append(float(r["impressions"])); errs.append(abs(act - pred) / act)
+    if not errs:
+        return {"usable": False, "reason": "No comparable held-out ads."}
+
+    e = np.array(errs); iw = np.array(imps)
+    agg_pred = float(np.average(preds, weights=iw))
+    agg_act = float(np.average(acts, weights=iw))
+    agg_err = abs(agg_act - agg_pred) / agg_act if agg_act else None
+    return {
+        "usable": True,
+        "n_train": int(len(train)),
+        "n_test": int(len(errs)),
+        "split": "by date — calibrated on your older 70% of ads, tested on the newest 30%",
+        "metric": "predicted vs actual click-through on held-out ads",
+        "median_abs_pct_error": round(float(np.median(e)), 3),
+        "within_20pct": round(float((e <= 0.20).mean()), 3),
+        "within_30pct": round(float((e <= 0.30).mean()), 3),
+        "agg_predicted_ctr": round(agg_pred, 5),
+        "agg_actual_ctr": round(agg_act, 5),
+        "agg_abs_pct_error": round(agg_err, 3) if agg_err is not None else None,
+        "note": ("Validates the click-rate calibration (the forecast's foundation) "
+                 "out-of-sample. Per-ad creative effects and ROAS need creative "
+                 "files + conversion data to backtest."),
     }
 
 
 def ingest_and_calibrate(data: bytes | str, filename: str = "") -> dict:
-    """End-to-end: normalize a file then calibrate. Returns a JSON-able dict."""
+    """End-to-end: normalize a file then calibrate + backtest. JSON-able dict."""
     df, report = normalize_export(data, filename)
     cal = calibrate(df, currency=report.currency)
+    bt = backtest(df)
     # A compact preview of the cleaned rows for the UI.
     preview_cols = [c for c in ("ad_name", "platform", "placement", "spend",
                                 "impressions", "clicks", "real_ctr", "real_cpm",
@@ -316,6 +430,7 @@ def ingest_and_calibrate(data: bytes | str, filename: str = "") -> dict:
     return {
         "report": asdict(report),
         "calibration": cal,
+        "backtest": bt,
         "preview": preview,
         "rows": df.replace({np.nan: None}).to_dict("records"),
     }

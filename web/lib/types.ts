@@ -181,11 +181,34 @@ export interface PlatformCalibration {
   real_roas: number | null;
   confidence: 'low' | 'medium' | 'high';
 }
+export interface CalibrationTrend {
+  older_ctr: number;
+  recent_ctr: number;
+  change_pct: number;
+  direction: 'up' | 'down' | 'flat';
+}
 export interface AccountCalibration {
   currency: string;
   overall: Partial<PlatformCalibration>;
   by_platform: Record<string, PlatformCalibration>;
   usable: boolean;
+  window?: string;
+  trend?: CalibrationTrend | null;
+}
+export interface Backtest {
+  usable: boolean;
+  reason?: string;
+  n_train?: number;
+  n_test?: number;
+  split?: string;
+  metric?: string;
+  median_abs_pct_error?: number;
+  within_20pct?: number;
+  within_30pct?: number;
+  agg_predicted_ctr?: number;
+  agg_actual_ctr?: number;
+  agg_abs_pct_error?: number | null;
+  note?: string;
 }
 export interface IngestReport {
   n_rows_in: number;
@@ -199,6 +222,7 @@ export interface IngestReport {
 export interface IngestResult {
   report: IngestReport;
   calibration: AccountCalibration;
+  backtest: Backtest;
   preview: Record<string, unknown>[];
   rows: Record<string, unknown>[];
 }
@@ -354,7 +378,7 @@ export interface SavedVariantResult {
   roasP50: number;
   roiP50: number;
   ctrPct: number;
-  verdictClass: 'strong' | 'positive' | 'break_even' | 'underperforming';
+  verdictClass: 'strong' | 'positive' | 'break_even' | 'underperforming' | 'void';
 }
 
 export interface SavedCampaign {
@@ -369,7 +393,7 @@ export interface SavedCampaign {
   roasP50: number;          // aggregate (mean of variant ROAS)
   roiP50: number;
   ctrPct: number;
-  verdictClass: 'strong' | 'positive' | 'break_even' | 'underperforming';
+  verdictClass: 'strong' | 'positive' | 'break_even' | 'underperforming' | 'void';
   thumbnailUrl: string | null;
   result: SimulateResponse; // first variant's result (back-compat)
   variants?: SavedVariantResult[];

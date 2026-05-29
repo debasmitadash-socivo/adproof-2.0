@@ -16,9 +16,10 @@ const VERDICT_GRADIENT: Record<string, string> = {
   positive: 'from-coral via-magenta to-violet',
   break_even: 'from-warning to-ink',
   underperforming: 'from-danger to-ink',
+  void: 'from-danger to-ink',
 };
 const VERDICT_GRADE: Record<string, string> = {
-  strong: 'A', positive: 'B', break_even: 'C', underperforming: 'D',
+  strong: 'A', positive: 'B', break_even: 'C', underperforming: 'D', void: '✕',
 };
 
 const CHART_TABS = [
@@ -120,7 +121,7 @@ export default function ResultPage() {
                   .map(({ v, originalIdx }, rank) => {
                     const winner = rank === 0;
                     const active = originalIdx === activeVariantIdx;
-                    const tone = ({ strong: 'success', positive: 'coral', break_even: 'warning', underperforming: 'danger' } as const)[v.verdictClass];
+                    const tone = ({ strong: 'success', positive: 'coral', break_even: 'warning', underperforming: 'danger', void: 'danger' } as const)[v.verdictClass];
                     return (
                       <tr key={v.label}
                           onClick={() => setActiveVariantIdx(originalIdx)}
@@ -776,13 +777,16 @@ function RerunButton({ campaign }: { campaign: SavedCampaign | null }) {
         roasP50: r.mc.predicted_roas.p50,
         roiP50: r.mc.predicted_roi.p50,
         ctrPct: (r.mc.sample_ctrs.reduce((a, b) => a + b, 0) / Math.max(r.mc.sample_ctrs.length, 1)) * 100,
-        verdictClass: r.insights.verdict_class,
+        verdictClass: (r.viability && (r.viability.forecast_valid === false || r.viability.runnable === false))
+          ? 'void'
+          : r.insights.verdict_class,
       }));
       const avgRoas = savedVariants.reduce((s, v) => s + v.roasP50, 0) / savedVariants.length;
       const avgRoi = savedVariants.reduce((s, v) => s + v.roiP50, 0) / savedVariants.length;
       const avgCtr = savedVariants.reduce((s, v) => s + v.ctrPct, 0) / savedVariants.length;
       const worstVerdict = (
-        savedVariants.some((v) => v.verdictClass === 'underperforming') ? 'underperforming'
+        savedVariants.some((v) => v.verdictClass === 'void') ? 'void'
+        : savedVariants.some((v) => v.verdictClass === 'underperforming') ? 'underperforming'
         : savedVariants.some((v) => v.verdictClass === 'break_even') ? 'break_even'
         : savedVariants.some((v) => v.verdictClass === 'positive') ? 'positive'
         : 'strong'
@@ -790,7 +794,9 @@ function RerunButton({ campaign }: { campaign: SavedCampaign | null }) {
 
       const newCampaign: SavedCampaign = {
         ...campaign,
-        id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         name: campaign.name.replace(/ \(re-run.*\)$/, '') + ` (re-run ${new Date().toLocaleDateString()})`,
         createdAt: Date.now(),
         result: firstResult,

@@ -8,7 +8,7 @@
 import { getSupabase } from './supabase';
 import type {
   SavedCampaign, SavedVariantResult, SavedAudience, CompanyProfile,
-  SimulateResponse, SimulateRequest, AccountCalibration,
+  SimulateResponse, SimulateRequest, AccountCalibration, Backtest,
 } from './types';
 
 async function uid(): Promise<string | null> {
@@ -196,12 +196,14 @@ export async function insertOutcomes(rows: Record<string, unknown>[], sourceFile
 }
 
 // ---------------------------------------------------------- calibrations (Path B)
-export async function saveCalibration(cal: AccountCalibration, nAds: number, sourceFile?: string): Promise<void> {
+export async function saveCalibration(
+  cal: AccountCalibration, nAds: number, backtest?: Backtest, sourceFile?: string,
+): Promise<void> {
   const sb = getSupabase(); const user_id = await uid();
   if (!sb || !user_id) return;
   const { error } = await sb.from('calibrations').insert({
     user_id, scope: 'account', params: cal as unknown, n_ads: nAds,
-    backtest: sourceFile ? { source_file: sourceFile } : null,
+    backtest: { ...(backtest ?? {}), source_file: sourceFile ?? null } as unknown,
   });
   if (error) console.error('[db] saveCalibration', error.message);
 }

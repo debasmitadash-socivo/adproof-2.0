@@ -12,12 +12,14 @@ const VERDICT_TONE: Record<SavedCampaign['verdictClass'], 'success' | 'coral' | 
   positive: 'coral',
   break_even: 'warning',
   underperforming: 'danger',
+  void: 'danger',
 };
 const VERDICT_LABEL: Record<SavedCampaign['verdictClass'], string> = {
   strong: 'Strong',
   positive: 'Positive',
   break_even: 'Break-even',
   underperforming: 'Underperforming',
+  void: "Won't run",
 };
 
 export default function DashboardPage() {

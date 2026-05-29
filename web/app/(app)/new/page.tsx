@@ -243,10 +243,10 @@ export default function NewAnalysisPage() {
         roiP50: r.mc.predicted_roi.p50,
         ctrPct: (r.mc.sample_ctrs.reduce((a, b) => a + b, 0) /
                  Math.max(r.mc.sample_ctrs.length, 1)) * 100,
-        // A void forecast (banned / broken creative) must never read as a
-        // positive verdict on the dashboard — downgrade to underperforming.
-        verdictClass: (r.viability && r.viability.forecast_valid === false)
-          ? 'underperforming'
+        // A void forecast (banned / broken creative) is NOT "underperforming"
+        // (which implies it runs but poorly) — it can't be forecast at all.
+        verdictClass: (r.viability && (r.viability.forecast_valid === false || r.viability.runnable === false))
+          ? 'void'
           : r.insights.verdict_class,
       }));
 
@@ -256,7 +256,8 @@ export default function NewAnalysisPage() {
       const avgCtr = savedVariants.reduce((s, v) => s + v.ctrPct, 0) / savedVariants.length;
       // Worst-case verdict (most pessimistic) so dashboard is honest.
       const worstVerdict = (
-        savedVariants.some((v) => v.verdictClass === 'underperforming') ? 'underperforming'
+        savedVariants.some((v) => v.verdictClass === 'void') ? 'void'
+        : savedVariants.some((v) => v.verdictClass === 'underperforming') ? 'underperforming'
         : savedVariants.some((v) => v.verdictClass === 'break_even') ? 'break_even'
         : savedVariants.some((v) => v.verdictClass === 'positive') ? 'positive'
         : 'strong'
