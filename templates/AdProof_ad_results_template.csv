@@ -1,0 +1,4 @@
+ad_name,date_start,date_end,platform,format,spend,impressions,clicks,conversions,revenue,ad_copy,audience,creative_file_or_link,test_group,conversion_type,objective,currency,geo,product_price_or_AOV
+IG Serum - Glow A,2025-09-01,2025-09-30,meta_ig,feed_image,1200,410000,5330,142,8520,Glow from within - 30% off our vitamin C serum.,"Women 25-45, skincare, UK",serum_A.jpg (attach file),serum_creative_test,purchase,conversions,GBP,UK,60
+IG Serum - Glow B,2025-09-01,2025-09-30,meta_ig,feed_image,1200,398000,4120,138,8280,Glow from within - 30% off our vitamin C serum.,"Women 25-45, skincare, UK",serum_B.jpg (attach file),serum_creative_test,purchase,conversions,GBP,UK,60
+LinkedIn Demo - Ops,2025-09-01,2025-09-30,linkedin,sponsored_image,2400,95000,480,22,6600,Cut reporting time 40% - book a 15-min demo.,"Ops & finance managers, UK",demo.png (attach file),,demo_booking,leads,GBP,UK,300

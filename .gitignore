@@ -54,6 +54,9 @@ data/benchmarks/*.json
 *.csv
 !src/**/*.csv
 !data/raw/synthetic_ctr.csv
+# Blank client-facing templates (no customer data) — keep in the repo.
+!templates/*.xlsx
+!templates/*.csv
 
 # ============================================================================
 # Node / Next.js / Frontend build
