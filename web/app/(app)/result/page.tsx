@@ -92,9 +92,12 @@ export default function ResultPage() {
       {/* MULTI-VARIANT LEADERBOARD — only shows when the campaign has >1 variant */}
       {hasVariants && campaign?.variants && (
         <Card className="mb-6 !p-0 overflow-hidden">
-          <div className="px-6 py-4 bg-gradient-to-r from-coral-soft to-magenta-soft border-b border-coral/30">
-            <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.1em]">Variant leaderboard</div>
-            <div className="text-[14px] mt-0.5">{campaign.variants.length} variants tested against the same audience &amp; budget — sorted by ROAS.</div>
+          <div className="px-6 py-4 bg-gradient-to-r from-coral-soft to-magenta-soft border-b border-coral/30 flex items-center gap-3">
+            <div className="flex-1">
+              <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.1em]">Variant leaderboard</div>
+              <div className="text-[14px] mt-0.5">{campaign.variants.length} variants tested against the same audience &amp; budget — sorted by ROAS.</div>
+            </div>
+            <Link href="/compare"><Button size="sm">Compare all → why each wins</Button></Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
