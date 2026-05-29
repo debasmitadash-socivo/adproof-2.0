@@ -85,6 +85,7 @@ _TERM_LABEL = {
     "persona_match": "audience / channel / category fit",
     "word_of_mouth": "word-of-mouth on the social graph",
     "fatigue": "ad fatigue from repeat exposure",
+    "plausibility_cap": "plausibility cap (kept the forecast realistic)",
 }
 
 

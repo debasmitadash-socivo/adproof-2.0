@@ -12,6 +12,24 @@ import type {
   UserProfile,
   Variant,
 } from './types';
+import {
+  saveCampaign as dbSaveCampaign,
+  deleteCampaign as dbDeleteCampaign,
+  listCampaigns as dbListCampaigns,
+  saveAudience as dbSaveAudience,
+  deleteAudience as dbDeleteAudience,
+  listAudiences as dbListAudiences,
+  saveCompany as dbSaveCompany,
+  getCompany as dbGetCompany,
+} from './db';
+import { getSupabase } from './supabase';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (s: string) => UUID_RE.test(s);
+const newId = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 interface AppState {
   // -- persisted across sessions ----------------------------------------
@@ -33,6 +51,12 @@ interface AppState {
 
   hydrated: boolean;
   setHydrated: (b: boolean) => void;
+
+  // DB sync: true once we've loaded from / imported into Supabase (or decided
+  // there's no DB). The app waits for this before the onboarding redirect so a
+  // company that lives only in the DB isn't mistaken for "no company".
+  dbSynced: boolean;
+  syncFromDb: () => Promise<void>;
 
   resetAccount: () => void;
 
@@ -138,25 +162,83 @@ const transientDefaults = {
 
 export const useApp = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // persisted
       user: null,
       setUser: (u) => set({ user: u }),
       companyDescription: '',
       companyProfile: null,
       setCompanyDescription: (s) => set({ companyDescription: s }),
-      setCompanyProfile: (p) => set({ companyProfile: p }),
+      setCompanyProfile: (p) => {
+        set({ companyProfile: p });
+        if (p) dbSaveCompany(p).catch((e) => console.error('[db] saveCompany', e));
+      },
       savedCampaigns: [],
-      addCampaign: (c) =>
-        set((s) => ({ savedCampaigns: [c, ...s.savedCampaigns].slice(0, 200) })),
-      deleteCampaign: (id) =>
-        set((s) => ({ savedCampaigns: s.savedCampaigns.filter((c) => c.id !== id) })),
+      addCampaign: (c) => {
+        set((s) => ({ savedCampaigns: [c, ...s.savedCampaigns].slice(0, 200) }));
+        dbSaveCampaign(c).catch((e) => console.error('[db] saveCampaign', e));
+      },
+      deleteCampaign: (id) => {
+        set((s) => ({ savedCampaigns: s.savedCampaigns.filter((c) => c.id !== id) }));
+        dbDeleteCampaign(id).catch((e) => console.error('[db] deleteCampaign', e));
+      },
       savedAudiences: [],
-      addAudience: (a) => set((s) => ({ savedAudiences: [a, ...s.savedAudiences] })),
-      deleteAudience: (id) =>
-        set((s) => ({ savedAudiences: s.savedAudiences.filter((a) => a.id !== id) })),
+      addAudience: (a) => {
+        set((s) => ({ savedAudiences: [a, ...s.savedAudiences] }));
+        dbSaveAudience(a).catch((e) => console.error('[db] saveAudience', e));
+      },
+      deleteAudience: (id) => {
+        set((s) => ({ savedAudiences: s.savedAudiences.filter((a) => a.id !== id) }));
+        dbDeleteAudience(id).catch((e) => console.error('[db] deleteAudience', e));
+      },
       hydrated: false,
       setHydrated: (b) => set({ hydrated: b }),
+      dbSynced: false,
+      syncFromDb: async () => {
+        try {
+          const sb = getSupabase();
+          if (!sb) { set({ dbSynced: true }); return; }
+          const { data } = await sb.auth.getUser();
+          if (!data.user) { set({ dbSynced: true }); return; }
+          const local = get();
+          let [campaigns, audiences, company] = await Promise.all([
+            dbListCampaigns(), dbListAudiences(), dbGetCompany(),
+          ]);
+          // One-time import: if the DB is empty but the browser has data, push
+          // it up (regenerating any non-UUID ids) so nothing is lost.
+          if (campaigns.length === 0 && local.savedCampaigns.length > 0) {
+            const imported: SavedCampaign[] = [];
+            for (const c of local.savedCampaigns) {
+              const cc = isUuid(c.id) ? c : { ...c, id: newId() };
+              await dbSaveCampaign(cc);
+              imported.push(cc);
+            }
+            campaigns = imported;
+          }
+          if (audiences.length === 0 && local.savedAudiences.length > 0) {
+            const imp: SavedAudience[] = [];
+            for (const a of local.savedAudiences) {
+              const aa = isUuid(a.id) ? a : { ...a, id: newId() };
+              await dbSaveAudience(aa);
+              imp.push(aa);
+            }
+            audiences = imp;
+          }
+          if (!company && local.companyProfile) {
+            await dbSaveCompany(local.companyProfile);
+            company = local.companyProfile;
+          }
+          set({
+            savedCampaigns: campaigns.length ? campaigns : local.savedCampaigns,
+            savedAudiences: audiences.length ? audiences : local.savedAudiences,
+            companyProfile: company ?? local.companyProfile,
+            dbSynced: true,
+          });
+        } catch (e) {
+          console.error('[db] syncFromDb failed', e);
+          set({ dbSynced: true });   // never block the app on a DB hiccup
+        }
+      },
       resetAccount: () =>
         set({
           user: null,

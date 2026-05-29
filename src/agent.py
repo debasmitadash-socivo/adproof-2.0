@@ -103,6 +103,26 @@ FATIGUE_CAP = 8
 # persona is to it.
 WOM_BASE_SCALE = 0.5
 
+# Plausibility guardrails (guardrails, NOT measured effects): bound how far a
+# single creative can move CTR / conversion away from the channel benchmark.
+# Without this, the additive visual + psychology + persona-match terms stack
+# into fantasy uplifts -- a merely-good ad computing ~4x the benchmark CTR and
+# a 20x+ ROAS. These caps keep the directional forecast inside a believable
+# band while preserving the relative ordering (weak < neutral < strong).
+#
+# Logit scale, applied to the deviation from the anchored benchmark. Clicks and
+# conversion get DIFFERENT caps on purpose: a strong creative can roughly
+# double click-through, but it has far less leverage over post-click
+# conversion -- that is driven mostly by price, product and landing page, none
+# of which the creative analysis can even see. A creative can also fail harder
+# than it can win, so the downside drag is looser than the upside.
+#   click uplift +0.7 ~ 2.0x odds  | drag -2.0 ~ 0.13x
+#   conv  uplift +0.5 ~ 1.6x odds  | drag -1.2 ~ 0.30x
+CLICK_MAX_LOGIT_UPLIFT = 0.7
+CLICK_MAX_LOGIT_DRAG = 2.0
+CONV_MAX_LOGIT_UPLIFT = 0.5
+CONV_MAX_LOGIT_DRAG = 1.2
+
 # How a product category maps onto persona interest tags (soft fit).
 _CATEGORY_INTEREST_HINTS = {
     "apparel": {"fashion"},
@@ -293,12 +313,19 @@ def compute_click_probability(persona: dict,
                                base_logit: float,
                                visual_weights: dict | None = None,
                                social_influence: float = 0.0,
-                               prior_exposures: int = 0
+                               prior_exposures: int = 0,
+                               anchor_logit: float | None = None
                                ) -> ProbabilityBreakdown:
     """Probability that ``persona`` clicks ``ad`` on a single exposure.
 
     ``calibration`` is any object exposing a ``coefficients`` dict mapping
     each psychology feature to its logit weight (see ``calibration.py``).
+
+    ``anchor_logit`` is the anchored benchmark click logit. When supplied, the
+    creative's deviation from it is clamped to a believable band (see
+    ``MAX_CREATIVE_LOGIT_*``) so a strong creative can't compute a fantasy CTR.
+    Leave it None (the default) to measure raw contributions -- the benchmark
+    anchoring itself relies on the unclamped value.
     """
     vw = visual_weights or DEFAULT_VISUAL_WEIGHTS
 
@@ -333,17 +360,31 @@ def compute_click_probability(persona: dict,
 
     total = (base_logit + visual_logit + match_logit + psych_logit
              + wom_logit + fatigue_logit)
+
+    # Plausibility clamp: bound the creative's deviation from the benchmark so
+    # the directional forecast stays in a believable range.
+    clamp_adjust = 0.0
+    if anchor_logit is not None:
+        deviation = total - anchor_logit
+        clamped = max(-CLICK_MAX_LOGIT_DRAG,
+                      min(CLICK_MAX_LOGIT_UPLIFT, deviation))
+        clamp_adjust = clamped - deviation        # 0 unless we hit a cap
+        total += clamp_adjust
+
+    contributions = {
+        "base": base_logit,
+        "visual": visual_logit,
+        "persona_match": match_logit,
+        "psychology": psych_logit,
+        "word_of_mouth": wom_logit,
+        "fatigue": fatigue_logit,
+    }
+    if clamp_adjust:
+        contributions["plausibility_cap"] = clamp_adjust
     return ProbabilityBreakdown(
         probability=_sigmoid(total),
         total_logit=total,
-        contributions={
-            "base": base_logit,
-            "visual": visual_logit,
-            "persona_match": match_logit,
-            "psychology": psych_logit,
-            "word_of_mouth": wom_logit,
-            "fatigue": fatigue_logit,
-        },
+        contributions=contributions,
         detail={
             "visual": visual_detail,
             "persona_match": match_detail,
@@ -354,12 +395,17 @@ def compute_click_probability(persona: dict,
 
 def compute_conversion_probability(persona: dict,
                                    ad: AdStimulus,
-                                   base_logit: float | None = None
+                                   base_logit: float | None = None,
+                                   anchor_logit: float | None = None
                                    ) -> ProbabilityBreakdown:
     """Probability of a purchase GIVEN a click (post-click conversion).
 
     Driven by the persona's buying disposition and by ad cues that build
     purchase confidence (relevance, clarity, social proof, deal appeal).
+
+    ``anchor_logit`` (the anchored benchmark conversion logit), when supplied,
+    clamps the creative's deviation to a believable band -- same plausibility
+    guardrail as the click model.
     """
     base = (DEFAULT_CONVERSION_BASE_LOGIT if base_logit is None
             else base_logit)
@@ -383,6 +429,16 @@ def compute_conversion_probability(persona: dict,
                         * _get(persona, "price_consciousness") * 0.60),
     }
     total = sum(contributions.values())
+
+    if anchor_logit is not None:
+        deviation = total - anchor_logit
+        clamped = max(-CONV_MAX_LOGIT_DRAG,
+                      min(CONV_MAX_LOGIT_UPLIFT, deviation))
+        adjust = clamped - deviation
+        if adjust:
+            contributions["plausibility_cap"] = adjust
+            total += adjust
+
     return ProbabilityBreakdown(
         probability=_sigmoid(total),
         total_logit=total,
@@ -447,6 +503,7 @@ class AdConsumerAgent(_MesaAgent):
             visual_weights=getattr(model, "visual_weights", None),
             social_influence=self.social_influence,
             prior_exposures=self.times_exposed,
+            anchor_logit=getattr(model, "_click_anchor_logit", None),
         )
         self.last_click_breakdown = click
         self.times_exposed += 1
@@ -457,6 +514,7 @@ class AdConsumerAgent(_MesaAgent):
             conv = compute_conversion_probability(
                 self.persona, model.ad,
                 base_logit=getattr(model, "conversion_base_logit", None),
+                anchor_logit=getattr(model, "_conv_anchor_logit", None),
             )
             self.last_conversion_breakdown = conv
             self.expected_conversions_total += conv.probability

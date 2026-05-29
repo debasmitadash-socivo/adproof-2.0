@@ -37,7 +37,8 @@ from brief import CampaignBrief, CreativeAssets  # noqa: E402
 from company_profile import parse_company  # noqa: E402
 from copy_critique import critique_copy  # noqa: E402
 from llm import have_any_key  # noqa: E402
-from pipeline import run_wizard_simulation  # noqa: E402
+from outcomes import ingest_and_calibrate  # noqa: E402
+from pipeline import VisionUnavailableError, run_wizard_simulation  # noqa: E402
 from platforms import (  # noqa: E402
     BENCHMARK_AS_OF,
     FORMATS,
@@ -199,6 +200,10 @@ class SimulateRequest(BaseModel):
     daily_reach: float = 0.35
     n_runs: int = 20
     target_conversion_rate: float = 0.025
+    # --- Per-account calibration (Path B): the advertiser's REAL CTR / CPM
+    # from their ad history, override the generic format benchmarks. ---------
+    target_ctr: Optional[float] = None
+    cpm_override: Optional[float] = None
     # --- Real economics (the honest inputs that replace synthetic AOV) -----
     avg_order_value: Optional[float] = None   # customer value in `currency`
     product_price: Optional[float] = None
@@ -404,6 +409,35 @@ async def upload_creative(file: UploadFile = File(...)) -> dict:
         "content_type": file.content_type,
         "kind": kind,
     }
+
+
+@app.post("/api/ingest-outcomes")
+async def ingest_outcomes(file: UploadFile = File(...)) -> dict:
+    """Parse a real ad-performance export (Meta/Google/our template) and
+    compute per-account real benchmarks — CTR/CPM/CPC, plus conversion-rate
+    and ROAS where the file actually contains that data.
+
+    Stateless: the cleaned rows + calibration are returned for the frontend to
+    persist under the logged-in user (RLS), so one account's data never becomes
+    a shared prior. This is Path B, part 1.
+    """
+    name = (file.filename or "").lower()
+    if not name.endswith((".csv", ".xlsx", ".xls")):
+        raise HTTPException(status_code=400,
+                            detail="Please upload a .csv or .xlsx export.")
+    try:
+        data = await file.read()
+    finally:
+        await file.close()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 25 MB).")
+    try:
+        return ingest_and_calibrate(data, file.filename or "upload")
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=422,
+                            detail=f"Could not parse this export: {str(e)[:300]}")
 
 
 # Serve uploaded files back so the wizard can preview them.
@@ -1074,6 +1108,8 @@ def simulate(req: SimulateRequest) -> dict:
         budget=req.budget, days=req.days,
         daily_reach=req.daily_reach, n_runs=req.n_runs,
         target_conversion_rate=req.target_conversion_rate,
+        target_ctr_override=req.target_ctr,
+        cpm_override=req.cpm_override,
         avg_order_value=req.avg_order_value,
         product_price=req.product_price,
         currency=req.currency,
@@ -1090,6 +1126,14 @@ def simulate(req: SimulateRequest) -> dict:
             profile=profile, match=match, brief=brief, assets=assets,
             visual_provider=req.visual_provider,
         )
+    except VisionUnavailableError as exc:
+        # The image couldn't be inspected by a real vision model, so the run
+        # is refused (no forecast). 422 = the request was valid but we can't
+        # responsibly produce a result for it right now.
+        detail = str(exc)
+        if exc.provider_error:
+            detail += f" (technical detail: {exc.provider_error})"
+        raise HTTPException(status_code=422, detail=detail)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

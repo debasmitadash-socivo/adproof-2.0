@@ -164,6 +164,43 @@ export interface SimulateRequest {
   cta: string;
   link: string;
   visual_provider: 'auto' | 'claude' | 'openai' | 'heuristic';
+  // Per-account calibration (Path B): the user's REAL CTR / CPM override the
+  // generic format benchmarks when they've uploaded their ad history.
+  target_ctr?: number | null;
+  cpm_override?: number | null;
+}
+
+// ---------- Path B: real-data ingest + per-account calibration ----------
+export interface PlatformCalibration {
+  n_ads: number;
+  impressions: number;
+  real_ctr: number | null;
+  real_cpm: number | null;
+  real_cpc: number | null;
+  real_cvr: number | null;
+  real_roas: number | null;
+  confidence: 'low' | 'medium' | 'high';
+}
+export interface AccountCalibration {
+  currency: string;
+  overall: Partial<PlatformCalibration>;
+  by_platform: Record<string, PlatformCalibration>;
+  usable: boolean;
+}
+export interface IngestReport {
+  n_rows_in: number;
+  n_rows_kept: number;
+  currency: string;
+  mapped: Record<string, string>;
+  missing: string[];
+  warnings: string[];
+  sheet: string | null;
+}
+export interface IngestResult {
+  report: IngestReport;
+  calibration: AccountCalibration;
+  preview: Record<string, unknown>[];
+  rows: Record<string, unknown>[];
 }
 
 export interface DistBand {

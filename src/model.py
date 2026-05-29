@@ -224,6 +224,11 @@ class AdSimulationModel(_MesaModel):
         self.network_avg_degree = float(np.mean(degrees)) if degrees else 0.0
 
         # --- Anchor base CTR to the channel benchmark --------------------
+        # ``_click_anchor_logit`` is the benchmark the actual creative's CTR is
+        # allowed to deviate around (within the plausibility caps). None when
+        # not anchoring, which disables the clamp.
+        self._click_anchor_logit = None
+        self._conv_anchor_logit = None
         if anchor_to_benchmark:
             if target_ctr is None:
                 target_logit = self.base_logit          # current = channel base
@@ -232,6 +237,7 @@ class AdSimulationModel(_MesaModel):
                     raise ValueError("target_ctr must be in (0, 1).")
                 target_logit = math.log(target_ctr / (1 - target_ctr))
             self._anchor_base_logit(target_logit)
+            self._click_anchor_logit = target_logit
         self.is_anchored = bool(anchor_to_benchmark)
 
         # --- Anchor the conversion model too ---------------------------
@@ -246,6 +252,7 @@ class AdSimulationModel(_MesaModel):
             conv_target_logit = math.log(
                 target_conversion_rate / (1 - target_conversion_rate))
             self._anchor_conversion_base_logit(conv_target_logit)
+            self._conv_anchor_logit = conv_target_logit
 
         # --- Run state ---------------------------------------------------
         self.current_day = 0

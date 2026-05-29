@@ -54,9 +54,25 @@ __all__ = [
     "get_resources",
     "format_headline_md",
     "format_visual_md",
+    "VisionUnavailableError",
     "CHANNELS", "SEGMENTS", "CATEGORIES", "PROVIDERS",
     "DEFAULT_AD_TEXT", "DISCLAIMER",
 ]
+
+
+class VisionUnavailableError(RuntimeError):
+    """Raised when an image was supplied but no real vision model could
+    inspect it (all providers exhausted/down), so the run is refused.
+
+    A forecast for an image we never actually looked at can't confirm the
+    creative is policy-safe or judge its quality, so we block rather than
+    show a number we can't stand behind. Carries ``provider_error`` with the
+    underlying per-provider failure detail for diagnostics.
+    """
+
+    def __init__(self, message: str, provider_error: str = ""):
+        super().__init__(message)
+        self.provider_error = provider_error
 
 # ---------------------------------------------------------------------------
 # UI option lists -- imported by app.py for dropdowns and report.py for CLI.
@@ -388,6 +404,23 @@ def run_wizard_simulation(profile: CompanyProfile,
                          brand_category=profile.product_category,
                          brand_industry=profile.industry)
               if image_path else None)
+
+    # SAFETY GATE — block the run if an image was supplied but no real vision
+    # model could inspect it. Heuristic mode can't see the picture: it can't
+    # screen for nudity/policy violations and its "visual quality" scores are
+    # pixel statistics, not understanding. Showing a forecast here would imply
+    # an unscreened image is fine, so we refuse the run before spending any
+    # compute on a number we can't stand behind.
+    if image_path and visual is not None and visual.is_heuristic:
+        raise VisionUnavailableError(
+            "We couldn't analyse your image — the image-understanding service "
+            "is temporarily unavailable (the free-tier vision quota is used "
+            "up right now). We won't show a forecast we can't stand behind: "
+            "without actually looking at the image we can't confirm it's "
+            "policy-safe or judge its quality. Please try again in a few "
+            "minutes, or add your own vision API key in Settings.",
+            provider_error=getattr(visual, "provider_error", "") or "",
+        )
 
     _step(0.25, "Building ad stimulus...")
     visual_scores = (visual.scores if visual is not None

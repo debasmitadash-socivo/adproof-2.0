@@ -10,6 +10,7 @@ import type {
   SimulateRequest,
   SimulateResponse,
   UploadResponse,
+  IngestResult,
 } from './types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -19,7 +20,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`API ${res.status}: ${text || res.statusText}`);
+    // FastAPI returns errors as {"detail": "..."} (or {"detail": {...}}).
+    // Surface the human message rather than the raw JSON envelope.
+    let message = text || res.statusText;
+    try {
+      const body = JSON.parse(text);
+      if (body && body.detail) {
+        message = typeof body.detail === 'string'
+          ? body.detail
+          : (body.detail.message || JSON.stringify(body.detail));
+      }
+    } catch {
+      /* response wasn't JSON — keep the raw text */
+    }
+    throw new Error(message);
   }
   return res.json() as Promise<T>;
 }
@@ -64,6 +78,23 @@ export const api = {
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Upload failed (${res.status}): ${text || res.statusText}`);
+    }
+    return res.json();
+  },
+  ingestOutcomes: async (file: File): Promise<IngestResult> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/ingest-outcomes', { method: 'POST', body: fd });
+    if (!res.ok) {
+      const text = await res.text();
+      let message = text || res.statusText;
+      try {
+        const body = JSON.parse(text);
+        if (body?.detail) {
+          message = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+        }
+      } catch { /* keep raw text */ }
+      throw new Error(message);
     }
     return res.json();
   },

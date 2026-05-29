@@ -12,6 +12,7 @@ const Icon = {
   Sq: (<svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 9h6v6H9z" /></svg>),
   Home: (<svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21h18" /><path d="M5 21V7l8-4 8 4v14" /></svg>),
   Cog: (<svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33" /></svg>),
+  Chart: (<svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18" /><rect x="7" y="11" width="3" height="6" /><rect x="12" y="7" width="3" height="10" /><rect x="17" y="13" width="3" height="4" /></svg>),
 };
 
 export function Sidebar() {
@@ -35,6 +36,7 @@ export function Sidebar() {
     { href: '/audiences', label: 'Audiences', icon: Icon.Users,
       badge: audienceCount > 0 ? String(audienceCount) : undefined },
     { href: '/creatives', label: 'Creatives', icon: Icon.Sq },
+    { href: '/data', label: 'Your data', icon: Icon.Chart },
   ];
   const workspaceLinks = [
     { href: '/company', label: 'Company profile', icon: Icon.Home },

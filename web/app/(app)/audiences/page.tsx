@@ -106,7 +106,9 @@ function CreateAudienceModal({
   function save() {
     if (!name.trim()) return;
     const audience: SavedAudience = {
-      id: `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `a_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       name: name.trim(),
       description,
       segment: 'all', // matcher will pick best fit at simulate time

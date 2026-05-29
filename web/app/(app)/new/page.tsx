@@ -9,7 +9,20 @@ import { Pill } from '@/components/ui/Pill';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { useApp } from '@/lib/store';
 import { api } from '@/lib/api';
+import { getLatestCalibration } from '@/lib/db';
 import type { BenchmarkRefreshResponse, Platform, SavedCampaign, SavedVariantResult } from '@/lib/types';
+
+// Map a wizard platform id to the calibration bucket produced by the ingest.
+function calibrationPlatformKey(platformId: string): string {
+  const p = platformId.toLowerCase();
+  if (p.includes('instagram')) return 'meta_instagram';
+  if (p.includes('facebook') || p.includes('meta')) return 'meta_facebook';
+  if (p.includes('linkedin')) return 'linkedin';
+  if (p.includes('tiktok')) return 'tiktok';
+  if (p.includes('youtube')) return 'youtube';
+  if (p.includes('google') || p.includes('search')) return 'google_search';
+  return platformId;
+}
 import {
   filtersForPlatform,
   suggestedChips,
@@ -144,6 +157,22 @@ export default function NewAnalysisPage() {
         })),
       ];
 
+      // Per-account calibration (Path B): if the user has uploaded their ad
+      // history, use THEIR real CTR / CPM for this platform instead of the
+      // generic format benchmark — so the forecast reflects their account.
+      let calCtr: number | null = null;
+      let calCpm: number | null = null;
+      let calCvr: number | null = null;
+      try {
+        const cal = await getLatestCalibration();
+        const pc = cal?.by_platform?.[calibrationPlatformKey(w.platformId)];
+        if (pc && pc.real_ctr) {
+          calCtr = pc.real_ctr;
+          calCpm = pc.real_cpm;
+          calCvr = pc.real_cvr;
+        }
+      } catch { /* calibration is best-effort — never block a run */ }
+
       // Common simulate inputs reused per variant.
       const commonInputs = {
         company_description: w.companyDescription,
@@ -158,8 +187,14 @@ export default function NewAnalysisPage() {
         n_runs: w.nRuns,
         // Real economics + market for THIS campaign (defaults from company
         // profile, overridable on the Run step). Conversion rate is entered
-        // as a percentage in the UI; convert to a fraction here.
-        target_conversion_rate: Math.max(Number(convRate) || 2.5, 0.01) / 100,
+        // as a percentage in the UI; convert to a fraction here. A calibrated
+        // conversion rate (from real data) wins when available.
+        target_conversion_rate: (calCvr && calCvr > 0)
+          ? calCvr
+          : Math.max(Number(convRate) || 2.5, 0.01) / 100,
+        // Calibrated click + cost benchmarks (null = fall back to generic).
+        target_ctr: calCtr,
+        cpm_override: calCpm,
         avg_order_value: aov ? Number(aov) : null,
         currency,
         geo,
@@ -228,7 +263,9 @@ export default function NewAnalysisPage() {
       ) as SavedCampaign['verdictClass'];
 
       const campaign: SavedCampaign = {
-        id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         name: (w.headline || `${firstResult.format.platform} · ${firstResult.format.name}`)
               + (savedVariants.length > 1 ? ` (${savedVariants.length} variants)` : ''),
         createdAt: Date.now(),

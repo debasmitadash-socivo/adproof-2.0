@@ -34,8 +34,11 @@ class CampaignBrief:
     days: int = 14
     daily_reach: float = 0.35
     n_runs: int = 20
-    # Optional explicit benchmark anchors (None = derive from format).
+    # Optional explicit benchmark anchors (None = derive from format). These
+    # are how per-account calibration (Path B) feeds the engine: the user's
+    # REAL CTR / CPM from their ad history override the generic benchmarks.
     target_ctr_override: float | None = None
+    cpm_override: float | None = None
     target_conversion_rate: float | None = 0.025
     # --- Real economics (supplied by the advertiser; the honest inputs) ----
     # Average order value / customer value in `currency`. When set, this is
@@ -73,6 +76,8 @@ class CampaignBrief:
 
     @property
     def effective_cpm(self) -> float:
+        if self.cpm_override and self.cpm_override > 0:
+            return float(self.cpm_override)
         cpm = float(self.format.benchmarks.get("cpm", 10.0))
         # For CPC-priced formats (CPM == 0), approximate equivalent CPM via
         # CTR * CPC * 1000 so budget -> impressions math still works.

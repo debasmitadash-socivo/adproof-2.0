@@ -9,6 +9,7 @@ import { getSupabase } from '@/lib/supabase';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const hydrated = useApp((s) => s.hydrated);
+  const dbSynced = useApp((s) => s.dbSynced);
   const user = useApp((s) => s.user);
   const profile = useApp((s) => s.companyProfile);
   const setUser = useApp((s) => s.setUser);
@@ -45,6 +46,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         // — clear it so we don't show a phantom logged-in state.
         setUser(null);
       }
+      // Load campaigns/company/audiences from the DB (and one-time import any
+      // browser-only data). Safe whether or not there's a session.
+      useApp.getState().syncFromDb();
     });
 
     // Listen for sign-out / token-refresh events to keep things in sync.
@@ -58,10 +62,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [setUser]);
 
   // Onboarding redirect — once we know there's a user but no company profile.
+  // Wait for the DB sync so a company that lives only in the DB isn't treated
+  // as "no company" (which would wrongly bounce the user to onboarding).
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !dbSynced) return;
     if (user && !profile) router.replace('/onboarding');
-  }, [hydrated, user, profile, router]);
+  }, [hydrated, dbSynced, user, profile, router]);
 
   if (!hydrated) return null;
 
