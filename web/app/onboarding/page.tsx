@@ -16,7 +16,11 @@ export default function OnboardingPage() {
   const setCompanyProfile = useApp((s) => s.setCompanyProfile);
   const createWorkspace = useApp((s) => s.createWorkspace);
 
-  const [step, setStep] = useState<1 | 2>(1);
+  // New-workspace flow starts at the Company step (the user is already known).
+  const [step, setStep] = useState<1 | 2>(() =>
+    (typeof window !== 'undefined' &&
+     new URLSearchParams(window.location.search).get('new') === '1') ? 2 : 1,
+  );
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [desc, setDesc] = useState('');
@@ -30,13 +34,13 @@ export default function OnboardingPage() {
   const [usps, setUsps] = useState<string[]>([]);
   const [brandColor, setBrandColor] = useState<string>('#FF5A4D');
   // When ?new=1, this is a "create another workspace" flow — not first-time
-  // onboarding — so don't auto-redirect even if a profile already exists.
-  const [isNewWorkspace, setIsNewWorkspace] = useState(false);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    setIsNewWorkspace(params.get('new') === '1');
-  }, []);
+  // onboarding. Read the flag SYNCHRONOUSLY on the first render (lazy init) so
+  // the redirect-if-onboarded effect below sees the right value immediately —
+  // otherwise it bounces straight to /dashboard before the flag is set.
+  const [isNewWorkspace] = useState(() =>
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('new') === '1',
+  );
 
   // Skip onboarding if it's already been completed — UNLESS this is an
   // explicit "create another workspace" run.
