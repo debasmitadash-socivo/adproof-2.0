@@ -346,6 +346,66 @@ def _aov_multiplier_for_profile(profile: CompanyProfile) -> float:
     return base
 
 
+def _parse_ratio(s: str) -> float | None:
+    try:
+        w, h = s.split(":")
+        return float(w) / float(h)
+    except Exception:
+        return None
+
+
+def _orientation(r: float) -> str:
+    if r < 0.9:
+        return "vertical"
+    if r > 1.15:
+        return "horizontal"
+    return "square"
+
+
+def check_image_specs(image_path, fmt):
+    """Cheap, NO-API pre-flight on an image creative. Confirms the file opens
+    and that its orientation can actually run on this placement. If a creative
+    fundamentally can't be published here (corrupt file, or a landscape photo
+    on a vertical-only Reel), there's nothing worth forecasting — so we refuse
+    BEFORE spending a vision-model call. Returns (hard_error|None, warnings).
+    """
+    from PIL import Image
+    warnings: list = []
+    try:
+        with Image.open(image_path) as im:
+            im.verify()                       # detects truncation/corruption
+        with Image.open(image_path) as im:
+            w, h = im.size
+    except Exception as exc:                  # noqa: BLE001
+        return (f"We couldn't open this image — it looks corrupt or is an "
+                f"unsupported file type. Upload a valid JPG/PNG/WebP, then "
+                f"re-run. (detail: {str(exc)[:80]})"), warnings
+    if not w or not h:
+        return "This image reports no dimensions — it may be corrupt.", warnings
+
+    allowed = [r for r in (_parse_ratio(s) for s in (fmt.aspect_ratios or ())) if r]
+    if not allowed:
+        return None, warnings                 # no ratio constraint for this format
+
+    img_ratio = w / h
+    if any(abs(img_ratio - r) / r <= 0.20 for r in allowed):
+        return None, warnings                 # close enough to an allowed ratio
+
+    img_o = _orientation(img_ratio)
+    allowed_os = sorted({_orientation(r) for r in allowed})
+    nice = ", ".join(fmt.aspect_ratios)
+    # Hard block ONLY on a clear orientation clash (square stays lenient).
+    if img_o != "square" and img_o not in allowed_os and "square" not in allowed_os:
+        return (f"This image is {img_o} ({w}×{h}px), but {fmt.name} needs a "
+                f"{'/'.join(allowed_os)} creative ({nice}). It can't run properly "
+                f"on this placement, so there's no point analysing it — crop or "
+                f"replace it, then re-run."), warnings
+    warnings.append({"severity": "warning",
+        "message": f"Image is {w}×{h}px (ratio {img_ratio:.2f}); {fmt.name} prefers "
+                   f"{nice}. It'll be cropped to fit — check the framing."})
+    return None, warnings
+
+
 def _resolve_creative_for_visual(assets: CreativeAssets):
     """Pick the file to send to the visual analyser.
 
@@ -390,6 +450,16 @@ def run_wizard_simulation(profile: CompanyProfile,
     creative_kind, creative_path = _resolve_creative_for_visual(assets)
     image_path = creative_path if creative_kind == "image" else None
     video_path = creative_path if creative_kind == "video" else None
+
+    # Platform-spec pre-flight (cheap, NO API): if an image was supplied,
+    # confirm it can actually RUN on this placement before we spend a vision
+    # call. A corrupt file or a wrong-orientation creative is unpublishable, so
+    # analysing it would just burn API on an ad that can never go live.
+    if image_path:
+        spec_error, spec_warnings = check_image_specs(image_path, fmt)
+        if spec_error:
+            raise ValueError(spec_error)      # 400 to the client; no API spent
+        validation.extend(spec_warnings)
 
     # Geo-aware lens: tell the vision model which market this ad is for so it
     # flags tone / spelling / cultural mismatches for that audience (e.g. US

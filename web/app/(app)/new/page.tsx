@@ -158,6 +158,22 @@ export default function NewAnalysisPage() {
         })),
       ];
 
+      // PRE-FLIGHT GUARD — don't spend a single API call if a creative is
+      // missing. Without an image/video there's no ad to run and nothing to
+      // analyse, so we stop here BEFORE firing simulate or the market-context
+      // call (both cost API/quota).
+      const needsCreative = format ? format.media_type !== 'text' : true;
+      if (needsCreative) {
+        const missing = variants.filter((v) => !v.imagePath && !v.videoPath);
+        if (missing.length) {
+          throw new Error(
+            missing.length === variants.length
+              ? `Upload ${format?.media_type === 'video' ? 'a video' : 'an image'} for ${format?.name ?? 'this format'} before running — there's nothing to analyse (and no ad to run) without a creative.`
+              : `Variant${missing.length > 1 ? 's' : ''} ${missing.map((m) => m.label).join(', ')} ${missing.length > 1 ? 'are' : 'is'} missing a creative. Add ${format?.media_type === 'video' ? 'a video' : 'an image'} to every variant before running.`,
+          );
+        }
+      }
+
       // Per-account calibration (Path B): if the user has uploaded their ad
       // history, use THEIR real CTR / CPM for this platform instead of the
       // generic format benchmark — so the forecast reflects their account.

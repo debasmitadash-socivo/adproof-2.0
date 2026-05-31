@@ -126,13 +126,22 @@ def validate_creative(brief: CampaignBrief,
     media = fmt.media_type
     if media == "image" and not assets.image_path:
         issues.append({"severity": "error",
-                        "message": f"{fmt.name} requires an image asset."})
-    if media == "video" and not (assets.video_path or assets.image_path):
-        # We accept an image as a stand-in (e.g. video thumbnail) but warn.
-        issues.append({"severity": "warning",
-                        "message": f"{fmt.name} is a video format. Upload a "
-                                   "video file for the most accurate scoring; "
-                                   "an image will be treated as a still."})
+                        "message": f"{fmt.name} needs an image — there's nothing "
+                                   "to analyse (and no ad to run) without one."})
+    if media == "video":
+        if not (assets.video_path or assets.image_path):
+            # Nothing to analyse — block before wasting any API.
+            issues.append({"severity": "error",
+                            "message": f"{fmt.name} is a video placement — upload "
+                                       "a video (or at least a still image). There's "
+                                       "nothing to analyse without a creative."})
+        elif not assets.video_path and assets.image_path:
+            # An image stand-in is allowed but scored as a still — warn only.
+            issues.append({"severity": "warning",
+                            "message": f"{fmt.name} is a video format but you "
+                                       "uploaded a still image — it'll be scored "
+                                       "as a frame. Upload the video for an "
+                                       "accurate read."})
     if media == "text" and not (assets.headline or assets.primary_text):
         issues.append({"severity": "error",
                         "message": f"{fmt.name} requires written copy."})
