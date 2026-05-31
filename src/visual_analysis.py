@@ -1093,7 +1093,7 @@ def _analyze_openai_with_brand(b64, media_type, ad_text, audience_hint, brand_hi
 # ===========================================================================
 # Gemini natively ingests video (samples frames + audio); other providers
 # don't accept video uniformly, so this path is Gemini-only. Output uses the
-# SAME VisualResult schema as the image path so every downstream consumer
+# SAME VisualAnalysisResult schema as the image path so every downstream consumer
 # (viability gate, scores, ban_risk, brand fit) works unchanged.
 
 _VIDEO_MIME_TYPES = {
@@ -1196,7 +1196,7 @@ def analyze_ad_video(video_path,
                      audience_hint: str | None = None,
                      brand_category: str = "general",
                      brand_industry: str = ""):
-    """Analyse a video creative. Returns the same VisualResult schema as
+    """Analyse a video creative. Returns the same VisualAnalysisResult schema as
     analyze_ad so the viability gate, scores, ban_risk, brand fit and the
     explanation module all keep working unchanged."""
     brand_hint = None
@@ -1207,10 +1207,10 @@ def analyze_ad_video(video_path,
 
     # Heuristic-marked fallback used when Gemini isn't usable — the safety
     # gate will then refuse the forecast (same philosophy as the image path).
-    def _heuristic_block(error: str) -> VisualResult:
+    def _heuristic_block(error: str) -> VisualAnalysisResult:
         scores = {k: 0.5 for k in VISUAL_SCORE_KEYS}
-        return VisualResult(
-            scores=scores, score_normalisation=scores,
+        return VisualAnalysisResult(
+            scores=scores,
             explanations={k: "Video not analysed (vision unavailable)."
                           for k in VISUAL_SCORE_KEYS},
             strengths=[], weaknesses=[
@@ -1218,10 +1218,10 @@ def analyze_ad_video(video_path,
             overall="Video creative could not be inspected.",
             provider="gemini", model="(unavailable)",
             is_heuristic=True, provider_error=error[:240],
-            brand_relevance=None, brand_relevance_explanation="",
+            brand_relevance=0.5, brand_relevance_explanation="",
             brand_relevance_source="heuristic",
-            image_description="(video)",
-            image_copy_coherence=None,
+            image_description="(video — not analysed)",
+            image_copy_coherence=0.5,
             image_copy_coherence_explanation="",
             ban_risk={"level": "unknown", "flags": [],
                        "explanation": "Vision unavailable for ban-risk screen."},
@@ -1246,19 +1246,22 @@ def analyze_ad_video(video_path,
         "explanation": str(br_raw.get("explanation", "")),
     }
     scores = _validate_scores(raw.get("scores", {}))
-    return VisualResult(
-        scores=scores, score_normalisation=scores,
+    def _flt(x, d=0.5):
+        try: return float(x) if x is not None else d
+        except Exception: return d
+    return VisualAnalysisResult(
+        scores=scores,
         explanations=raw.get("explanations", {}),
         strengths=list(raw.get("strengths", [])),
         weaknesses=list(raw.get("weaknesses", [])),
         overall=str(raw.get("overall", "")),
         provider="gemini", model=model_id,
         is_heuristic=False,
-        brand_relevance=raw.get("brand_relevance"),
+        brand_relevance=_flt(raw.get("brand_relevance")),
         brand_relevance_explanation=str(raw.get("brand_relevance_explanation", "")),
         brand_relevance_source="llm",
         image_description=str(raw.get("image_description", "")),
-        image_copy_coherence=raw.get("image_copy_coherence"),
+        image_copy_coherence=_flt(raw.get("image_copy_coherence")),
         image_copy_coherence_explanation=str(raw.get("image_copy_coherence_explanation", "")),
         ban_risk=ban_risk,
     )
