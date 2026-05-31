@@ -1236,6 +1236,27 @@ def simulate(req: SimulateRequest) -> dict:
         plain = "Likely to lose money — don't ship as is."
         verdict_word = "underperforming"
 
+    # ---- Believability guardrails (so a fantasy number can't read Grade A) --
+    _mean_aov = mc_dict.get("mean_aov", 0) or 0
+    _conv = (brief.target_conversion_rate or 0.025)
+    _cur = brief.currency or "GBP"
+    if roas > 12.0:
+        # An implausibly high ROAS is almost always an overstated input, not a
+        # real forecast. Refuse to celebrate it; point at the likely culprits.
+        verdict_word = "underperforming" if verdict_word == "underperforming" else "break_even"
+        plain = (f"A {roas:.0f}× ROAS is implausibly high — real campaigns are "
+                 f"usually 1–8×. This almost always means an input is overstated: "
+                 f"check your conversion rate ({_conv*100:.1f}%) and order value "
+                 f"({_cur} {_mean_aov:,.0f}). Treat the number as a red flag, not "
+                 f"a result.")
+    elif sample_ctr < fmt_bench_ctr * 0.90 and verdict_word in ("strong", "positive"):
+        # A below-benchmark click-through is not a strong creative — any decent
+        # return is coming from economics, not the ad itself.
+        verdict_word = "break_even"
+        plain = ("The ad's click-through is below the format benchmark, so this "
+                 "isn't a strong creative — any decent return is coming from your "
+                 "economics, not the ad. Strengthen the creative before scaling.")
+
     # ----------------------------------------------------------------------
     # VIABILITY GATE — the forecast assumes the ad actually RUNS. If the
     # creative will be rejected (nudity/prohibited content) or is

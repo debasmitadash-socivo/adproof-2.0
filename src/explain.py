@@ -28,6 +28,7 @@ __all__ = ["explain_simulation"]
 _ROAS_STRONG = 4.0       # >= -> "strong"
 _ROAS_POSITIVE = 2.0     # >= -> "positive"
 _ROAS_BREAKEVEN = 1.0    # >= -> "break-even"
+_ROAS_IMPLAUSIBLE = 12.0  # > -> almost certainly an overstated input, not real
 _FATIGUE_FLAG = -0.50    # logit threshold for "fatigue is biting"
 _WOM_NOTABLE = 0.05      # mean WoM contribution to call out
 _VISUAL_WEAK = 0.45
@@ -38,28 +39,58 @@ _VISUAL_STRONG = 0.65
 # Verdict
 # ===========================================================================
 
-def _verdict(mc) -> tuple[str, str, str]:
-    """Return (verdict_class, headline, one-liner)."""
+def _verdict(mc, sample_ctr: float | None = None,
+             bench_ctr: float | None = None) -> tuple[str, str, str]:
+    """Return (verdict_class, headline, one-liner).
+
+    The base verdict is the ROAS band, but two believability guardrails apply
+    so a fantasy number can't read as a green 'Strong' win:
+      * an implausibly high ROAS (>12x) is treated as a likely overstated input
+        (conversion rate / order value), not a result;
+      * a below-benchmark click-through can't be a 'strong' creative — any high
+        return there is driven by economics, not the ad.
+    """
     roas_p50 = mc.predicted_roas["p50"]
     roas_p10 = mc.predicted_roas["p10"]
     roi_p50 = mc.predicted_roi["p50"] * 100
 
     if roas_p50 >= _ROAS_STRONG:
-        cls, headline = "strong", "Strong forecast"
+        cls = "strong"
     elif roas_p50 >= _ROAS_POSITIVE:
-        cls, headline = "positive", "Positive forecast"
+        cls = "positive"
     elif roas_p50 >= _ROAS_BREAKEVEN:
-        cls, headline = "break_even", "Near break-even"
+        cls = "break_even"
     else:
-        cls, headline = "underperforming", "Underperforming forecast"
+        cls = "underperforming"
+
+    notes: list = []
+    if sample_ctr and bench_ctr and sample_ctr < bench_ctr * 0.90 \
+            and cls in ("strong", "positive"):
+        cls = "break_even"
+        notes.append("the creative's click-through is below the format "
+                     "benchmark, so any high return is driven by your economics, "
+                     "not the ad's strength")
+    if roas_p50 > _ROAS_IMPLAUSIBLE:
+        cls = "underperforming" if cls == "underperforming" else "break_even"
+        notes.append(f"a {roas_p50:.0f}x ROAS is far above what real campaigns "
+                     "achieve (1-8x) — almost always an overstated conversion "
+                     "rate or order value; verify those inputs")
+
+    headline = {
+        "strong": "Strong forecast", "positive": "Positive forecast",
+        "break_even": ("Check your inputs" if roas_p50 > _ROAS_IMPLAUSIBLE
+                       else "Near break-even"),
+        "underperforming": "Underperforming forecast",
+    }[cls]
 
     risk = ""
     if roas_p10 < _ROAS_BREAKEVEN and cls != "underperforming":
         risk = " — but the p10 downside slips below break-even, so treat the upside as conditional"
+    extra = (" Note: " + "; ".join(notes) + ".") if notes else ""
     one_liner = (
         f"Median ROAS {roas_p50:.2f}x (ROI {roi_p50:+.0f}%); "
         f"p10 {mc.predicted_roas['p10']:.2f}x — p90 "
-        f"{mc.predicted_roas['p90']:.2f}x.{risk}"
+        f"{mc.predicted_roas['p90']:.2f}x.{risk}{extra}"
     )
     return cls, headline, one_liner
 
@@ -261,7 +292,14 @@ def explain_simulation(mc,
     company name, platform, and format-specific benchmark in view -- not just
     in abstract simulator terms.
     """
-    verdict_class, headline, one_liner = _verdict(mc)
+    # Pull the format benchmark CTR (if the wizard passed the format) so the
+    # verdict can tell whether the creative is actually pulling its weight.
+    _fmt = (context or {}).get("format")
+    _bench_ctr = (_fmt.benchmarks.get("ctr", 0.012)
+                  if _fmt is not None and hasattr(_fmt, "benchmarks") else None)
+    _sample_ctr = (sum(mc.sample_ctrs) / max(len(mc.sample_ctrs), 1)
+                   if mc.sample_ctrs else None)
+    verdict_class, headline, one_liner = _verdict(mc, _sample_ctr, _bench_ctr)
 
     positives, negatives = _rank_factors(mc.aggregate_click_factors or {})
     what_works = []
