@@ -121,7 +121,7 @@ export default function ResultPage() {
                   .map(({ v, originalIdx }, rank) => {
                     const winner = rank === 0;
                     const active = originalIdx === activeVariantIdx;
-                    const tone = ({ strong: 'success', positive: 'coral', break_even: 'warning', underperforming: 'danger', void: 'danger' } as const)[v.verdictClass];
+                    const tone = ({ strong: 'success', positive: 'coral', break_even: 'warning', underperforming: 'danger', void: 'danger' } as Record<string, 'success' | 'coral' | 'warning' | 'danger'>)[v.verdictClass] ?? 'warning';
                     return (
                       <tr key={v.label}
                           onClick={() => setActiveVariantIdx(originalIdx)}
@@ -146,7 +146,7 @@ export default function ResultPage() {
                         <td className="px-3 py-3 text-right font-mono text-[13.5px]"><strong>{v.roasP50.toFixed(2)}×</strong></td>
                         <td className="px-3 py-3 text-right font-mono text-[13px]">{(v.roiP50 * 100 >= 0 ? '+' : '') + Math.round(v.roiP50 * 100)}%</td>
                         <td className="px-3 py-3 text-right font-mono text-[13px]">{v.ctrPct.toFixed(2)}%</td>
-                        <td className="px-3 py-3"><Pill tone={tone} dot>{v.verdictClass.replace('_', ' ')}</Pill></td>
+                        <td className="px-3 py-3"><Pill tone={tone} dot>{(v.verdictClass ?? 'n/a').replace('_', ' ')}</Pill></td>
                         <td className="px-3 py-3 text-right text-[12px] text-coral font-semibold">{active ? '— viewing' : 'view details →'}</td>
                       </tr>
                     );

@@ -178,27 +178,30 @@ export const useApp = create<AppState>()(
       companyProfile: null,
       setCompanyDescription: (s) => set({ companyDescription: s }),
       setCompanyProfile: (p) => {
-        // companyProfile == the CURRENT workspace's profile. Update it
-        // locally + persist by id; if no id (first ever), create a workspace.
         if (!p) { set({ companyProfile: null }); return; }
-        const stamped = p.id ? p : { ...p };
-        set((s) => ({
-          companyProfile: stamped,
-          companies: stamped.id
-            ? s.companies.map((c) => c.id === stamped.id ? stamped : c)
-            : s.companies,
-        }));
-        if (stamped.id) {
+        // Stamp with the ACTIVE workspace id when the caller didn't supply one
+        // (e.g. re-parsing the description builds a fresh profile with no id),
+        // so we UPDATE the current workspace instead of silently spawning a
+        // duplicate. Only genuinely create when there's no workspace at all.
+        const id = p.id ?? get().currentCompanyId ?? undefined;
+        if (id) {
+          const stamped = { ...p, id };
+          set((s) => ({
+            companyProfile: stamped,
+            companies: s.companies.some((c) => c.id === id)
+              ? s.companies.map((c) => (c.id === id ? stamped : c))
+              : [...s.companies, stamped],
+          }));
           dbSaveCompany(stamped).catch((e) => console.error('[db] saveCompany', e));
         } else {
-          // First-time profile creation — persist and remember the new id.
-          dbCreateCompany(stamped).then((id) => {
-            if (!id) return;
-            const withId = { ...stamped, id };
+          set({ companyProfile: p });
+          dbCreateCompany(p).then((newId) => {
+            if (!newId) return;
+            const withId = { ...p, id: newId };
             set((s) => ({
               companyProfile: withId,
-              companies: s.companies.some((c) => c.id === id) ? s.companies : [...s.companies, withId],
-              currentCompanyId: s.currentCompanyId ?? id,
+              companies: s.companies.some((c) => c.id === newId) ? s.companies : [...s.companies, withId],
+              currentCompanyId: s.currentCompanyId ?? newId,
             }));
           }).catch((e) => console.error('[db] createCompany', e));
         }
@@ -208,7 +211,15 @@ export const useApp = create<AppState>()(
       setCurrentCompany: async (id) => {
         const cmp = get().companies.find((c) => c.id === id);
         if (!cmp) return;
-        set({ currentCompanyId: id, companyProfile: cmp, savedCampaigns: [], savedAudiences: [] });
+        // Switch workspace: drop the previous workspace's data AND any transient
+        // wizard/result state so one client's audience/campaign can't bleed into
+        // another.
+        set({
+          currentCompanyId: id, companyProfile: cmp,
+          savedCampaigns: [], savedAudiences: [],
+          audienceSegment: null, audienceMatch: null,
+          filterSelections: {}, currentCampaign: null, result: null,
+        });
         // Reload the new workspace's data
         try {
           const [campaigns, audiences] = await Promise.all([
@@ -231,8 +242,11 @@ export const useApp = create<AppState>()(
       },
       savedCampaigns: [],
       addCampaign: (c) => {
-        // Tag every new campaign with the current workspace.
-        const tagged = { ...c, companyId: c.companyId ?? get().currentCompanyId ?? undefined };
+        // Tag every new campaign with the current workspace. Fall back to the
+        // first workspace if currentCompanyId hasn't synced yet, so a campaign
+        // is never saved unscoped (which would make it invisible everywhere).
+        const st = get();
+        const tagged = { ...c, companyId: c.companyId ?? st.currentCompanyId ?? st.companies[0]?.id ?? undefined };
         set((s) => ({ savedCampaigns: [tagged, ...s.savedCampaigns].slice(0, 200) }));
         dbSaveCampaign(tagged).catch((e) => console.error('[db] saveCampaign', e));
       },
@@ -242,7 +256,8 @@ export const useApp = create<AppState>()(
       },
       savedAudiences: [],
       addAudience: (a) => {
-        const tagged = { ...a, companyId: a.companyId ?? get().currentCompanyId ?? undefined };
+        const st = get();
+        const tagged = { ...a, companyId: a.companyId ?? st.currentCompanyId ?? st.companies[0]?.id ?? undefined };
         set((s) => ({ savedAudiences: [tagged, ...s.savedAudiences] }));
         dbSaveAudience(tagged).catch((e) => console.error('[db] saveAudience', e));
       },
@@ -262,11 +277,15 @@ export const useApp = create<AppState>()(
 
           const local = get();
           let companies = await dbListCompanies();
+          // Only a brand-new account (zero DB workspaces) is eligible for the
+          // one-time localStorage import. Once the user has any DB workspace,
+          // the DB is the source of truth and we must NOT re-import local data
+          // (which would dump it into whatever workspace happens to be active).
+          const firstEverAccount = companies.length === 0;
 
-          // One-time bootstrap: if the user has data only in localStorage and
-          // no companies in the DB yet, lift the local company up to the DB
-          // so subsequent state has a workspace to scope under.
-          if (companies.length === 0 && local.companyProfile && !local.companyProfile.id) {
+          // Bootstrap: lift a local-only company up to the DB so there's a
+          // workspace to scope under.
+          if (firstEverAccount && local.companyProfile && !local.companyProfile.id) {
             const newId = await dbCreateCompany(local.companyProfile);
             if (newId) companies = await dbListCompanies();
           }
@@ -284,9 +303,10 @@ export const useApp = create<AppState>()(
             ? await Promise.all([dbListCampaigns(currentId), dbListAudiences(currentId)])
             : [[], []];
 
-          // Import any orphan local campaigns/audiences into the active workspace.
+          // One-time migration ONLY for a brand-new account: lift local
+          // campaigns/audiences into the (single, just-created) workspace.
           let finalCampaigns: SavedCampaign[] = campaigns;
-          if (currentId && campaigns.length === 0 && local.savedCampaigns.length > 0) {
+          if (firstEverAccount && currentId && local.savedCampaigns.length > 0) {
             const imported: SavedCampaign[] = [];
             for (const c of local.savedCampaigns) {
               const cc = { ...c, id: isUuid(c.id) ? c.id : newId(), companyId: currentId };
@@ -296,7 +316,7 @@ export const useApp = create<AppState>()(
             finalCampaigns = imported;
           }
           let finalAudiences: SavedAudience[] = audiences;
-          if (currentId && audiences.length === 0 && local.savedAudiences.length > 0) {
+          if (firstEverAccount && currentId && local.savedAudiences.length > 0) {
             const imp: SavedAudience[] = [];
             for (const a of local.savedAudiences) {
               const aa = { ...a, id: isUuid(a.id) ? a.id : newId(), companyId: currentId };
@@ -380,8 +400,15 @@ export const useApp = create<AppState>()(
       toggleFilter: (chipId) =>
         set((s) => {
           const next = { ...s.filterSelections };
-          if (next[chipId]) delete next[chipId];
-          else next[chipId] = true;
+          if (next[chipId]) { delete next[chipId]; return { filterSelections: next }; }
+          // Single-select groups (gender): turning one on clears its siblings,
+          // so we never emit "Gender: All, Women, Men".
+          for (const pre of ['gender:']) {
+            if (chipId.startsWith(pre)) {
+              for (const k of Object.keys(next)) if (k.startsWith(pre)) delete next[k];
+            }
+          }
+          next[chipId] = true;
           return { filterSelections: next };
         }),
       clearFilters: () => set({ filterSelections: {} }),

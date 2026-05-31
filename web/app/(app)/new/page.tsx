@@ -837,8 +837,9 @@ function PlatformFilters({ platformId }: { platformId: string }) {
         platform_id: platformId,
         available_chips: allChips,
       });
-      const next = new Set(selectedIds);
-      r.selected_chip_ids.forEach((id) => next.add(id));
+      // Drop any existing gender (single-select) and let the AI's one win.
+      const next = new Set(selectedIds.filter((id) => !id.startsWith('gender:')));
+      r.selected_chip_ids.filter((id) => !id.startsWith('gender:')).forEach((id) => next.add(id));
       r.custom_interests.forEach((t) => next.add(`custom:${t}`));
       if (r.gender) next.add(`gender:${r.gender}`);
       setManyFilters([...next]);

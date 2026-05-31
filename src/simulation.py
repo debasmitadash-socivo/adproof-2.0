@@ -72,6 +72,13 @@ CHANNEL_CPM = {
     "email": 3.0,
 }
 
+# Ceiling for a SYNTHETIC (estimated) average order value. Only applies when
+# the advertiser hasn't supplied their real AOV — it stops a large business-
+# model multiplier from fabricating an enormous order value (and a fantasy
+# ROAS). Advertisers with genuinely high order values enter their real number,
+# which is never capped.
+_SYNTHETIC_AOV_CAP = 2000.0
+
 
 def budget_to_impressions(budget: float, channel: str,
                            cpm_override: float | None = None) -> int:
@@ -283,11 +290,17 @@ def monte_carlo(personas,
     #      business-model multiplier. Clearly inferior; only used when the
     #      user hasn't supplied their economics.
     if aov_override is not None and aov_override > 0:
+        # User's REAL figure — trust it outright (no cap; it's their honest input).
         mean_aov = float(aov_override)
     else:
+        # Synthetic fallback: persona mean × a crude business-model multiplier.
+        # Cap it so a large multiplier (e.g. B2B/luxury) can't FABRICATE a huge
+        # order value and inflate ROAS into fantasy territory when the user
+        # never told us their economics. They can override with their real AOV.
         mean_aov = synthetic_mean_aov
         if aov_multiplier and aov_multiplier != 1.0:
             mean_aov *= float(aov_multiplier)
+        mean_aov = min(mean_aov, _SYNTHETIC_AOV_CAP)
 
     # Scale sample rates to the real campaign volume. Clicks use EFFECTIVE
     # impressions (after saturation); the reported impression count stays at

@@ -125,14 +125,37 @@ def _map_columns(cols: list[str]) -> dict[str, str]:
     return mapping
 
 
+def _one_num(s: str) -> float:
+    """Parse a single money/number string, locale-aware on the decimal mark.
+
+    Handles UK/US '1,234.56', European '1.234,56', and bare '2,5' / '2.5'
+    without silently corrupting them (the old strip-everything approach turned
+    '1.234,56' into '1.234.56' -> NaN, or '2,5' into '25').
+    """
+    t = re.sub(r"[^0-9.,\-]", "", str(s)).strip()
+    if t in ("", "-", ".", ","):
+        return float("nan")
+    has_dot, has_comma = "." in t, "," in t
+    if has_dot and has_comma:
+        # The LAST separator is the decimal mark; the other groups thousands.
+        if t.rfind(",") > t.rfind("."):      # European: 1.234,56
+            t = t.replace(".", "").replace(",", ".")
+        else:                                 # UK/US: 1,234.56
+            t = t.replace(",", "")
+    elif has_comma:
+        # Comma only: decimal if it looks like one (e.g. '2,5'), else thousands.
+        t = t.replace(",", "." if re.fullmatch(r"-?\d{1,3},\d{1,2}", t) else "")
+    try:
+        return float(t)
+    except ValueError:
+        return float("nan")
+
+
 def _to_num(series: pd.Series) -> pd.Series:
-    """Coerce a money/number column to float, stripping symbols and commas."""
+    """Coerce a money/number column to float, locale-aware (see _one_num)."""
     if series.dtype.kind in "if":
         return series.astype(float)
-    cleaned = (series.astype(str)
-               .str.replace(r"[^0-9.\-]", "", regex=True)
-               .replace({"": np.nan, "-": np.nan}))
-    return pd.to_numeric(cleaned, errors="coerce")
+    return series.astype(str).map(_one_num).astype(float)
 
 
 def _detect_currency(df: pd.DataFrame, mapping: dict[str, str], cols: list[str]) -> str:

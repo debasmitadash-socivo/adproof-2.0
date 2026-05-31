@@ -185,10 +185,13 @@ export async function listCampaigns(companyId?: string): Promise<SavedCampaign[]
       roiP50: v.roi_p50 as number, ctrPct: v.ctr_pct as number,
       verdictClass: v.verdict_class as SavedVariantResult['verdictClass'],
     }));
-    // Re-run inputs: one saved request per variant, in the same order.
-    const originalRequests = rows
-      .map((v) => v.original_request)
-      .filter((r) => r != null) as SimulateRequest[];
+    // Re-run inputs: one saved request per variant, aligned 1:1 with `variants`
+    // (same sorted order). All-or-nothing — if any variant lacks its request we
+    // can't reliably replay the set, so re-run stays disabled (undefined) rather
+    // than misaligning labels/thumbnails.
+    const reqs = rows.map((v) => v.original_request);
+    const originalRequests = (reqs.length > 0 && reqs.every((r) => r != null))
+      ? (reqs as SimulateRequest[]) : undefined;
     return {
       id: c.id, companyId: c.company_id ?? undefined,
       name: c.name, createdAt: new Date(c.created_at).getTime(),
@@ -198,7 +201,7 @@ export async function listCampaigns(companyId?: string): Promise<SavedCampaign[]
       verdictClass: c.verdict_class, thumbnailUrl: c.thumbnail_url,
       result: variants[0]?.result as SimulateResponse,
       variants: variants.length > 1 ? variants : undefined,
-      originalRequests: originalRequests.length ? originalRequests : undefined,
+      originalRequests,
       marketContext: c.market_context ?? null, rerunOfId: c.rerun_of_id ?? undefined,
     };
   });

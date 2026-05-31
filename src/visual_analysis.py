@@ -1245,6 +1245,15 @@ def analyze_ad_video(video_path,
         "flags": list(br_raw.get("flags", [])),
         "explanation": str(br_raw.get("explanation", "")),
     }
+    # Strict safety: a parseable-but-degenerate response (no real ban-risk screen,
+    # or no scores) is NOT a genuine inspection — treat it as unavailable so the
+    # pipeline's safety gate refuses the forecast rather than passing a video we
+    # didn't actually evaluate.
+    if ban_risk["level"] not in ("none", "low", "medium", "high") \
+            or not raw.get("scores"):
+        return _heuristic_block(
+            "Gemini returned an incomplete video analysis (no usable ban-risk "
+            "screen / scores) — treated as not inspected.")
     scores = _validate_scores(raw.get("scores", {}))
     def _flt(x, d=0.5):
         try: return float(x) if x is not None else d

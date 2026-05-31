@@ -96,13 +96,23 @@ def merge_ban_risk(primary: dict[str, Any] | None,
         return {"level": "unknown", "flags": [], "explanation": ""}
     if not secondary: return primary  # type: ignore[return-value]
     if not primary:   return secondary
-    order = {"none": 0, "low": 1, "medium": 2, "high": 3, "unknown": -1}
-    p_lvl, s_lvl = str(primary.get("level", "")), str(secondary.get("level", ""))
-    worse = primary if order.get(p_lvl, -1) >= order.get(s_lvl, -1) else secondary
+    sev = {"none": 0, "low": 1, "medium": 2, "high": 3}
+    p_lvl = str(primary.get("level", "unknown"))
+    s_lvl = str(secondary.get("level", "unknown"))
+    # A genuine concern from EITHER screen always wins (take the worst).
+    concerns = [lvl for lvl in (p_lvl, s_lvl) if lvl in sev and lvl != "none"]
+    if concerns:
+        level = max(concerns, key=lambda x: sev[x])
+    elif p_lvl == "unknown":
+        # The PRIMARY (vision) couldn't confirm — a clean secondary moderation
+        # pass must NOT upgrade an un-inspected image to "safe".
+        level = "unknown"
+    else:
+        level = "none"
     flags = sorted(set(list(primary.get("flags", [])) + list(secondary.get("flags", []))))
     expl = " · ".join(x for x in (primary.get("explanation"), secondary.get("explanation")) if x)
     return {
-        "level": worse.get("level", "unknown"),
+        "level": level,
         "flags": flags,
         "explanation": expl,
         "sources": [primary.get("provider", "gemini"), secondary.get("provider", "aws_rekognition")],

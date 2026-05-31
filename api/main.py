@@ -1498,12 +1498,16 @@ def simulate(req: SimulateRequest) -> dict:
             "roi_p50_pct": round(mc_dict["predicted_roi"]["p50"] * 100, 0),
             "ctr_vs_bench_pct": round((sample_ctr - fmt_bench_ctr) / max(fmt_bench_ctr, 1e-6) * 100, 0),
             "break_even_chance_pct": round(
-                sum(1 for r in mc_dict["sample_ctrs"]
-                    if (r * mc_dict["total_impressions"] *
-                        mc_dict["predicted_conversions"]["p50"] /
-                        max(mc_dict["predicted_clicks"]["p50"], 1)) *
-                       mc_dict["mean_aov"] >= mc_dict["budget"])
-                / max(len(mc_dict["sample_ctrs"]), 1) * 100, 0),
+                sum(1 for r in (mc_dict.get("sample_ctrs") or [])
+                    if r
+                       # effective (post-saturation) impressions, matching the forecast
+                       * ((mc_dict.get("saturation") or {}).get("effective_impressions")
+                          or mc_dict.get("total_impressions", 0))
+                       # realised expected conversion-per-click (not the input rate)
+                       * (mc_dict.get("predicted_conversions", {}).get("p50", 0)
+                          / max(mc_dict.get("predicted_clicks", {}).get("p50", 1), 1))
+                       * mc_dict.get("mean_aov", 0) >= mc_dict.get("budget", 1))
+                / max(len(mc_dict.get("sample_ctrs") or []), 1) * 100, 0),
         },
         "factor_plain": factor_plain,
         "data_sources": data_sources,
