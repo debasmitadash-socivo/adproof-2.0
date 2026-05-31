@@ -419,6 +419,17 @@ def run_wizard_simulation(profile: CompanyProfile,
             brand_category=profile.product_category,
             brand_industry=profile.industry,
         )
+        # Second pair of eyes on the ban-screen: AWS Rekognition's specialised
+        # moderation model. Opt-in (silent skip if no AWS keys). Belt + braces
+        # — a creative has to clear BOTH Gemini's read AND Rekognition.
+        try:
+            from src.safety_aws import screen_image_aws, merge_ban_risk
+            aws_risk = screen_image_aws(image_path)
+            if aws_risk and visual is not None:
+                gemini_risk = visual.ban_risk or {}
+                visual.ban_risk = merge_ban_risk(gemini_risk, aws_risk)
+        except Exception:                                              # noqa: BLE001
+            pass    # AWS check is best-effort — never break a run on it
     else:
         visual = None
 
