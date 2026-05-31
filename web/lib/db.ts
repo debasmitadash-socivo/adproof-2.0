@@ -6,7 +6,7 @@
 import { getSupabase } from './supabase';
 import type {
   SavedCampaign, SavedVariantResult, SavedAudience, CompanyProfile,
-  SimulateResponse, AccountCalibration, Backtest,
+  SimulateResponse, SimulateRequest, AccountCalibration, Backtest,
 } from './types';
 
 async function uid(): Promise<string | null> {
@@ -167,18 +167,28 @@ export async function listCampaigns(companyId?: string): Promise<SavedCampaign[]
   if (!camps || !camps.length) return [];
   const { data: vars } = await sb.from('campaign_variants')
     .select('*').in('campaign_id', camps.map((c) => c.id));
-  const byCampaign = new Map<string, SavedVariantResult[]>();
+  // Keep the raw rows per campaign so we can rebuild BOTH the variant results
+  // and the saved original requests (needed for re-run), aligned by label.
+  const rowsByCampaign = new Map<string, Record<string, unknown>[]>();
   for (const v of vars ?? []) {
-    const list = byCampaign.get(v.campaign_id) ?? [];
-    list.push({
-      label: v.label, headline: v.headline, thumbnailUrl: v.thumbnail_url,
-      result: v.result as SimulateResponse, roasP50: v.roas_p50,
-      roiP50: v.roi_p50, ctrPct: v.ctr_pct, verdictClass: v.verdict_class,
-    });
-    byCampaign.set(v.campaign_id, list);
+    const list = rowsByCampaign.get(v.campaign_id as string) ?? [];
+    list.push(v);
+    rowsByCampaign.set(v.campaign_id as string, list);
   }
   return camps.map((c) => {
-    const variants = (byCampaign.get(c.id) ?? []).sort((a, b) => a.label.localeCompare(b.label));
+    const rows = (rowsByCampaign.get(c.id) ?? [])
+      .sort((a, b) => String(a.label ?? '').localeCompare(String(b.label ?? '')));
+    const variants: SavedVariantResult[] = rows.map((v) => ({
+      label: v.label as string, headline: v.headline as string,
+      thumbnailUrl: (v.thumbnail_url as string) ?? null,
+      result: v.result as SimulateResponse, roasP50: v.roas_p50 as number,
+      roiP50: v.roi_p50 as number, ctrPct: v.ctr_pct as number,
+      verdictClass: v.verdict_class as SavedVariantResult['verdictClass'],
+    }));
+    // Re-run inputs: one saved request per variant, in the same order.
+    const originalRequests = rows
+      .map((v) => v.original_request)
+      .filter((r) => r != null) as SimulateRequest[];
     return {
       id: c.id, companyId: c.company_id ?? undefined,
       name: c.name, createdAt: new Date(c.created_at).getTime(),
@@ -188,6 +198,7 @@ export async function listCampaigns(companyId?: string): Promise<SavedCampaign[]
       verdictClass: c.verdict_class, thumbnailUrl: c.thumbnail_url,
       result: variants[0]?.result as SimulateResponse,
       variants: variants.length > 1 ? variants : undefined,
+      originalRequests: originalRequests.length ? originalRequests : undefined,
       marketContext: c.market_context ?? null, rerunOfId: c.rerun_of_id ?? undefined,
     };
   });
