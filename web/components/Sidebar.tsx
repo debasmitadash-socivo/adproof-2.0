@@ -1,6 +1,7 @@
 'use client';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useApp, userInitials, workspaceLabel } from '@/lib/store';
 
@@ -17,13 +18,31 @@ const Icon = {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const user = useApp((s) => s.user);
   const profile = useApp((s) => s.companyProfile);
+  const companies = useApp((s) => s.companies);
+  const currentCompanyId = useApp((s) => s.currentCompanyId);
+  const setCurrentCompany = useApp((s) => s.setCurrentCompany);
   const campaignCount = useApp((s) => s.savedCampaigns.length);
   const audienceCount = useApp((s) => s.savedAudiences.length);
 
   const wsName = workspaceLabel(profile);
   const wsInitial = wsName[0]?.toUpperCase() ?? 'M';
+
+  // Workspace switcher: closed by default; click outside to close.
+  const [wsOpen, setWsOpen] = useState(false);
+  const wsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!wsOpen) return;
+    function onClick(e: MouseEvent) {
+      if (wsRef.current && !wsRef.current.contains(e.target as Node)) setWsOpen(false);
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [wsOpen]);
+
+  const otherWorkspaces = companies.filter((c) => c.id !== currentCompanyId);
   const userName = user?.name?.trim() || 'You';
   const userEmail = user?.email || 'Set up your profile';
   const initials = userInitials(user?.name ?? '');
@@ -53,12 +72,45 @@ export function Sidebar() {
         <div className="w-8 h-8 rounded-[9px] bg-gradient-sunset text-white font-display italic font-bold text-[16px] flex items-center justify-center shadow-glow">A</div>
         <div className="font-heading font-bold text-[18px] tracking-tight">AdProof</div>
       </div>
-      <Link href="/company"
-        className="relative z-10 flex items-center gap-2.5 px-2.5 py-2 border border-border rounded-lg bg-surface mb-4 cursor-pointer hover:border-coral transition-colors">
-        <div className="w-[22px] h-[22px] rounded-md bg-gradient-aurora text-white font-bold text-[12px] flex items-center justify-center">{wsInitial}</div>
-        <div className="text-[13.5px] font-semibold flex-1 truncate">{wsName}</div>
-        <div className="text-ink-muted text-[11px]">▾</div>
-      </Link>
+      <div ref={wsRef} className="relative z-20 mb-4">
+        <button type="button"
+          onClick={() => setWsOpen((v) => !v)}
+          className="w-full flex items-center gap-2.5 px-2.5 py-2 border border-border rounded-lg bg-surface cursor-pointer hover:border-coral transition-colors text-left">
+          <div className="w-[22px] h-[22px] rounded-md bg-gradient-aurora text-white font-bold text-[12px] flex items-center justify-center">{wsInitial}</div>
+          <div className="text-[13.5px] font-semibold flex-1 truncate">{wsName}</div>
+          <div className="text-ink-muted text-[11px]">▾</div>
+        </button>
+        {wsOpen && (
+          <div className="absolute left-0 right-0 mt-1 rounded-lg border border-border bg-surface shadow-lg overflow-hidden">
+            {otherWorkspaces.length > 0 && (
+              <>
+                <div className="px-3 py-1.5 text-[10.5px] text-ink-faint uppercase tracking-[0.12em] font-bold">Switch to</div>
+                {otherWorkspaces.map((c) => (
+                  <button key={c.id} type="button"
+                    onClick={() => { if (c.id) { setCurrentCompany(c.id); setWsOpen(false); } }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] hover:bg-bg-deep text-left">
+                    <div className="w-5 h-5 rounded bg-gradient-aurora text-white font-bold text-[10.5px] flex items-center justify-center">
+                      {(c.company_name || '?')[0]?.toUpperCase()}
+                    </div>
+                    <span className="truncate">{c.company_name || 'Untitled workspace'}</span>
+                  </button>
+                ))}
+                <div className="h-px bg-border" />
+              </>
+            )}
+            <button type="button"
+              onClick={() => { setWsOpen(false); router.push('/onboarding?new=1'); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-semibold hover:bg-bg-deep text-left text-coral">
+              <span className="text-[16px] leading-none">+</span>
+              <span>Create new workspace</span>
+            </button>
+            <Link href="/company" onClick={() => setWsOpen(false)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-ink-muted hover:bg-bg-deep">
+              Edit current workspace →
+            </Link>
+          </div>
+        )}
+      </div>
       <nav className="relative z-10 flex flex-col gap-px">
         {links.map((l) => (
           <Link

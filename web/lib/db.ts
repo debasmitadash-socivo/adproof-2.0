@@ -1,14 +1,12 @@
-// Supabase data-access layer. CRUD for the persisted entities, RLS-scoped to
-// the logged-in user (the browser client carries the auth cookie, so
-// `user_id = auth.uid()` is enforced server-side — we still set user_id on
-// insert so the WITH CHECK policy passes).
-//
-// Every function returns null/[] gracefully if Supabase isn't configured, so
-// the app keeps working (localStorage) when the DB layer is unavailable.
+// Supabase data-access layer. Every persisted row is RLS-scoped to the
+// logged-in user, and every data row (campaigns, audiences, calibrations,
+// ad_outcomes) is ALSO scoped to a workspace (`company_id`). One user can
+// have N workspaces (e.g. agency managing multiple clients) — each
+// workspace's calibration/audiences/campaigns stay independent.
 import { getSupabase } from './supabase';
 import type {
   SavedCampaign, SavedVariantResult, SavedAudience, CompanyProfile,
-  SimulateResponse, SimulateRequest, AccountCalibration, Backtest,
+  SimulateResponse, AccountCalibration, Backtest,
 } from './types';
 
 async function uid(): Promise<string | null> {
@@ -18,11 +16,30 @@ async function uid(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
-// ---------------------------------------------------------------- companies
-export async function saveCompany(p: CompanyProfile): Promise<void> {
-  const sb = getSupabase(); const user_id = await uid();
-  if (!sb || !user_id) return;
-  const row = {
+// ============================== companies (workspaces) =====================
+function rowToCompany(d: Record<string, unknown>): CompanyProfile {
+  return {
+    id: d.id as string,
+    raw_description: (d.raw_description as string) ?? '',
+    company_name: (d.name as string) ?? '',
+    industry: (d.industry as string) ?? '',
+    business_model: (d.business_model as string) ?? '',
+    product_category: (d.product_category as string) ?? '',
+    value_proposition: (d.value_proposition as string) ?? '',
+    target_customer_summary: (d.target_customer_summary as string) ?? '',
+    price_position: (d.price_position as string) ?? '',
+    brand_tone: (d.brand_tone as string) ?? '',
+    source: ((d.source as string) ?? 'empty') as CompanyProfile['source'],
+    website: (d.website as string) ?? undefined,
+    location: (d.location as string) ?? undefined,
+    avg_order_value: (d.avg_order_value as number) ?? undefined,
+    product_price: (d.product_price as number) ?? undefined,
+    currency: (d.currency as string) ?? undefined,
+  };
+}
+
+function companyRow(p: CompanyProfile, user_id: string) {
+  return {
     user_id,
     name: p.company_name, raw_description: p.raw_description,
     industry: p.industry, business_model: p.business_model,
@@ -33,39 +50,53 @@ export async function saveCompany(p: CompanyProfile): Promise<void> {
     currency: p.currency ?? 'GBP', avg_order_value: p.avg_order_value ?? null,
     product_price: p.product_price ?? null, source: p.source,
   };
-  const { data: existing } = await sb.from('companies')
-    .select('id').eq('user_id', user_id).order('created_at', { ascending: false }).limit(1);
-  if (existing && existing.length) {
-    await sb.from('companies').update(row).eq('id', existing[0].id);
-  } else {
-    await sb.from('companies').insert(row);
-  }
 }
 
-export async function getCompany(): Promise<CompanyProfile | null> {
-  const sb = getSupabase(); if (!sb) return null;
-  const { data } = await sb.from('companies')
-    .select('*').order('created_at', { ascending: false }).limit(1).maybeSingle();
-  if (!data) return null;
-  return {
-    raw_description: data.raw_description ?? '', company_name: data.name ?? '',
-    industry: data.industry ?? '', business_model: data.business_model ?? '',
-    product_category: data.product_category ?? '', value_proposition: data.value_proposition ?? '',
-    target_customer_summary: data.target_customer_summary ?? '',
-    price_position: data.price_position ?? '', brand_tone: data.brand_tone ?? '',
-    source: (data.source ?? 'empty') as CompanyProfile['source'],
-    website: data.website ?? undefined, location: data.location ?? undefined,
-    avg_order_value: data.avg_order_value ?? undefined,
-    product_price: data.product_price ?? undefined, currency: data.currency ?? undefined,
-  };
-}
-
-// ---------------------------------------------------------------- audiences
-export async function listAudiences(): Promise<SavedAudience[]> {
+export async function listCompanies(): Promise<CompanyProfile[]> {
   const sb = getSupabase(); if (!sb) return [];
-  const { data } = await sb.from('audiences').select('*').order('created_at', { ascending: false });
+  const { data } = await sb.from('companies').select('*')
+    .eq('archived', false).order('created_at', { ascending: true });
+  return (data ?? []).map(rowToCompany);
+}
+
+/** Create a brand-new workspace. Returns the new id. */
+export async function createCompany(p: CompanyProfile): Promise<string | null> {
+  const sb = getSupabase(); const user_id = await uid();
+  if (!sb || !user_id) return null;
+  const { data, error } = await sb.from('companies')
+    .insert(companyRow(p, user_id)).select('id').single();
+  if (error || !data) { console.error('[db] createCompany', error?.message); return null; }
+  return data.id as string;
+}
+
+/** Update an existing workspace's profile (by id). */
+export async function saveCompany(p: CompanyProfile): Promise<void> {
+  const sb = getSupabase(); const user_id = await uid();
+  if (!sb || !user_id) return;
+  if (!p.id) {
+    // No id → can't update; caller should use createCompany for new workspaces.
+    console.warn('[db] saveCompany: profile has no id; ignoring (use createCompany).');
+    return;
+  }
+  const { error } = await sb.from('companies').update(companyRow(p, user_id)).eq('id', p.id);
+  if (error) console.error('[db] saveCompany', error.message);
+}
+
+/** Backward-compat for code that loaded "the company": returns the first one. */
+export async function getCompany(): Promise<CompanyProfile | null> {
+  const list = await listCompanies();
+  return list[0] ?? null;
+}
+
+// ============================== audiences ===================================
+export async function listAudiences(companyId?: string): Promise<SavedAudience[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  let q = sb.from('audiences').select('*').order('created_at', { ascending: false });
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data } = await q;
   return (data ?? []).map((d) => ({
-    id: d.id, name: d.name, description: d.description ?? '', segment: d.segment ?? '',
+    id: d.id, companyId: d.company_id ?? undefined, name: d.name,
+    description: d.description ?? '', segment: d.segment ?? '',
     createdAt: new Date(d.created_at).getTime(), usedInCount: d.used_in_count ?? 0,
   }));
 }
@@ -74,7 +105,8 @@ export async function saveAudience(a: SavedAudience): Promise<void> {
   const sb = getSupabase(); const user_id = await uid();
   if (!sb || !user_id) return;
   await sb.from('audiences').upsert({
-    id: a.id, user_id, name: a.name, description: a.description,
+    id: a.id, user_id, company_id: a.companyId ?? null,
+    name: a.name, description: a.description,
     segment: a.segment, used_in_count: a.usedInCount,
   });
 }
@@ -84,7 +116,7 @@ export async function deleteAudience(id: string): Promise<void> {
   await sb.from('audiences').delete().eq('id', id);
 }
 
-// ---------------------------------------------------------------- campaigns
+// ============================== campaigns ===================================
 function variantRows(c: SavedCampaign, user_id: string) {
   const vs: SavedVariantResult[] = c.variants && c.variants.length
     ? c.variants
@@ -104,11 +136,10 @@ function variantRows(c: SavedCampaign, user_id: string) {
 export async function saveCampaign(c: SavedCampaign): Promise<string | null> {
   const sb = getSupabase(); const user_id = await uid();
   if (!sb || !user_id) return null;
-  // Upsert by the client-generated UUID so the browser and DB share one id
-  // and re-saves (e.g. re-runs) don't duplicate.
   const { error } = await sb.from('campaigns').upsert({
     id: c.id,
-    user_id, name: c.name, platform_name: c.platformName, format_name: c.formatName,
+    user_id, company_id: c.companyId ?? null,
+    name: c.name, platform_name: c.platformName, format_name: c.formatName,
     audience_label: c.audienceLabel, budget: c.budget, days: c.days,
     roas_p50: c.roasP50, roi_p50: c.roiP50, ctr_pct: c.ctrPct,
     verdict_class: c.verdictClass, thumbnail_url: c.thumbnailUrl,
@@ -116,17 +147,17 @@ export async function saveCampaign(c: SavedCampaign): Promise<string | null> {
     rerun_of_id: c.rerunOfId ?? null,
   });
   if (error) { console.error('[db] saveCampaign', error.message); return null; }
-  // Replace variants for this campaign (delete + insert keeps it idempotent).
   await sb.from('campaign_variants').delete().eq('campaign_id', c.id);
   const rows = variantRows(c, user_id).map((r) => ({ ...r, campaign_id: c.id }));
   await sb.from('campaign_variants').insert(rows);
   return c.id;
 }
 
-export async function listCampaigns(): Promise<SavedCampaign[]> {
+export async function listCampaigns(companyId?: string): Promise<SavedCampaign[]> {
   const sb = getSupabase(); if (!sb) return [];
-  const { data: camps } = await sb.from('campaigns')
-    .select('*').order('created_at', { ascending: false });
+  let q = sb.from('campaigns').select('*').order('created_at', { ascending: false });
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data: camps } = await q;
   if (!camps || !camps.length) return [];
   const { data: vars } = await sb.from('campaign_variants')
     .select('*').in('campaign_id', camps.map((c) => c.id));
@@ -143,7 +174,8 @@ export async function listCampaigns(): Promise<SavedCampaign[]> {
   return camps.map((c) => {
     const variants = (byCampaign.get(c.id) ?? []).sort((a, b) => a.label.localeCompare(b.label));
     return {
-      id: c.id, name: c.name, createdAt: new Date(c.created_at).getTime(),
+      id: c.id, companyId: c.company_id ?? undefined,
+      name: c.name, createdAt: new Date(c.created_at).getTime(),
       platformName: c.platform_name, formatName: c.format_name,
       audienceLabel: c.audience_label, budget: c.budget, days: c.days,
       roasP50: c.roas_p50, roiP50: c.roi_p50, ctrPct: c.ctr_pct,
@@ -157,12 +189,10 @@ export async function listCampaigns(): Promise<SavedCampaign[]> {
 
 export async function deleteCampaign(id: string): Promise<void> {
   const sb = getSupabase(); if (!sb) return;
-  await sb.from('campaigns').delete().eq('id', id);   // variants cascade
+  await sb.from('campaigns').delete().eq('id', id);
 }
 
-// ---------------------------------------------------------- ad_outcomes (Path B)
-// Only these columns exist on the table; ingest rows carry extras (placement,
-// real_ctr, …) we must not send.
+// ============================== ad_outcomes (Path B) ========================
 const OUTCOME_COLS = [
   'ad_name', 'date_start', 'date_end', 'platform', 'format', 'spend',
   'impressions', 'clicks', 'conversions', 'revenue', 'ad_copy', 'audience',
@@ -176,18 +206,23 @@ function isoDate(v: unknown): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
 
-export async function insertOutcomes(rows: Record<string, unknown>[], sourceFile?: string): Promise<number> {
+export async function insertOutcomes(
+  rows: Record<string, unknown>[], sourceFile?: string, companyId?: string,
+): Promise<number> {
   const sb = getSupabase(); const user_id = await uid();
   if (!sb || !user_id || !rows.length) return 0;
   const clean = rows.map((r) => {
-    const o: Record<string, unknown> = { user_id, source_file: sourceFile ?? null };
+    const o: Record<string, unknown> = {
+      user_id, company_id: companyId ?? null,
+      source_file: sourceFile ?? null,
+    };
     for (const c of OUTCOME_COLS) if (r[c] !== undefined) o[c] = r[c];
     o.date_start = isoDate(r.date_start);
     o.date_end = isoDate(r.date_end);
     return o;
   });
   let inserted = 0;
-  for (let i = 0; i < clean.length; i += 500) {        // batch large exports
+  for (let i = 0; i < clean.length; i += 500) {
     const { data, error } = await sb.from('ad_outcomes').insert(clean.slice(i, i + 500)).select('id');
     if (error) { console.error('[db] insertOutcomes', error.message); break; }
     inserted += data?.length ?? 0;
@@ -195,22 +230,26 @@ export async function insertOutcomes(rows: Record<string, unknown>[], sourceFile
   return inserted;
 }
 
-// ---------------------------------------------------------- calibrations (Path B)
+// ============================== calibrations (Path B) =======================
 export async function saveCalibration(
-  cal: AccountCalibration, nAds: number, backtest?: Backtest, sourceFile?: string,
+  cal: AccountCalibration, nAds: number,
+  backtest?: Backtest, sourceFile?: string, companyId?: string,
 ): Promise<void> {
   const sb = getSupabase(); const user_id = await uid();
   if (!sb || !user_id) return;
   const { error } = await sb.from('calibrations').insert({
-    user_id, scope: 'account', params: cal as unknown, n_ads: nAds,
+    user_id, company_id: companyId ?? null,
+    scope: 'account', params: cal as unknown, n_ads: nAds,
     backtest: { ...(backtest ?? {}), source_file: sourceFile ?? null } as unknown,
   });
   if (error) console.error('[db] saveCalibration', error.message);
 }
 
-export async function getLatestCalibration(): Promise<AccountCalibration | null> {
+export async function getLatestCalibration(companyId?: string): Promise<AccountCalibration | null> {
   const sb = getSupabase(); if (!sb) return null;
-  const { data } = await sb.from('calibrations').select('params')
-    .eq('scope', 'account').order('created_at', { ascending: false }).limit(1).maybeSingle();
+  let q = sb.from('calibrations').select('params').eq('scope', 'account')
+    .order('created_at', { ascending: false }).limit(1);
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data } = await q.maybeSingle();
   return (data?.params as AccountCalibration) ?? null;
 }

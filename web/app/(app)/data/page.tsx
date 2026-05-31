@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { api } from '@/lib/api';
 import { saveCalibration, insertOutcomes, getLatestCalibration } from '@/lib/db';
+import { useApp } from '@/lib/store';
 import type { IngestResult, AccountCalibration, PlatformCalibration } from '@/lib/types';
 
 const CONF_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
@@ -59,8 +60,13 @@ export default function DataPage() {
   const [result, setResult] = useState<IngestResult | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [existing, setExisting] = useState<AccountCalibration | null>(null);
+  // Per-workspace: calibration belongs to the active workspace, not the user
+  // overall. Reload when the workspace changes.
+  const currentCompanyId = useApp((s) => s.currentCompanyId);
 
-  useEffect(() => { getLatestCalibration().then(setExisting).catch(() => {}); }, []);
+  useEffect(() => {
+    getLatestCalibration(currentCompanyId ?? undefined).then(setExisting).catch(() => {});
+  }, [currentCompanyId]);
 
   async function analyze() {
     if (!file) return;
@@ -79,8 +85,8 @@ export default function DataPage() {
     setBusy(true); setError(null);
     try {
       const nAds = result.calibration.overall?.n_ads ?? result.report.n_rows_kept;
-      await saveCalibration(result.calibration, nAds, result.backtest, file?.name);
-      const n = await insertOutcomes(result.rows, file?.name);
+      await saveCalibration(result.calibration, nAds, result.backtest, file?.name, currentCompanyId ?? undefined);
+      const n = await insertOutcomes(result.rows, file?.name, currentCompanyId ?? undefined);
       setExisting(result.calibration);
       setSaved(`Saved. Your forecasts now use your real benchmarks (${n.toLocaleString()} ads stored).`);
       setResult(null); setFile(null);

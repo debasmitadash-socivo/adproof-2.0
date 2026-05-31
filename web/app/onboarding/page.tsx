@@ -14,6 +14,7 @@ export default function OnboardingPage() {
   const setUser = useApp((s) => s.setUser);
   const setCompanyDescription = useApp((s) => s.setCompanyDescription);
   const setCompanyProfile = useApp((s) => s.setCompanyProfile);
+  const createWorkspace = useApp((s) => s.createWorkspace);
 
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState('');
@@ -22,14 +23,23 @@ export default function OnboardingPage() {
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const [parsing, setParsing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  // Skip onboarding if it's already been completed.
+  // When ?new=1, this is a "create another workspace" flow — not first-time
+  // onboarding — so don't auto-redirect even if a profile already exists.
+  const [isNewWorkspace, setIsNewWorkspace] = useState(false);
   useEffect(() => {
-    if (!hydrated) return;
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    setIsNewWorkspace(params.get('new') === '1');
+  }, []);
+
+  // Skip onboarding if it's already been completed — UNLESS this is an
+  // explicit "create another workspace" run.
+  useEffect(() => {
+    if (!hydrated || isNewWorkspace) return;
     const u = useApp.getState().user;
     const p = useApp.getState().companyProfile;
     if (u && p) router.replace('/dashboard');
-  }, [hydrated, router]);
+  }, [hydrated, isNewWorkspace, router]);
 
   async function parse() {
     if (desc.trim().length < 10) return;
@@ -43,8 +53,18 @@ export default function OnboardingPage() {
     }
   }
 
-  function finish() {
-    if (!name.trim() || !profile) return;
+  async function finish() {
+    if (!profile) return;
+    if (isNewWorkspace) {
+      // Creating an ADDITIONAL workspace — don't touch the user identity, just
+      // add the new company and switch to it.
+      setCompanyDescription(desc);
+      const id = await createWorkspace(profile);
+      if (id) router.push('/dashboard');
+      return;
+    }
+    // First-time onboarding flow.
+    if (!name.trim()) return;
     setUser({
       name: name.trim(),
       email: email.trim() || `${name.trim().toLowerCase().replace(/\s+/g, '.')}@local`,

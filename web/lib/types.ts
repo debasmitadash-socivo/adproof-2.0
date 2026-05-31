@@ -1,6 +1,7 @@
 // Shapes mirrored from the Python backend.
 
 export interface CompanyProfile {
+  id?: string;                  // DB id — present once persisted (the workspace id)
   raw_description: string;
   company_name: string;
   industry: string;
@@ -393,6 +394,7 @@ export interface SavedVariantResult {
 
 export interface SavedCampaign {
   id: string;
+  companyId?: string;            // workspace this campaign belongs to
   name: string;
   createdAt: number;
   platformName: string;
@@ -419,6 +421,7 @@ export interface SavedCampaign {
 
 export interface SavedAudience {
   id: string;
+  companyId?: string;            // workspace this audience belongs to
   name: string;
   description: string;
   segment: string;

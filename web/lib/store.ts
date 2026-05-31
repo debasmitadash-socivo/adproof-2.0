@@ -20,7 +20,8 @@ import {
   deleteAudience as dbDeleteAudience,
   listAudiences as dbListAudiences,
   saveCompany as dbSaveCompany,
-  getCompany as dbGetCompany,
+  createCompany as dbCreateCompany,
+  listCompanies as dbListCompanies,
 } from './db';
 import { getSupabase } from './supabase';
 
@@ -37,9 +38,16 @@ interface AppState {
   setUser: (u: UserProfile | null) => void;
 
   companyDescription: string;
-  companyProfile: CompanyProfile | null;
+  companyProfile: CompanyProfile | null;     // current workspace's profile
   setCompanyDescription: (s: string) => void;
   setCompanyProfile: (p: CompanyProfile | null) => void;
+
+  // Multi-workspace: one user can manage several companies/clients. Each
+  // workspace has its own campaigns / audiences / calibration.
+  companies: CompanyProfile[];
+  currentCompanyId: string | null;
+  setCurrentCompany: (id: string) => Promise<void>;
+  createWorkspace: (p: CompanyProfile) => Promise<string | null>;
 
   savedCampaigns: SavedCampaign[];
   addCampaign: (c: SavedCampaign) => void;
@@ -170,13 +178,63 @@ export const useApp = create<AppState>()(
       companyProfile: null,
       setCompanyDescription: (s) => set({ companyDescription: s }),
       setCompanyProfile: (p) => {
-        set({ companyProfile: p });
-        if (p) dbSaveCompany(p).catch((e) => console.error('[db] saveCompany', e));
+        // companyProfile == the CURRENT workspace's profile. Update it
+        // locally + persist by id; if no id (first ever), create a workspace.
+        if (!p) { set({ companyProfile: null }); return; }
+        const stamped = p.id ? p : { ...p };
+        set((s) => ({
+          companyProfile: stamped,
+          companies: stamped.id
+            ? s.companies.map((c) => c.id === stamped.id ? stamped : c)
+            : s.companies,
+        }));
+        if (stamped.id) {
+          dbSaveCompany(stamped).catch((e) => console.error('[db] saveCompany', e));
+        } else {
+          // First-time profile creation — persist and remember the new id.
+          dbCreateCompany(stamped).then((id) => {
+            if (!id) return;
+            const withId = { ...stamped, id };
+            set((s) => ({
+              companyProfile: withId,
+              companies: s.companies.some((c) => c.id === id) ? s.companies : [...s.companies, withId],
+              currentCompanyId: s.currentCompanyId ?? id,
+            }));
+          }).catch((e) => console.error('[db] createCompany', e));
+        }
+      },
+      companies: [],
+      currentCompanyId: null,
+      setCurrentCompany: async (id) => {
+        const cmp = get().companies.find((c) => c.id === id);
+        if (!cmp) return;
+        set({ currentCompanyId: id, companyProfile: cmp, savedCampaigns: [], savedAudiences: [] });
+        // Reload the new workspace's data
+        try {
+          const [campaigns, audiences] = await Promise.all([
+            dbListCampaigns(id), dbListAudiences(id),
+          ]);
+          set({ savedCampaigns: campaigns, savedAudiences: audiences });
+        } catch (e) { console.error('[db] reload workspace', e); }
+      },
+      createWorkspace: async (p) => {
+        const id = await dbCreateCompany(p);
+        if (!id) return null;
+        const withId = { ...p, id };
+        set((s) => ({
+          companies: [...s.companies, withId],
+          currentCompanyId: id,
+          companyProfile: withId,
+          savedCampaigns: [], savedAudiences: [],     // fresh workspace = empty data
+        }));
+        return id;
       },
       savedCampaigns: [],
       addCampaign: (c) => {
-        set((s) => ({ savedCampaigns: [c, ...s.savedCampaigns].slice(0, 200) }));
-        dbSaveCampaign(c).catch((e) => console.error('[db] saveCampaign', e));
+        // Tag every new campaign with the current workspace.
+        const tagged = { ...c, companyId: c.companyId ?? get().currentCompanyId ?? undefined };
+        set((s) => ({ savedCampaigns: [tagged, ...s.savedCampaigns].slice(0, 200) }));
+        dbSaveCampaign(tagged).catch((e) => console.error('[db] saveCampaign', e));
       },
       deleteCampaign: (id) => {
         set((s) => ({ savedCampaigns: s.savedCampaigns.filter((c) => c.id !== id) }));
@@ -184,8 +242,9 @@ export const useApp = create<AppState>()(
       },
       savedAudiences: [],
       addAudience: (a) => {
-        set((s) => ({ savedAudiences: [a, ...s.savedAudiences] }));
-        dbSaveAudience(a).catch((e) => console.error('[db] saveAudience', e));
+        const tagged = { ...a, companyId: a.companyId ?? get().currentCompanyId ?? undefined };
+        set((s) => ({ savedAudiences: [tagged, ...s.savedAudiences] }));
+        dbSaveAudience(tagged).catch((e) => console.error('[db] saveAudience', e));
       },
       deleteAudience: (id) => {
         set((s) => ({ savedAudiences: s.savedAudiences.filter((a) => a.id !== id) }));
@@ -200,43 +259,64 @@ export const useApp = create<AppState>()(
           if (!sb) { set({ dbSynced: true }); return; }
           const { data } = await sb.auth.getUser();
           if (!data.user) { set({ dbSynced: true }); return; }
+
           const local = get();
-          let [campaigns, audiences, company] = await Promise.all([
-            dbListCampaigns(), dbListAudiences(), dbGetCompany(),
-          ]);
-          // One-time import: if the DB is empty but the browser has data, push
-          // it up (regenerating any non-UUID ids) so nothing is lost.
-          if (campaigns.length === 0 && local.savedCampaigns.length > 0) {
+          let companies = await dbListCompanies();
+
+          // One-time bootstrap: if the user has data only in localStorage and
+          // no companies in the DB yet, lift the local company up to the DB
+          // so subsequent state has a workspace to scope under.
+          if (companies.length === 0 && local.companyProfile && !local.companyProfile.id) {
+            const newId = await dbCreateCompany(local.companyProfile);
+            if (newId) companies = await dbListCompanies();
+          }
+
+          // Pick the active workspace: persisted choice if still valid, else
+          // the first available company (sorted by created_at asc).
+          let currentId = local.currentCompanyId;
+          if (!currentId || !companies.some((c) => c.id === currentId)) {
+            currentId = companies[0]?.id ?? null;
+          }
+          const currentCompany = companies.find((c) => c.id === currentId) ?? null;
+
+          // Load the active workspace's data (if any).
+          const [campaigns, audiences] = currentId
+            ? await Promise.all([dbListCampaigns(currentId), dbListAudiences(currentId)])
+            : [[], []];
+
+          // Import any orphan local campaigns/audiences into the active workspace.
+          let finalCampaigns: SavedCampaign[] = campaigns;
+          if (currentId && campaigns.length === 0 && local.savedCampaigns.length > 0) {
             const imported: SavedCampaign[] = [];
             for (const c of local.savedCampaigns) {
-              const cc = isUuid(c.id) ? c : { ...c, id: newId() };
+              const cc = { ...c, id: isUuid(c.id) ? c.id : newId(), companyId: currentId };
               await dbSaveCampaign(cc);
               imported.push(cc);
             }
-            campaigns = imported;
+            finalCampaigns = imported;
           }
-          if (audiences.length === 0 && local.savedAudiences.length > 0) {
+          let finalAudiences: SavedAudience[] = audiences;
+          if (currentId && audiences.length === 0 && local.savedAudiences.length > 0) {
             const imp: SavedAudience[] = [];
             for (const a of local.savedAudiences) {
-              const aa = isUuid(a.id) ? a : { ...a, id: newId() };
+              const aa = { ...a, id: isUuid(a.id) ? a.id : newId(), companyId: currentId };
               await dbSaveAudience(aa);
               imp.push(aa);
             }
-            audiences = imp;
+            finalAudiences = imp;
           }
-          if (!company && local.companyProfile) {
-            await dbSaveCompany(local.companyProfile);
-            company = local.companyProfile;
-          }
+
           set({
-            savedCampaigns: campaigns.length ? campaigns : local.savedCampaigns,
-            savedAudiences: audiences.length ? audiences : local.savedAudiences,
-            companyProfile: company ?? local.companyProfile,
+            companies,
+            currentCompanyId: currentId,
+            companyProfile: currentCompany ?? local.companyProfile,
+            savedCampaigns: finalCampaigns,
+            savedAudiences: finalAudiences,
             dbSynced: true,
           });
         } catch (e) {
           console.error('[db] syncFromDb failed', e);
-          set({ dbSynced: true });   // never block the app on a DB hiccup
+          set({ dbSynced: true });
         }
       },
       resetAccount: () =>
@@ -329,6 +409,9 @@ export const useApp = create<AppState>()(
         companyProfile: state.companyProfile,
         savedCampaigns: state.savedCampaigns,
         savedAudiences: state.savedAudiences,
+        // Multi-workspace: remember which workspace the user last had open.
+        companies: state.companies,
+        currentCompanyId: state.currentCompanyId,
       }),
       onRehydrateStorage: () => (s) => s?.setHydrated(true),
     },

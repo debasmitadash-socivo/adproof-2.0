@@ -165,7 +165,7 @@ export default function NewAnalysisPage() {
       let calCpm: number | null = null;
       let calCvr: number | null = null;
       try {
-        const cal = await getLatestCalibration();
+        const cal = await getLatestCalibration(w.currentCompanyId ?? undefined);
         const pc = cal?.by_platform?.[calibrationPlatformKey(w.platformId)];
         if (pc && pc.real_ctr) {
           calCtr = pc.real_ctr;
