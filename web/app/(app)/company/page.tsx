@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import clsx from 'clsx';
 import { Button } from '@/components/ui/Button';
 import { Card, CardTitle } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
@@ -26,6 +27,34 @@ export default function CompanyPage() {
   const [currency, setCurrency] = useState(profile?.currency ?? 'GBP');
   const [aov, setAov] = useState<string>(profile?.avg_order_value != null ? String(profile.avg_order_value) : '');
   const [price, setPrice] = useState<string>(profile?.product_price != null ? String(profile.product_price) : '');
+  // Onboarding-overhaul fields — also editable here.
+  const [goal, setGoal] = useState<NonNullable<CompanyProfile['conversion_goal']> | ''>(profile?.conversion_goal ?? '');
+  const [salesCycle, setSalesCycle] = useState<NonNullable<CompanyProfile['sales_cycle']> | ''>(profile?.sales_cycle ?? '');
+  const [usps, setUsps] = useState<string[]>(profile?.usps ?? []);
+  const [brandColor, setBrandColor] = useState<string>(profile?.brand_color ?? '#FF5A4D');
+  function toggleUsp(u: string) {
+    setUsps((cur) => cur.includes(u) ? cur.filter((x) => x !== u) : cur.length >= 3 ? cur : [...cur, u]);
+  }
+  function saveBrandGoals() {
+    persist({
+      conversion_goal: goal || undefined, sales_cycle: salesCycle || undefined,
+      usps: usps.length ? usps : undefined, brand_color: brandColor || undefined,
+    });
+  }
+  const GOAL_OPTIONS: { v: NonNullable<CompanyProfile['conversion_goal']>; label: string }[] = [
+    { v: 'purchase', label: '🛒 Sales' }, { v: 'lead', label: '✉️ Leads' },
+    { v: 'demo', label: '📅 Demo / Call' }, { v: 'signup', label: '✨ Sign-up' },
+    { v: 'awareness', label: '👁 Awareness' },
+  ];
+  const CYCLE_OPTIONS: { v: NonNullable<CompanyProfile['sales_cycle']>; label: string }[] = [
+    { v: 'impulse', label: 'Impulse' }, { v: 'considered', label: 'Considered' },
+    { v: 'long', label: 'Long' }, { v: 'enterprise', label: 'Enterprise' },
+  ];
+  const USP_OPTIONS = [
+    'Quality', 'Speed', 'Price', 'Expertise', 'Customer service', 'Local',
+    'Trust / reputation', 'Personalisation', 'Sustainability', 'Innovation',
+    'Convenience', 'Selection',
+  ];
 
   const [researching, setResearching] = useState(false);
   const [researchMsg, setResearchMsg] = useState<string | null>(null);
@@ -192,6 +221,81 @@ export default function CompanyPage() {
               </div>
 
               <Button onClick={saveEconomics} disabled={!aov}>Save economics</Button>
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Brand & goals</CardTitle>
+            <p className="text-ink-muted text-[13.5px] -mt-2 mb-4">
+              Four quick picks. Each one actually changes the forecast.
+            </p>
+            <div className="space-y-5">
+              <div>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <label className="label !mb-0">Main goal</label>
+                  <span className="text-[11.5px] text-ink-faint">sets the default conversion rate</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {GOAL_OPTIONS.map((o) => (
+                    <button key={o.v} type="button" onClick={() => setGoal(o.v)}
+                      className={clsx('px-3 py-1.5 rounded-full text-[13px] border transition-colors',
+                        goal === o.v ? 'bg-ink text-white border-ink' : 'bg-surface border-border hover:border-coral')}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <label className="label !mb-0">Sales cycle</label>
+                  <span className="text-[11.5px] text-ink-faint">drives expected conversion + retention</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {CYCLE_OPTIONS.map((o) => (
+                    <button key={o.v} type="button" onClick={() => setSalesCycle(o.v)}
+                      className={clsx('px-3 py-1.5 rounded-full text-[13px] border transition-colors',
+                        salesCycle === o.v ? 'bg-ink text-white border-ink' : 'bg-surface border-border hover:border-coral')}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <label className="label !mb-0">Top 3 things you&apos;re known for</label>
+                  <span className="text-[11.5px] text-ink-faint">{usps.length}/3 — informs copy + brand-fit</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {USP_OPTIONS.map((u) => {
+                    const sel = usps.includes(u); const cap = usps.length >= 3 && !sel;
+                    return (
+                      <button key={u} type="button" onClick={() => toggleUsp(u)} disabled={cap}
+                        className={clsx('px-3 py-1.5 rounded-full text-[13px] border transition-colors',
+                          sel ? 'bg-ink text-white border-ink' : 'bg-surface border-border hover:border-coral',
+                          cap && 'opacity-40 cursor-not-allowed')}>
+                        {u}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <label className="label !mb-0">Brand colour</label>
+                  <span className="text-[11.5px] text-ink-faint">used in &quot;is this on-brand?&quot; checks</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)}
+                    className="w-12 h-12 rounded-md border border-border cursor-pointer" />
+                  <input type="text" value={brandColor} onChange={(e) => setBrandColor(e.target.value)}
+                    className="input font-mono w-32" maxLength={7} />
+                </div>
+              </div>
+
+              <Button onClick={saveBrandGoals}>Save brand & goals</Button>
             </div>
           </Card>
         </div>

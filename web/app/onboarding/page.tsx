@@ -23,6 +23,12 @@ export default function OnboardingPage() {
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const [parsing, setParsing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Richer onboarding (Phase 5 of UX): the four chip-picker fields that
+  // actually move the forecast. Stored alongside the AI-parsed profile.
+  const [goal, setGoal] = useState<NonNullable<CompanyProfile['conversion_goal']> | ''>('');
+  const [salesCycle, setSalesCycle] = useState<NonNullable<CompanyProfile['sales_cycle']> | ''>('');
+  const [usps, setUsps] = useState<string[]>([]);
+  const [brandColor, setBrandColor] = useState<string>('#FF5A4D');
   // When ?new=1, this is a "create another workspace" flow — not first-time
   // onboarding — so don't auto-redirect even if a profile already exists.
   const [isNewWorkspace, setIsNewWorkspace] = useState(false);
@@ -53,17 +59,28 @@ export default function OnboardingPage() {
     }
   }
 
+  function toggleUsp(label: string) {
+    setUsps((cur) => cur.includes(label)
+      ? cur.filter((x) => x !== label)
+      : cur.length >= 3 ? cur : [...cur, label]);
+  }
+
   async function finish() {
     if (!profile) return;
+    // Merge the chip-picker fields onto the AI-parsed profile.
+    const enriched: CompanyProfile = {
+      ...profile,
+      usps: usps.length ? usps : undefined,
+      conversion_goal: goal || undefined,
+      sales_cycle: salesCycle || undefined,
+      brand_color: brandColor || undefined,
+    };
     if (isNewWorkspace) {
-      // Creating an ADDITIONAL workspace — don't touch the user identity, just
-      // add the new company and switch to it.
       setCompanyDescription(desc);
-      const id = await createWorkspace(profile);
+      const id = await createWorkspace(enriched);
       if (id) router.push('/dashboard');
       return;
     }
-    // First-time onboarding flow.
     if (!name.trim()) return;
     setUser({
       name: name.trim(),
@@ -71,9 +88,30 @@ export default function OnboardingPage() {
       createdAt: Date.now(),
     });
     setCompanyDescription(desc);
-    setCompanyProfile(profile);
+    setCompanyProfile(enriched);
     router.push('/dashboard');
   }
+
+  // Chip-picker option lists. Plain-English labels; the value below is what
+  // we store. Each list also annotates which part of the forecast it moves.
+  const GOAL_OPTIONS: { v: NonNullable<CompanyProfile['conversion_goal']>; label: string; hint: string }[] = [
+    { v: 'purchase',  label: '🛒 Sales',         hint: 'someone buys' },
+    { v: 'lead',      label: '✉️ Leads',          hint: 'capture an email / form' },
+    { v: 'demo',      label: '📅 Demo / Call',    hint: 'book a meeting' },
+    { v: 'signup',    label: '✨ Sign-up',        hint: 'free trial / register' },
+    { v: 'awareness', label: '👁 Awareness',      hint: 'reach + brand lift' },
+  ];
+  const CYCLE_OPTIONS: { v: NonNullable<CompanyProfile['sales_cycle']>; label: string; hint: string }[] = [
+    { v: 'impulse',    label: 'Impulse',      hint: 'decide in minutes (£10–£100 items)' },
+    { v: 'considered', label: 'Considered',   hint: 'compare for days (£100–£1k)' },
+    { v: 'long',       label: 'Long',         hint: 'weeks of decision (£1k+ / B2B)' },
+    { v: 'enterprise', label: 'Enterprise',   hint: 'months, multiple stakeholders' },
+  ];
+  const USP_OPTIONS = [
+    'Quality', 'Speed', 'Price', 'Expertise',
+    'Customer service', 'Local', 'Trust / reputation', 'Personalisation',
+    'Sustainability', 'Innovation', 'Convenience', 'Selection',
+  ];
 
   if (!hydrated) return null;
 
@@ -173,6 +211,85 @@ export default function OnboardingPage() {
                     {profile.value_proposition && (
                       <span className="sm:col-span-2"><strong className="mr-1.5">Value prop</strong>{profile.value_proposition}</span>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* RICHER FIELDS — these actually move the forecast. One tap each. */}
+              {profile && (
+                <div className="mt-6 space-y-5">
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <label className="label !mb-0">What&apos;s the main goal?</label>
+                      <span className="text-[11.5px] text-ink-faint">sets the default conversion rate</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {GOAL_OPTIONS.map((o) => (
+                        <button key={o.v} type="button"
+                          onClick={() => setGoal(o.v)}
+                          className={clsx('px-3 py-1.5 rounded-full text-[13px] border transition-colors',
+                            goal === o.v ? 'bg-ink text-white border-ink' : 'bg-surface border-border hover:border-coral')}>
+                          {o.label}
+                          <span className="text-[11px] opacity-70 ml-1.5">{o.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <label className="label !mb-0">Typical sales cycle?</label>
+                      <span className="text-[11.5px] text-ink-faint">drives expected conversion + retention</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {CYCLE_OPTIONS.map((o) => (
+                        <button key={o.v} type="button"
+                          onClick={() => setSalesCycle(o.v)}
+                          className={clsx('px-3 py-1.5 rounded-full text-[13px] border transition-colors',
+                            salesCycle === o.v ? 'bg-ink text-white border-ink' : 'bg-surface border-border hover:border-coral')}>
+                          {o.label}
+                          <span className="text-[11px] opacity-70 ml-1.5">{o.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <label className="label !mb-0">Top 3 things you&apos;re known for</label>
+                      <span className="text-[11.5px] text-ink-faint">{usps.length}/3 — informs copy + brand-fit checks</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {USP_OPTIONS.map((u) => {
+                        const sel = usps.includes(u);
+                        const cap = usps.length >= 3 && !sel;
+                        return (
+                          <button key={u} type="button"
+                            onClick={() => toggleUsp(u)} disabled={cap}
+                            className={clsx('px-3 py-1.5 rounded-full text-[13px] border transition-colors',
+                              sel ? 'bg-ink text-white border-ink' : 'bg-surface border-border hover:border-coral',
+                              cap && 'opacity-40 cursor-not-allowed')}>
+                            {u}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <label className="label !mb-0">Brand colour</label>
+                      <span className="text-[11.5px] text-ink-faint">used when judging if a creative is &quot;on-brand&quot;</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input type="color" value={brandColor}
+                        onChange={(e) => setBrandColor(e.target.value)}
+                        className="w-12 h-12 rounded-md border border-border cursor-pointer" />
+                      <input type="text" value={brandColor}
+                        onChange={(e) => setBrandColor(e.target.value)}
+                        className="input font-mono w-32" maxLength={7} />
+                      <span className="text-[12.5px] text-ink-muted">optional</span>
+                    </div>
                   </div>
                 </div>
               )}

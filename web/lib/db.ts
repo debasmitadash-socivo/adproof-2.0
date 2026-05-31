@@ -35,6 +35,10 @@ function rowToCompany(d: Record<string, unknown>): CompanyProfile {
     avg_order_value: (d.avg_order_value as number) ?? undefined,
     product_price: (d.product_price as number) ?? undefined,
     currency: (d.currency as string) ?? undefined,
+    usps: (d.usps as string[]) ?? undefined,
+    conversion_goal: (d.conversion_goal as CompanyProfile['conversion_goal']) ?? undefined,
+    sales_cycle: (d.sales_cycle as CompanyProfile['sales_cycle']) ?? undefined,
+    brand_color: (d.brand_color as string) ?? undefined,
   };
 }
 
@@ -49,6 +53,8 @@ function companyRow(p: CompanyProfile, user_id: string) {
     website: p.website ?? null, location: p.location ?? null,
     currency: p.currency ?? 'GBP', avg_order_value: p.avg_order_value ?? null,
     product_price: p.product_price ?? null, source: p.source,
+    usps: p.usps ?? null, conversion_goal: p.conversion_goal ?? null,
+    sales_cycle: p.sales_cycle ?? null, brand_color: p.brand_color ?? null,
   };
 }
 

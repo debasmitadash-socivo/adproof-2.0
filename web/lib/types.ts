@@ -18,6 +18,11 @@ export interface CompanyProfile {
   avg_order_value?: number;     // customer value in `currency`
   product_price?: number;
   currency?: string;            // ISO-ish: GBP | USD | EUR ...
+  // Onboarding overhaul: richer fields that genuinely move the forecast.
+  usps?: string[];                          // top 3 unique selling points
+  conversion_goal?: 'purchase' | 'lead' | 'demo' | 'signup' | 'awareness';
+  sales_cycle?: 'impulse' | 'considered' | 'long' | 'enterprise';
+  brand_color?: string;                     // hex e.g. '#FF5A4D'
 }
 
 // AI-proposed economics from /api/research-company — an ESTIMATE to confirm.
