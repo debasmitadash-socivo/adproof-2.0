@@ -293,6 +293,11 @@ export function describeFilters(
   }
   const bucketed: Record<string, string[]> = {};
   for (const id of selectedIds) {
+    // Free-text interests added by the user come through as `custom:<text>`.
+    if (id.startsWith('custom:')) {
+      (bucketed['Custom interests'] ||= []).push(id.slice('custom:'.length));
+      continue;
+    }
     if (!labels[id]) continue;
     const bucket = groupOf[id] || 'Targeting';
     bucketed[bucket] ||= [];

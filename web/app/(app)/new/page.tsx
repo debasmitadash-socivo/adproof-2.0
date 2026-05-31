@@ -808,47 +808,120 @@ function PlatformFilters({ platformId }: { platformId: string }) {
   const profile = useApp((s) => s.companyProfile);
 
   const cards = filtersForPlatform(platformId);
-  const selectedCount = Object.keys(filterSelections).length;
-  const suggestions = suggestedChips(
-    profile?.product_category ?? 'general',
-    platformId,
-  );
+  const selectedIds = Object.keys(filterSelections);
+  const selectedCount = selectedIds.length;
+  const customChips = selectedIds.filter((id) => id.startsWith('custom:'));
+  const hasSelections = selectedCount > 0;
 
-  function applySuggestions() {
-    const next = { ...filterSelections };
-    for (const id of suggestions) next[id] = true;
-    setManyFilters(Object.keys(next));
+  const [tailoring, setTailoring] = useState(false);
+  const [rationale, setRationale] = useState<string | null>(null);
+  const [tailorErr, setTailorErr] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [customText, setCustomText] = useState('');
+
+  // Flatten the catalogue so the LLM can only return ids we know how to toggle.
+  const allChips = cards.flatMap((card) =>
+    card.groups.flatMap((g) => g.chips.map((ch) =>
+      ({ id: ch.id, label: ch.label, group: g.title || card.title }))));
+
+  async function tailorToCompany() {
+    setTailoring(true); setTailorErr(null);
+    try {
+      const r = await api.suggestAudience({
+        company_description: profile?.raw_description ?? '',
+        industry: profile?.industry ?? '',
+        product_category: profile?.product_category ?? '',
+        business_model: profile?.business_model ?? '',
+        value_proposition: profile?.value_proposition ?? '',
+        conversion_goal: profile?.conversion_goal,
+        platform_id: platformId,
+        available_chips: allChips,
+      });
+      const next = new Set(selectedIds);
+      r.selected_chip_ids.forEach((id) => next.add(id));
+      r.custom_interests.forEach((t) => next.add(`custom:${t}`));
+      if (r.gender) next.add(`gender:${r.gender}`);
+      setManyFilters([...next]);
+      setRationale(r.rationale || null);
+      setShowAll(false);                     // collapse to the relevant groups
+      if (r.source !== 'llm') setTailorErr('AI was unavailable — pick chips manually, or try again.');
+    } catch (e) {
+      setTailorErr((e as Error).message);
+    } finally { setTailoring(false); }
+  }
+
+  function addCustom() {
+    const t = customText.trim();
+    if (!t) return;
+    setManyFilters([...new Set([...selectedIds, `custom:${t}`])]);
+    setCustomText('');
+  }
+
+  function groupVisible(card: FilterCardType, g: { chips: { id: string }[] }) {
+    if (showAll || !hasSelections) return true;
+    if (card.id.includes('gender') || card.id.includes('location')) return true;
+    return g.chips.some((ch) => filterSelections[ch.id]);
   }
 
   return (
     <div className="space-y-3">
-      {/* Suggestion bar */}
-      {suggestions.length > 0 && (
-        <Card className="!bg-coral-soft !border-coral/30 flex items-center gap-3 flex-wrap">
-          <span className="text-[13.5px]">
-            <strong>Suggested for {profile?.product_category ?? 'your category'}:</strong>{' '}
-            {suggestions.length} filters that fit a {profile?.industry || profile?.product_category || 'company like yours'}.
-          </span>
-          <div className="flex-1" />
-          <Button size="sm" variant="secondary" onClick={applySuggestions}>Apply suggested</Button>
-          <Button size="sm" variant="ghost" onClick={clearFilters}>Clear all</Button>
-        </Card>
-      )}
-      <div className="text-[12.5px] text-ink-muted px-1">
-        {selectedCount === 0
-          ? <>No filters selected yet — click chips to build your audience.</>
-          : <><strong className="text-ink">{selectedCount}</strong> filter{selectedCount === 1 ? '' : 's'} selected. They'll be sent as the audience description on Run.</>
-        }
+      {/* Tailor-to-company bar */}
+      <Card className="!bg-coral-soft !border-coral/30">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="text-[13.5px] flex-1">
+            <strong>✨ Tailor to {profile?.company_name || 'your company'}.</strong>{' '}
+            We read your profile and pick only the interests, behaviours &amp; demographics that fit — and hide the rest.
+          </div>
+          <Button size="sm" onClick={tailorToCompany} disabled={tailoring}>
+            {tailoring ? 'Tailoring…' : '✨ Tailor to my company'}
+          </Button>
+          {hasSelections && (
+            <Button size="sm" variant="ghost" onClick={() => { clearFilters(); setRationale(null); }}>Clear</Button>
+          )}
+        </div>
+        {rationale && <div className="text-[12.5px] text-ink mt-2 pt-2 border-t border-coral/20"><strong>Why:</strong> {rationale}</div>}
+        {tailorErr && <div className="text-[12.5px] text-danger mt-2">{tailorErr}</div>}
+      </Card>
+
+      <div className="text-[12.5px] text-ink-muted px-1 flex items-center gap-2 flex-wrap">
+        <span>{selectedCount === 0
+          ? 'Nothing selected yet — tailor to your company, or click chips below.'
+          : <><strong className="text-ink">{selectedCount}</strong> selected — sent as the audience on Run.</>}</span>
+        <div className="flex-1" />
+        {hasSelections && (
+          <button type="button" className="text-coral font-semibold text-[12.5px]"
+            onClick={() => setShowAll((v) => !v)}>
+            {showAll ? 'Show only relevant ↑' : 'Show everything ↓'}
+          </button>
+        )}
       </div>
 
-      {cards.map((card) => (
-        <FilterCardPanel
-          key={card.id}
-          card={card}
-          selections={filterSelections}
-          onToggle={toggleFilter}
-        />
-      ))}
+      {/* Free-text custom interests */}
+      <Card>
+        <div className="text-[11.5px] text-ink-muted font-bold uppercase tracking-[0.07em] mb-2">Your own interests — type anything</div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {customChips.map((id) => (
+            <span key={id} onClick={() => toggleFilter(id)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-coral bg-coral-soft text-coral text-[13px] font-semibold cursor-pointer">
+              {id.slice(7)} <span className="font-bold">×</span>
+            </span>
+          ))}
+          <input value={customText} onChange={(e) => setCustomText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }}
+            placeholder="e.g. marketing automation, fly fishing…"
+            className="input flex-1 min-w-[200px] text-[13px]" />
+          <Button size="sm" variant="secondary" onClick={addCustom} disabled={!customText.trim()}>Add</Button>
+        </div>
+      </Card>
+
+      {cards.map((card) => {
+        const visGroups = card.groups.filter((g) => groupVisible(card, g));
+        if (visGroups.length === 0) return null;
+        return (
+          <FilterCardPanel key={card.id} card={{ ...card, groups: visGroups }}
+            selections={filterSelections} onToggle={toggleFilter} />
+        );
+      })}
     </div>
   );
 }

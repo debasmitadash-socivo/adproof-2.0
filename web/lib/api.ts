@@ -56,6 +56,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ description }),
     }),
+  suggestAudience: (payload: {
+    company_description?: string; industry?: string; product_category?: string;
+    business_model?: string; value_proposition?: string; conversion_goal?: string;
+    platform_id: string;
+    available_chips: { id: string; label: string; group: string }[];
+  }) =>
+    request<{
+      selected_chip_ids: string[]; custom_interests: string[];
+      gender: 'all' | 'women' | 'men'; rationale: string;
+      audience_name: string; source: string;
+    }>('/api/suggest-audience', { method: 'POST', body: JSON.stringify(payload) }),
   researchCompany: (payload: { url?: string; description?: string; geo?: string }) =>
     request<ResearchProposal>('/api/research-company', {
       method: 'POST',

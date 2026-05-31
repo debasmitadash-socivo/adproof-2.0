@@ -36,7 +36,7 @@ from audience_match import match_audience  # noqa: E402
 from brief import CampaignBrief, CreativeAssets  # noqa: E402
 from company_profile import parse_company  # noqa: E402
 from copy_critique import critique_copy  # noqa: E402
-from llm import have_any_key  # noqa: E402
+from llm import have_any_key, text_complete, extract_json  # noqa: E402
 from outcomes import ingest_and_calibrate  # noqa: E402
 from pipeline import VisionUnavailableError, run_wizard_simulation  # noqa: E402
 from platforms import (  # noqa: E402
@@ -924,6 +924,76 @@ def parse_company_endpoint(req: ParseCompanyRequest) -> dict:
 def match_audience_endpoint(req: MatchAudienceRequest) -> dict:
     match = match_audience(req.description, prefer_llm=have_any_key())
     return match.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# Smart audience suggestion — read the company profile and pick the TIGHT,
+# relevant targeting from the platform catalogue (instead of dumping every
+# generic interest on the user). The frontend sends its own chip catalogue so
+# the model can only return ids the UI knows how to toggle.
+# ---------------------------------------------------------------------------
+
+class AudienceChip(BaseModel):
+    id: str
+    label: str
+    group: str = ""
+
+
+class SuggestAudienceRequest(BaseModel):
+    company_description: str = ""
+    industry: str = ""
+    product_category: str = ""
+    business_model: str = ""
+    value_proposition: str = ""
+    conversion_goal: Optional[str] = None
+    platform_id: str = "meta_instagram"
+    available_chips: list[AudienceChip] = []
+
+
+@app.post("/api/suggest-audience")
+def suggest_audience(req: SuggestAudienceRequest) -> dict:
+    valid_ids = {c.id for c in req.available_chips}
+    # Compact, grouped catalogue for the prompt.
+    by_group: dict = {}
+    for c in req.available_chips:
+        by_group.setdefault(c.group or "Other", []).append(f"{c.id} = {c.label}")
+    catalogue = "\n".join(
+        f"[{g}]\n  " + "\n  ".join(items) for g, items in by_group.items())
+
+    system = ("You are a senior paid-social strategist. You choose the TIGHTEST, "
+              "most relevant audience targeting for ONE specific company. Be "
+              "ruthless — only include targeting that genuinely fits this "
+              "business; never pad with generic interests (e.g. do NOT pick "
+              "'Skincare' or 'Parent of newborn' for a B2B SaaS). Reply with "
+              "strict JSON only.")
+    prompt = (
+        f"COMPANY\n"
+        f"- Industry: {req.industry or 'n/a'}\n"
+        f"- Sells: {req.value_proposition or req.product_category or 'n/a'}\n"
+        f"- Model: {req.business_model or 'n/a'}\n"
+        f"- Goal: {req.conversion_goal or 'conversions'}\n"
+        f"- Notes: {req.company_description[:600]}\n\n"
+        f"PLATFORM: {req.platform_id}\n\n"
+        f"AVAILABLE TARGETING (id = label):\n{catalogue}\n\n"
+        f"Pick ONLY ids that genuinely fit this company. Also suggest up to 4 "
+        f"EXTRA interests not in the list. Recommend a gender. Reply JSON:\n"
+        f'{{"selected_chip_ids": ["..."], "custom_interests": ["..."], '
+        f'"gender": "all|women|men", "rationale": "one sentence why", '
+        f'"audience_name": "short name"}}')
+
+    raw = text_complete(prompt, system=system, max_tokens=700, json_mode=True) \
+        if have_any_key() else None
+    data = extract_json(raw) or {}
+    selected = [i for i in (data.get("selected_chip_ids") or []) if i in valid_ids]
+    gender = data.get("gender")
+    return {
+        "selected_chip_ids": selected,
+        "custom_interests": [str(x)[:40] for x in (data.get("custom_interests") or [])][:4],
+        "gender": gender if gender in ("all", "women", "men") else "all",
+        "rationale": str(data.get("rationale", ""))[:220],
+        "audience_name": str(data.get("audience_name", ""))[:60],
+        "source": "llm" if (raw and selected) else "unavailable",
+    }
 
 
 # ---------------------------------------------------------------------------

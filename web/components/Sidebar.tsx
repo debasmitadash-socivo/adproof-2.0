@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import { useApp, userInitials, workspaceLabel } from '@/lib/store';
 
@@ -18,7 +18,6 @@ const Icon = {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const user = useApp((s) => s.user);
   const profile = useApp((s) => s.companyProfile);
   const companies = useApp((s) => s.companies);
@@ -98,12 +97,11 @@ export function Sidebar() {
                 <div className="h-px bg-border" />
               </>
             )}
-            <button type="button"
-              onClick={() => { setWsOpen(false); router.push('/onboarding?new=1'); }}
+            <Link href="/onboarding?new=1" onClick={() => setWsOpen(false)}
               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-semibold hover:bg-bg-deep text-left text-coral">
               <span className="text-[16px] leading-none">+</span>
               <span>Create new workspace</span>
-            </button>
+            </Link>
             <Link href="/company" onClick={() => setWsOpen(false)}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-[12.5px] text-ink-muted hover:bg-bg-deep">
               Edit current workspace →
