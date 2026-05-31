@@ -349,11 +349,15 @@ def _aov_multiplier_for_profile(profile: CompanyProfile) -> float:
 def _resolve_creative_for_visual(assets: CreativeAssets):
     """Pick the file to send to the visual analyser.
 
-    Only images go to the visual scorer for now — the heuristic uses PIL,
-    which can't open mp4. Video analysis (thumbnail extraction or
-    multimodal-on-frames) is a v1.1 task.
+    Returns ``(kind, path)`` where kind is 'video', 'image', or None.
+    Videos are analysed via Gemini's native video ingest (Phase 6); images
+    via the multi-provider scorer.
     """
-    return assets.image_path or None
+    if assets.video_path:
+        return "video", assets.video_path
+    if assets.image_path:
+        return "image", assets.image_path
+    return None, None
 
 
 def run_wizard_simulation(profile: CompanyProfile,
@@ -383,7 +387,9 @@ def run_wizard_simulation(profile: CompanyProfile,
         raise ValueError("; ".join(v["message"] for v in blocking))
 
     ad_text_combined = _best_ad_text(assets)
-    image_path = _resolve_creative_for_visual(assets)
+    creative_kind, creative_path = _resolve_creative_for_visual(assets)
+    image_path = creative_path if creative_kind == "image" else None
+    video_path = creative_path if creative_kind == "video" else None
 
     # Geo-aware lens: tell the vision model which market this ad is for so it
     # flags tone / spelling / cultural mismatches for that audience (e.g. US
@@ -398,27 +404,37 @@ def run_wizard_simulation(profile: CompanyProfile,
     )
 
     _step(0.15, "Scoring the creative on the four visual dimensions...")
-    visual = (analyze_ad(image_path, ad_text_combined,
-                         provider=visual_provider,
-                         audience_hint=audience_hint,
-                         brand_category=profile.product_category,
-                         brand_industry=profile.industry)
-              if image_path else None)
+    if video_path:
+        from src.visual_analysis import analyze_ad_video    # noqa
+        visual = analyze_ad_video(
+            video_path, ad_text_combined,
+            audience_hint=audience_hint,
+            brand_category=profile.product_category,
+            brand_industry=profile.industry,
+        )
+    elif image_path:
+        visual = analyze_ad(
+            image_path, ad_text_combined,
+            provider=visual_provider, audience_hint=audience_hint,
+            brand_category=profile.product_category,
+            brand_industry=profile.industry,
+        )
+    else:
+        visual = None
 
-    # SAFETY GATE — block the run if an image was supplied but no real vision
-    # model could inspect it. Heuristic mode can't see the picture: it can't
-    # screen for nudity/policy violations and its "visual quality" scores are
-    # pixel statistics, not understanding. Showing a forecast here would imply
-    # an unscreened image is fine, so we refuse the run before spending any
-    # compute on a number we can't stand behind.
-    if image_path and visual is not None and visual.is_heuristic:
+    # SAFETY GATE — refuse the forecast if a creative was supplied but no real
+    # vision model could inspect it. Without actually seeing the image/video
+    # we can't screen for policy violations or judge quality; pretending we did
+    # would be exactly the kind of overclaim this product exists to prevent.
+    if creative_path and visual is not None and visual.is_heuristic:
+        kind_word = "video" if creative_kind == "video" else "image"
         raise VisionUnavailableError(
-            "We couldn't analyse your image — the image-understanding service "
-            "is temporarily unavailable (the free-tier vision quota is used "
-            "up right now). We won't show a forecast we can't stand behind: "
-            "without actually looking at the image we can't confirm it's "
-            "policy-safe or judge its quality. Please try again in a few "
-            "minutes, or add your own vision API key in Settings.",
+            f"We couldn't analyse your {kind_word} — the analysis service is "
+            "temporarily unavailable (free-tier quota likely used up). We "
+            f"won't show a forecast we can't stand behind: without actually "
+            f"watching the {kind_word} we can't confirm it's policy-safe or "
+            "judge its quality. Please try again in a few minutes, or add "
+            "your own Gemini API key in Settings.",
             provider_error=getattr(visual, "provider_error", "") or "",
         )
 

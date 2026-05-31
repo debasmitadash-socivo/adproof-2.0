@@ -1089,6 +1089,182 @@ def _analyze_openai_with_brand(b64, media_type, ad_text, audience_hint, brand_hi
 
 
 # ===========================================================================
+# VIDEO ANALYSIS  (Phase 6) — reels / video ads via Gemini
+# ===========================================================================
+# Gemini natively ingests video (samples frames + audio); other providers
+# don't accept video uniformly, so this path is Gemini-only. Output uses the
+# SAME VisualResult schema as the image path so every downstream consumer
+# (viability gate, scores, ban_risk, brand fit) works unchanged.
+
+_VIDEO_MIME_TYPES = {
+    ".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/quicktime",
+    ".webm": "video/webm", ".mkv": "video/x-matroska",
+    ".avi": "video/x-msvideo", ".3gp": "video/3gpp", ".mpeg": "video/mpeg",
+    ".mpg": "video/mpeg",
+}
+# Inline-bytes ceiling for Gemini video. Larger files would need the File API.
+_MAX_VIDEO_BYTES = 20 * 1024 * 1024
+
+
+def _prepare_video(video_path):
+    p = Path(video_path)
+    if not p.exists():
+        raise FileNotFoundError(f"Video not found: {p}")
+    size = p.stat().st_size
+    if size > _MAX_VIDEO_BYTES:
+        raise ValueError(
+            f"Video is {size / 1_048_576:.1f}MB — current limit is "
+            f"{_MAX_VIDEO_BYTES // 1_048_576}MB. Compress or shorten the clip.")
+    mime = _VIDEO_MIME_TYPES.get(p.suffix.lower(), "video/mp4")
+    return p.read_bytes(), mime, size
+
+
+def _build_video_user_prompt(ad_text: str, audience_hint: str | None,
+                              brand_hint: str | None = None) -> str:
+    parts = ["Analyse the attached AD VIDEO together with its copy.",
+             "Use the SAME JSON schema as for images — return the 4 scores, "
+             "ban_risk, brand_relevance, and image_copy_coherence (treat "
+             "'image_copy_coherence' as creative-vs-copy coherence for video)."]
+    parts.append(f'Ad copy: "{ad_text.strip()}"' if ad_text.strip()
+                 else "Ad copy: (none provided — judge the video alone)")
+    if brand_hint:
+        parts.append(f"Brand context: {brand_hint.strip()}")
+    if audience_hint:
+        parts.append(f"Intended audience: {audience_hint.strip()}")
+    parts.append(
+        "Specific to video, weigh: (a) hook strength in the FIRST 3 SECONDS "
+        "(reflect this in attention_capture), (b) pacing and retention cues, "
+        "(c) on-screen text / captions readability, (d) audio / voiceover "
+        "presence and clarity, (e) overall production quality (visual_clarity), "
+        "(f) ban_risk across the WHOLE video — any prohibited content at any "
+        "point counts. Be strict on brand_relevance: does the video genuinely "
+        "match the brand and copy, or is it stock-feel?")
+    parts.append("Return the JSON object now.")
+    return "\n".join(parts)
+
+
+def _analyze_gemini_video_with_brand(video_bytes, mime_type, ad_text,
+                                      audience_hint, brand_hint):
+    """Call Gemini with a video Part, rotating models on quota."""
+    try:
+        from google import genai
+        from google.genai import types as gtypes
+    except ImportError as exc:
+        raise RuntimeError("google-genai not installed.") from exc
+    key = _get_key("GEMINI_API_KEY")
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY not set.")
+    client = genai.Client(api_key=key)
+    last_exc: Exception | None = None
+    for model_id in GEMINI_VISION_CHAIN:
+        if ("gemini-video", model_id) in _VISION_EXHAUSTED:
+            continue
+        config_kwargs: dict = {
+            "system_instruction": _SYSTEM_PROMPT,
+            "response_mime_type": "application/json",
+            "max_output_tokens": 4096,
+        }
+        if "lite" not in model_id:
+            config_kwargs["thinking_config"] = gtypes.ThinkingConfig(
+                thinking_budget=512)
+        try:
+            response = client.models.generate_content(
+                model=model_id,
+                contents=[
+                    gtypes.Part.from_bytes(data=video_bytes,
+                                            mime_type=mime_type),
+                    _build_video_user_prompt(ad_text, audience_hint, brand_hint),
+                ],
+                config=gtypes.GenerateContentConfig(**config_kwargs),
+            )
+        except Exception as exc:                       # noqa: BLE001
+            last_exc = exc
+            if _is_quota_error(exc):
+                _VISION_EXHAUSTED.add(("gemini-video", model_id))
+                continue
+            raise
+        text = getattr(response, "text", None)
+        if text:
+            return _normalise_raw(_extract_json(text)), model_id
+        last_exc = RuntimeError("Gemini video response had no text payload.")
+    raise (last_exc or RuntimeError("All Gemini video models exhausted."))
+
+
+def analyze_ad_video(video_path,
+                     ad_text: str,
+                     *,
+                     audience_hint: str | None = None,
+                     brand_category: str = "general",
+                     brand_industry: str = ""):
+    """Analyse a video creative. Returns the same VisualResult schema as
+    analyze_ad so the viability gate, scores, ban_risk, brand fit and the
+    explanation module all keep working unchanged."""
+    brand_hint = None
+    if brand_category and brand_category != "general":
+        brand_hint = f"product category '{brand_category}'"
+        if brand_industry:
+            brand_hint += f", industry '{brand_industry}'"
+
+    # Heuristic-marked fallback used when Gemini isn't usable — the safety
+    # gate will then refuse the forecast (same philosophy as the image path).
+    def _heuristic_block(error: str) -> VisualResult:
+        scores = {k: 0.5 for k in VISUAL_SCORE_KEYS}
+        return VisualResult(
+            scores=scores, score_normalisation=scores,
+            explanations={k: "Video not analysed (vision unavailable)."
+                          for k in VISUAL_SCORE_KEYS},
+            strengths=[], weaknesses=[
+                "Couldn't analyse the video — vision model unavailable."],
+            overall="Video creative could not be inspected.",
+            provider="gemini", model="(unavailable)",
+            is_heuristic=True, provider_error=error[:240],
+            brand_relevance=None, brand_relevance_explanation="",
+            brand_relevance_source="heuristic",
+            image_description="(video)",
+            image_copy_coherence=None,
+            image_copy_coherence_explanation="",
+            ban_risk={"level": "unknown", "flags": [],
+                       "explanation": "Vision unavailable for ban-risk screen."},
+        )
+
+    try:
+        video_bytes, mime, _size = _prepare_video(video_path)
+    except Exception as exc:                       # noqa: BLE001
+        return _heuristic_block(f"prepare_video: {exc}")
+
+    try:
+        raw, model_id = _analyze_gemini_video_with_brand(
+            video_bytes, mime, ad_text, audience_hint, brand_hint)
+    except Exception as exc:                       # noqa: BLE001
+        return _heuristic_block(f"gemini_video: {exc}")
+
+    # Same construction as the image path's tail.
+    br_raw = raw.get("ban_risk") or {}
+    ban_risk = {
+        "level": str(br_raw.get("level", "unknown")).lower(),
+        "flags": list(br_raw.get("flags", [])),
+        "explanation": str(br_raw.get("explanation", "")),
+    }
+    scores = _validate_scores(raw.get("scores", {}))
+    return VisualResult(
+        scores=scores, score_normalisation=scores,
+        explanations=raw.get("explanations", {}),
+        strengths=list(raw.get("strengths", [])),
+        weaknesses=list(raw.get("weaknesses", [])),
+        overall=str(raw.get("overall", "")),
+        provider="gemini", model=model_id,
+        is_heuristic=False,
+        brand_relevance=raw.get("brand_relevance"),
+        brand_relevance_explanation=str(raw.get("brand_relevance_explanation", "")),
+        brand_relevance_source="llm",
+        image_description=str(raw.get("image_description", "")),
+        image_copy_coherence=raw.get("image_copy_coherence"),
+        image_copy_coherence_explanation=str(raw.get("image_copy_coherence_explanation", "")),
+        ban_risk=ban_risk,
+    )
+
+
+# ===========================================================================
 # CLI entry point
 # ===========================================================================
 

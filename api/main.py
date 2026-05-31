@@ -378,7 +378,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 _ALLOWED_MIME = {
     "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif",
-    "video/mp4", "video/quicktime",
+    "video/mp4", "video/quicktime", "video/webm", "video/x-matroska",
+    "video/3gpp", "video/x-msvideo", "video/mpeg",
 }
 
 
