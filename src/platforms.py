@@ -176,7 +176,7 @@ FORMATS_RAW: list = [
        tone="benefit-led, concrete offer, scroll-stopping visual",
        primary_objectives=("conversion", "consideration")),
     _f(id="meta_fb_feed_video", platform_id="meta_facebook",
-       platform_name="Meta — Facebook", name="Feed — Video",
+       platform_name="Meta — Facebook", name="In-Feed Video",
        media_type="video",
        asset_types=("video", "primary_text", "headline", "cta", "link"),
        benchmarks={"ctr": 0.0115, "cpm": 14.00, "cpc": 1.22,
@@ -188,7 +188,9 @@ FORMATS_RAW: list = [
        copy_limits={"primary_text_chars": 125, "headline_chars": 40,
                     "video_seconds_max": 240},
        aspect_ratios=("1:1", "4:5", "9:16"),
-       best_for="brand storytelling + demos; mid-funnel",
+       best_for="Plays in the main Facebook feed between organic posts. "
+                "Any aspect ratio, up to 4 min — best for brand storytelling, "
+                "product demos, mid-funnel consideration.",
        tone="hook in first 3 seconds, captions-on by default",
        primary_objectives=("awareness", "consideration", "conversion")),
     _f(id="meta_fb_reels", platform_id="meta_facebook",
@@ -203,7 +205,9 @@ FORMATS_RAW: list = [
                    "trend_note": "Format matured: CPM +29%, CTR -7%. No longer a 'cheap reach' loophole."},
        copy_limits={"primary_text_chars": 72, "video_seconds_max": 90},
        aspect_ratios=("9:16",),
-       best_for="discovery + younger audiences; cheaper CPM than Feed",
+       best_for="Plays in the dedicated Reels feed (vertical scroller, "
+                "TikTok-style). Vertical 9:16 only, up to 90s — best for "
+                "discovery, Gen-Z / millennial reach, cheaper CPM than Feed.",
        tone="native, vertical, fast-paced; trends + sound matter",
        primary_objectives=("awareness", "consideration")),
 
@@ -235,7 +239,9 @@ FORMATS_RAW: list = [
                    "trend_note": "Now ~50% of IG ad inventory; CPM up 25%."},
        copy_limits={"caption_chars": 2200, "video_seconds_max": 90},
        aspect_ratios=("9:16",),
-       best_for="Gen-Z / millennial discovery; viral upside",
+       best_for="Plays in the dedicated Reels tab (vertical scroller). "
+                "Vertical 9:16 only, up to 90s — best for Gen-Z / millennial "
+                "discovery and viral upside.",
        tone="native, trend-aware, short hook",
        primary_objectives=("awareness", "consideration")),
     _f(id="meta_ig_stories", platform_id="meta_instagram",
@@ -250,7 +256,9 @@ FORMATS_RAW: list = [
                    "trend_note": "Stories engagement plateauing; budgets reallocating to Reels."},
        copy_limits={"video_seconds_max": 60},
        aspect_ratios=("9:16",),
-       best_for="time-sensitive offers, retargeting",
+       best_for="Plays full-screen at the top of the IG/FB app between "
+                "friends' Stories. Vertical 9:16, up to 60s — best for "
+                "time-sensitive offers and retargeting.",
        tone="full-screen, fast, swipe-up clear",
        primary_objectives=("consideration", "conversion")),
 

@@ -65,13 +65,18 @@ export async function listCompanies(): Promise<CompanyProfile[]> {
   return (data ?? []).map(rowToCompany);
 }
 
-/** Create a brand-new workspace. Returns the new id. */
-export async function createCompany(p: CompanyProfile): Promise<string | null> {
-  const sb = getSupabase(); const user_id = await uid();
-  if (!sb || !user_id) return null;
+/** Create a brand-new workspace. Throws on failure so the caller can surface
+ *  a usable error message — silent nulls leave the user staring at a dead
+ *  button with no clue whether auth expired, RLS rejected, etc. */
+export async function createCompany(p: CompanyProfile): Promise<string> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured. Check NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY.');
+  const user_id = await uid();
+  if (!user_id) throw new Error('You\'re not signed in. Sign in again to create a workspace.');
   const { data, error } = await sb.from('companies')
     .insert(companyRow(p, user_id)).select('id').single();
-  if (error || !data) { console.error('[db] createCompany', error?.message); return null; }
+  if (error) throw new Error(`Couldn\'t save the workspace: ${error.message}`);
+  if (!data) throw new Error('Couldn\'t save the workspace: no row returned.');
   return data.id as string;
 }
 

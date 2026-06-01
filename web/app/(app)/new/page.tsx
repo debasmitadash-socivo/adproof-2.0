@@ -410,24 +410,34 @@ export default function NewAnalysisPage() {
 
             <h3 className="font-heading text-[15px] font-bold mt-4 mb-2">Ad format on {platform?.name ?? 'this platform'}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(platform?.formats ?? []).map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => w.setFormat(f.id)}
-                  className={clsx(
-                    'text-left border-2 rounded-md p-3.5 transition-all bg-surface',
-                    w.formatId === f.id ? 'border-coral bg-coral-soft' : 'border-border hover:border-ink-faint',
-                  )}
-                >
-                  <div className="font-semibold text-[14px]">{f.name}</div>
-                  <div className="text-ink-muted text-[12px] mt-0.5">{f.best_for}</div>
-                  <div className="mt-2 flex gap-1.5 flex-wrap">
-                    <Pill tone="violet">{f.media_type}</Pill>
-                    <Pill tone="lime">CTR {(f.benchmarks.ctr * 100).toFixed(2)}%</Pill>
-                    {f.benchmarks.cpm > 0 && <Pill tone="muted">CPM ${f.benchmarks.cpm.toFixed(0)}</Pill>}
-                  </div>
-                </button>
-              ))}
+              {(platform?.formats ?? []).map((f) => {
+                const maxSec = f.copy_limits?.video_seconds_max as number | undefined;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => w.setFormat(f.id)}
+                    className={clsx(
+                      'text-left border-2 rounded-md p-3.5 transition-all bg-surface',
+                      w.formatId === f.id ? 'border-coral bg-coral-soft' : 'border-border hover:border-ink-faint',
+                    )}
+                  >
+                    <div className="font-semibold text-[14px]">{f.name}</div>
+                    <div className="text-ink-muted text-[12px] mt-0.5 leading-snug">{f.best_for}</div>
+                    <div className="mt-2 flex gap-1.5 flex-wrap">
+                      <Pill tone="violet">{f.media_type}</Pill>
+                      {/* Aspect-ratio + duration are the at-a-glance markers that make
+                          Reels (9:16, ≤90s) instantly distinguishable from In-Feed
+                          Video (1:1 / 4:5 / 9:16, ≤240s). */}
+                      {f.aspect_ratios.length > 0 && (
+                        <Pill tone="muted">{f.aspect_ratios.join(' / ')}</Pill>
+                      )}
+                      {maxSec && <Pill tone="muted">≤{maxSec}s</Pill>}
+                      <Pill tone="lime">CTR {(f.benchmarks.ctr * 100).toFixed(2)}%</Pill>
+                      {f.benchmarks.cpm > 0 && <Pill tone="muted">CPM ${f.benchmarks.cpm.toFixed(0)}</Pill>}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

@@ -26,6 +26,7 @@ export default function OnboardingPage() {
   const [desc, setDesc] = useState('');
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // Richer onboarding (Phase 5 of UX): the four chip-picker fields that
   // actually move the forecast. Stored alongside the AI-parsed profile.
@@ -79,11 +80,20 @@ export default function OnboardingPage() {
       sales_cycle: salesCycle || undefined,
       brand_color: brandColor || undefined,
     };
+    setErr(null);
     if (isNewWorkspace) {
-      setCompanyDescription(desc);
-      const id = await createWorkspace(enriched);
-      if (id) router.push('/dashboard');
-      return;
+      setCreating(true);
+      try {
+        setCompanyDescription(desc);
+        await createWorkspace(enriched);
+        router.push('/dashboard');
+        return;
+      } catch (e) {
+        setErr((e as Error).message);
+        return;
+      } finally {
+        setCreating(false);
+      }
     }
     if (!name.trim()) return;
     setUser({
@@ -299,8 +309,12 @@ export default function OnboardingPage() {
               )}
 
               <div className="flex justify-between mt-8 pt-5 border-t border-border-soft">
-                <Button variant="ghost" onClick={() => setStep(1)}>← Back</Button>
-                <Button onClick={finish} disabled={!profile}>Finish &amp; go to dashboard →</Button>
+                <Button variant="ghost" onClick={() => setStep(1)} disabled={creating}>← Back</Button>
+                <Button onClick={finish} disabled={!profile || creating}>
+                  {creating
+                    ? (isNewWorkspace ? 'Creating workspace…' : 'Saving…')
+                    : (isNewWorkspace ? 'Create workspace →' : 'Finish & go to dashboard →')}
+                </Button>
               </div>
             </>
           )}

@@ -59,7 +59,13 @@ export async function middleware(req: NextRequest) {
 
   if (isProtected(path) && !user) {
     const loginUrl = new URL('/login', req.url);
-    loginUrl.searchParams.set('next', path);   // remember where they wanted to go
+    // Remember both path AND query string — otherwise a session expiring on the
+    // way to /onboarding?new=1 drops the new-workspace flag and the user lands
+    // back on /dashboard with no idea why their click went nowhere.
+    const nextWithQuery = req.nextUrl.search
+      ? `${path}${req.nextUrl.search}`
+      : path;
+    loginUrl.searchParams.set('next', nextWithQuery);
     return NextResponse.redirect(loginUrl);
   }
   if (path === '/login' && user) {

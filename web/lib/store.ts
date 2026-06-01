@@ -47,7 +47,7 @@ interface AppState {
   companies: CompanyProfile[];
   currentCompanyId: string | null;
   setCurrentCompany: (id: string) => Promise<void>;
-  createWorkspace: (p: CompanyProfile) => Promise<string | null>;
+  createWorkspace: (p: CompanyProfile) => Promise<string>;
 
   savedCampaigns: SavedCampaign[];
   addCampaign: (c: SavedCampaign) => void;
@@ -229,8 +229,10 @@ export const useApp = create<AppState>()(
         } catch (e) { console.error('[db] reload workspace', e); }
       },
       createWorkspace: async (p) => {
+        // dbCreateCompany now throws on auth / RLS / network failures, so the
+        // caller can show the actual reason instead of guessing why nothing
+        // happened. Propagate by re-throwing.
         const id = await dbCreateCompany(p);
-        if (!id) return null;
         const withId = { ...p, id };
         set((s) => ({
           companies: [...s.companies, withId],
