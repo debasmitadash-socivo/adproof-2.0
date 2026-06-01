@@ -76,6 +76,14 @@ interface AppState {
   formatId: string;
   setPlatform: (pid: string) => void;
   setFormat: (fid: string) => void;
+  // Additional placements to run the SAME creative on alongside the primary
+  // format. Used for Meta cross-placement runs ("score this Reel on FB AND
+  // IG") and any other "also try this placement" comparison. Each entry is
+  // a format id from /api/platforms; on Run, each copy variant is expanded
+  // into one run per (primary + additional) placement.
+  additionalFormatIds: string[];
+  toggleAdditionalFormat: (fid: string) => void;
+  clearAdditionalFormats: () => void;
 
   audienceDescription: string;
   audienceSegment: string | null;
@@ -157,6 +165,7 @@ const transientDefaults = {
   videoPath: null,
   videoUrl: null,
   filterSelections: {} as Record<string, true>,
+  additionalFormatIds: [] as string[],
   extraVariants: [] as Variant[],
   activeVariant: 0,
   budget: 5000,
@@ -354,8 +363,26 @@ export const useApp = create<AppState>()(
       // transient
       ...transientDefaults,
       setObjective: (o) => set({ objective: o }),
-      setPlatform: (pid) => set({ platformId: pid }),
-      setFormat: (fid) => set({ formatId: fid }),
+      setPlatform: (pid) => set({ platformId: pid, additionalFormatIds: [] }),
+      setFormat: (fid) =>
+        set((s) => ({
+          formatId: fid,
+          // If the new primary was previously sitting in the additional list,
+          // drop it from there — a format can't be both primary and secondary.
+          additionalFormatIds: s.additionalFormatIds.filter((id) => id !== fid),
+        })),
+      toggleAdditionalFormat: (fid) =>
+        set((s) => {
+          // The primary format is never an "additional" — guard that.
+          if (fid === s.formatId) return {};
+          const has = s.additionalFormatIds.includes(fid);
+          return {
+            additionalFormatIds: has
+              ? s.additionalFormatIds.filter((id) => id !== fid)
+              : [...s.additionalFormatIds, fid],
+          };
+        }),
+      clearAdditionalFormats: () => set({ additionalFormatIds: [] }),
       setAudienceDescription: (s) => set({ audienceDescription: s }),
       setAudienceSegment: (s) => set({ audienceSegment: s }),
       setAudienceMatch: (m) => set({ audienceMatch: m }),

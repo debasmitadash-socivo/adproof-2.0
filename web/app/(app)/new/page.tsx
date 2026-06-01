@@ -142,8 +142,9 @@ export default function NewAnalysisPage() {
         : audienceMethod === 'words' ? w.audienceDescription
         : '';
 
-      // Build the full variant list: Variant A (base store) + any extras.
-      const variants = [
+      // Build the full COPY variant list: Variant A (base store) + any extras.
+      // These are different headlines/creatives the user wants to compare.
+      const copyVariants = [
         {
           label: 'A',
           headline: w.headline, primaryText: w.primaryText,
@@ -164,13 +165,53 @@ export default function NewAnalysisPage() {
       // call (both cost API/quota).
       const needsCreative = format ? format.media_type !== 'text' : true;
       if (needsCreative) {
-        const missing = variants.filter((v) => !v.imagePath && !v.videoPath);
+        const missing = copyVariants.filter((v) => !v.imagePath && !v.videoPath);
         if (missing.length) {
           throw new Error(
-            missing.length === variants.length
+            missing.length === copyVariants.length
               ? `Upload ${format?.media_type === 'video' ? 'a video' : 'an image'} for ${format?.name ?? 'this format'} before running — there's nothing to analyse (and no ad to run) without a creative.`
               : `Variant${missing.length > 1 ? 's' : ''} ${missing.map((m) => m.label).join(', ')} ${missing.length > 1 ? 'are' : 'is'} missing a creative. Add ${format?.media_type === 'video' ? 'a video' : 'an image'} to every variant before running.`,
           );
+        }
+      }
+
+      // PLACEMENT EXPANSION — for each additional placement (Meta multi-select
+      // etc.), every copy variant gets one extra run. Build the (placement_id,
+      // platform_id, format_obj) tuple list, starting with the PRIMARY (so the
+      // base run keeps its short single-letter label).
+      const placementRuns: { formatId: string; platformId: string; formatName: string }[] = [
+        { formatId: w.formatId, platformId: w.platformId, formatName: format?.name ?? '' },
+      ];
+      for (const fid of w.additionalFormatIds) {
+        const ownerPlatform = platforms.find((p) => p.formats.some((f) => f.id === fid));
+        const fmt = ownerPlatform?.formats.find((f) => f.id === fid);
+        if (!ownerPlatform || !fmt) continue;            // catalogue out of sync — skip silently
+        placementRuns.push({
+          formatId: fid,
+          platformId: ownerPlatform.id,
+          formatName: `${ownerPlatform.name.split(' — ').pop() ?? ownerPlatform.name} · ${fmt.name}`,
+        });
+      }
+
+      // Flatten into the full run list: one entry per (copy variant, placement).
+      // The base label stays a single letter when there's no extra placement
+      // (so existing single-format flows look unchanged); otherwise the label
+      // carries the placement name for the leaderboard.
+      type RunPlan = (typeof copyVariants)[number] & {
+        runLabel: string; placementName: string; formatId: string; platformId: string;
+      };
+      const variants: RunPlan[] = [];
+      for (const cv of copyVariants) {
+        for (const pl of placementRuns) {
+          variants.push({
+            ...cv,
+            runLabel: placementRuns.length > 1
+              ? `${cv.label} · ${pl.formatName}`
+              : cv.label,
+            placementName: pl.formatName,
+            formatId: pl.formatId,
+            platformId: pl.platformId,
+          });
         }
       }
 
@@ -224,9 +265,13 @@ export default function NewAnalysisPage() {
       };
 
       // Capture the exact requests we sent — saved with the campaign so it
-      // can be re-run later against improved backend code.
+      // can be re-run later against improved backend code. Each variant's
+      // platform_id and format_id override commonInputs (they vary across
+      // copy × placement expansion).
       const originalRequests = variants.map((v) => ({
         ...commonInputs,
+        platform_id: v.platformId,
+        format_id: v.formatId,
         image_path: v.imagePath,
         video_path: v.videoPath,
         headline: v.headline,
@@ -253,21 +298,33 @@ export default function NewAnalysisPage() {
       ]);
 
       const firstResult = results[0];
-      const savedVariants: SavedVariantResult[] = results.map((r, i) => ({
-        label: variants[i].label,
-        headline: variants[i].headline || `Variant ${variants[i].label}`,
-        thumbnailUrl: variants[i].imageUrl,
-        result: r,
-        roasP50: r.mc.predicted_roas.p50,
-        roiP50: r.mc.predicted_roi.p50,
-        ctrPct: (r.mc.sample_ctrs.reduce((a, b) => a + b, 0) /
-                 Math.max(r.mc.sample_ctrs.length, 1)) * 100,
-        // A void forecast (banned / broken creative) is NOT "underperforming"
-        // (which implies it runs but poorly) — it can't be forecast at all.
-        verdictClass: (r.viability && (r.viability.forecast_valid === false || r.viability.runnable === false))
-          ? 'void'
-          : r.insights.verdict_class,
-      }));
+      const hasMultiPlacement = placementRuns.length > 1;
+      const savedVariants: SavedVariantResult[] = results.map((r, i) => {
+        const v = variants[i];
+        // Headline is what's displayed on the leaderboard. When the user is
+        // running across multiple placements, lead with the placement so the
+        // cards visually distinguish FB Reels vs IG Reels even when the copy
+        // is identical.
+        const baseHeadline = v.headline || `Variant ${v.label}`;
+        const headline = hasMultiPlacement
+          ? `${baseHeadline} · ${v.placementName}`
+          : baseHeadline;
+        return {
+          label: v.runLabel,
+          headline,
+          thumbnailUrl: v.imageUrl,
+          result: r,
+          roasP50: r.mc.predicted_roas.p50,
+          roiP50: r.mc.predicted_roi.p50,
+          ctrPct: (r.mc.sample_ctrs.reduce((a, b) => a + b, 0) /
+                   Math.max(r.mc.sample_ctrs.length, 1)) * 100,
+          // A void forecast (banned / broken creative) is NOT "underperforming"
+          // (which implies it runs but poorly) — it can't be forecast at all.
+          verdictClass: (r.viability && (r.viability.forecast_valid === false || r.viability.runnable === false))
+            ? 'void'
+            : r.insights.verdict_class,
+        };
+      });
 
       // Aggregate ROAS = mean across variants. ROI same.
       const avgRoas = savedVariants.reduce((s, v) => s + v.roasP50, 0) / savedVariants.length;
@@ -439,6 +496,13 @@ export default function NewAnalysisPage() {
                 );
               })}
             </div>
+
+            {/* Also-run-on placements. Lets a Meta advertiser score the same
+                creative on FB Reels AND IG Reels at once, or run a hero ad
+                on multiple platforms. Each ticked placement = one extra
+                simulation per copy variant (so 2 copy variants × 2 extra
+                placements = 6 runs total). */}
+            <AdditionalPlacements platforms={platforms} primaryFormatId={w.formatId} />
           </div>
 
           {format && <BenchmarkCard format={format} industry={w.companyProfile?.industry} />}
@@ -785,6 +849,14 @@ export default function NewAnalysisPage() {
               <div><strong>Goal:</strong> {w.objective}</div>
               <div><strong>Platform:</strong> {platform?.name ?? '—'}</div>
               <div><strong>Format:</strong> {format?.name ?? '—'}</div>
+              {w.additionalFormatIds.length > 0 && (
+                <div><strong>Also on:</strong> {w.additionalFormatIds.length} extra placement{w.additionalFormatIds.length > 1 ? 's' : ''}
+                  {(() => {
+                    const totalRuns = (1 + w.extraVariants.length) * (1 + w.additionalFormatIds.length);
+                    return <span className="text-ink-muted"> · {totalRuns} runs total</span>;
+                  })()}
+                </div>
+              )}
               <div><strong>Audience:</strong> {audienceMethod === 'saved' ? (w.audienceSegment ?? '—') : audienceMethod === 'words' ? (w.audienceDescription ? w.audienceDescription.slice(0, 60) + '…' : '—') : 'filters'}</div>
               <div><strong>Creative:</strong> {w.imagePath ? '✓ uploaded' : '— not uploaded'}</div>
               <div><strong>Market:</strong> {geo}</div>
@@ -802,6 +874,109 @@ export default function NewAnalysisPage() {
           : <Button size="lg" onClick={runSimulation} disabled={running}>{running ? 'Running…' : 'Run simulation →'}</Button>}
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Additional placements — multi-select chip list for "also run on these
+// formats". Groups by platform; chips show aspect-ratio + duration so the
+// user can pick valid alternatives for their creative at a glance.
+// ---------------------------------------------------------------------------
+
+function AdditionalPlacements({
+  platforms,
+  primaryFormatId,
+}: {
+  platforms: Platform[];
+  primaryFormatId: string;
+}) {
+  const additionalFormatIds = useApp((s) => s.additionalFormatIds);
+  const toggleAdditionalFormat = useApp((s) => s.toggleAdditionalFormat);
+  const clearAdditionalFormats = useApp((s) => s.clearAdditionalFormats);
+
+  // Find the primary so we can hide it (it's already the headline run).
+  const primary = platforms.flatMap((p) => p.formats).find((f) => f.id === primaryFormatId);
+  // Bias the suggestions: if primary is Meta, surface the OTHER Meta formats
+  // first (since "FB and IG run together" is the most common ask).
+  const primaryPlatformId = platforms.find((p) =>
+    p.formats.some((f) => f.id === primaryFormatId))?.id ?? '';
+  const isMetaPrimary = primaryPlatformId.startsWith('meta_');
+
+  const grouped = platforms
+    .map((p) => ({
+      platform: p,
+      formats: p.formats.filter((f) => f.id !== primaryFormatId),
+    }))
+    .filter((g) => g.formats.length > 0)
+    .sort((a, b) => {
+      // Meta first when primary is Meta, else current platform first.
+      const aMeta = a.platform.id.startsWith('meta_');
+      const bMeta = b.platform.id.startsWith('meta_');
+      if (isMetaPrimary && aMeta !== bMeta) return aMeta ? -1 : 1;
+      if (a.platform.id === primaryPlatformId) return -1;
+      if (b.platform.id === primaryPlatformId) return 1;
+      return 0;
+    });
+
+  if (!primary) return null;
+
+  return (
+    <div className="mt-6 border-t border-border pt-5">
+      <div className="flex items-baseline justify-between mb-1">
+        <h3 className="font-heading text-[15px] font-bold tracking-tight">
+          Also run this creative on… <span className="text-ink-muted font-normal">(optional)</span>
+        </h3>
+        {additionalFormatIds.length > 0 && (
+          <button onClick={clearAdditionalFormats}
+            className="text-coral font-semibold text-[12px]">Clear all</button>
+        )}
+      </div>
+      <p className="text-ink-muted text-[12.5px] mb-3 leading-snug">
+        Score the same creative on extra placements at the same time. Each ticked placement
+        becomes an extra variant per copy version — so 2 copy variants × 2 extra placements = 6 runs.
+        Watch the aspect-ratio pills: a 1:1 image can&apos;t legitimately run on a 9:16 Reel.
+      </p>
+      {grouped.map(({ platform: p, formats }) => (
+        <div key={p.id} className="mb-3 last:mb-0">
+          <div className="text-[11px] text-ink-muted font-bold uppercase tracking-[0.07em] mb-1.5">
+            {p.name}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {formats.map((f) => {
+              const on = additionalFormatIds.includes(f.id);
+              const maxSec = f.copy_limits?.video_seconds_max as number | undefined;
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => toggleAdditionalFormat(f.id)}
+                  className={clsx(
+                    'inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[12px] transition-colors',
+                    on
+                      ? 'bg-coral text-white border-coral font-semibold'
+                      : 'bg-surface border-border text-ink hover:border-coral',
+                  )}
+                >
+                  <span>{f.name}</span>
+                  <span className={clsx('text-[10.5px] font-normal',
+                    on ? 'text-white/85' : 'text-ink-muted')}>
+                    {f.aspect_ratios.join('/')}
+                    {maxSec ? ` · ≤${maxSec}s` : ''}
+                  </span>
+                  {on && <span>×</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      {additionalFormatIds.length > 0 && (
+        <div className="mt-3 text-[12.5px] bg-coral-soft border border-coral/30 rounded-md p-3">
+          <strong className="text-coral">{additionalFormatIds.length} extra placement{additionalFormatIds.length > 1 ? 's' : ''}.</strong>
+          {' '}Each copy variant will also run on {additionalFormatIds.length === 1 ? 'this' : 'these'} —
+          you&apos;ll see a per-placement leaderboard on the result page.
+        </div>
+      )}
+    </div>
   );
 }
 

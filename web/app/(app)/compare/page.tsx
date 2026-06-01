@@ -78,14 +78,29 @@ export default function ComparePage() {
         <Link href="/result"><Button variant="secondary" size="sm">← Back to detail</Button></Link>
       </div>
 
-      {/* HONEST FRAMING */}
-      <Card className="mb-5 !bg-bg-deep !border-border">
-        <div className="text-[13px] text-ink leading-snug">
-          All variants ran against the <strong>same audience, budget and format</strong>, so this is a fair fight.
-          The <strong>ranking</strong> below is the reliable part. The ROAS figures are a <strong>directional model estimate</strong> —
-          read them as <em>relative</em> (A beats B), not as a promise of exact return. The break-even row is grounded in your real economics.
-        </div>
-      </Card>
+      {/* HONEST FRAMING — adapts to whether variants share a format (true A/B
+          test) or differ (cross-placement comparison). */}
+      {(() => {
+        const formatNames = new Set(
+          variants.map((v) => v.result?.format?.name).filter(Boolean) as string[]);
+        const sameFormat = formatNames.size <= 1;
+        return (
+          <Card className="mb-5 !bg-bg-deep !border-border">
+            <div className="text-[13px] text-ink leading-snug">
+              {sameFormat ? (
+                <>All variants ran against the <strong>same audience, budget and format</strong>, so this is a fair fight.</>
+              ) : (
+                <>Variants ran against the <strong>same audience and budget</strong>, but on{' '}
+                  <strong>different placements</strong> ({Array.from(formatNames).join(', ')}). The placements
+                  have different CTR/CPM benchmarks, so absolute ROAS isn&apos;t directly comparable across them —
+                  use this view to see <em>which placement is the strongest match</em> for the same creative.</>
+              )}{' '}
+              The <strong>ranking</strong> below is the reliable part. The ROAS figures are a <strong>directional model estimate</strong> —
+              read them as <em>relative</em>, not as a promise of exact return. The break-even row is grounded in your real economics.
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* BEST / WORST VERDICT */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
