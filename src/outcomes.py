@@ -483,3 +483,50 @@ def ingest_and_calibrate(data: bytes | str, filename: str = "",
         "preview": preview,
         "rows": df.replace({np.nan: None}).to_dict("records"),
     }
+
+
+def calibrate_rows(rows: list[dict], currency: str = "GBP",
+                   segment: str = "general", source: str = "live") -> dict:
+    """Calibrate + backtest + fatigue on already-normalized ad_outcomes rows
+    (e.g. pulled live from a connected ad account). Mirrors the shape of
+    ingest_and_calibrate so the frontend renders the SAME result UI.
+    """
+    df = pd.DataFrame(rows or [])
+    n_in = len(df)
+    if not df.empty:
+        for c in ("impressions", "clicks", "spend", "reach", "conversions", "revenue"):
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+        if "impressions" in df.columns:
+            df = df[df["impressions"].fillna(0) > 0].copy()
+            if "clicks" in df.columns:
+                df["real_ctr"] = (df["clicks"] / df["impressions"]).where(df["impressions"] > 0)
+    cal = calibrate(df, currency=currency)
+    bt = backtest(df)
+    try:
+        try:
+            from src.fatigue import analyze_fatigue
+        except ImportError:
+            from fatigue import analyze_fatigue
+        fat = analyze_fatigue(df, segment=segment)
+    except Exception as exc:                          # noqa: BLE001
+        fat = {"usable": False, "segment": segment,
+               "reason": f"Fatigue analysis unavailable: {exc}"}
+    preview_cols = [c for c in ("ad_name", "platform", "date_start", "spend",
+                                "impressions", "clicks", "real_ctr",
+                                "conversions", "revenue") if c in df.columns]
+    preview = (df[preview_cols].head(8).replace({np.nan: None}).to_dict("records")
+               if preview_cols and not df.empty else [])
+    report = {
+        "n_rows_in": n_in, "n_rows_kept": int(len(df)),
+        "currency": currency, "mapped": {}, "missing": [],
+        "warnings": [], "sheet": None, "source": source,
+    }
+    return {
+        "report": report,
+        "calibration": cal,
+        "backtest": bt,
+        "fatigue": fat,
+        "preview": preview,
+        "rows": (df.replace({np.nan: None}).to_dict("records") if not df.empty else []),
+    }

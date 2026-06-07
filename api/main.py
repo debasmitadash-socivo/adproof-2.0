@@ -37,7 +37,7 @@ from brief import CampaignBrief, CreativeAssets  # noqa: E402
 from company_profile import parse_company  # noqa: E402
 from copy_critique import critique_copy  # noqa: E402
 from llm import have_any_key, text_complete, extract_json  # noqa: E402
-from outcomes import ingest_and_calibrate  # noqa: E402
+from outcomes import calibrate_rows, ingest_and_calibrate  # noqa: E402
 from pipeline import VisionUnavailableError, run_wizard_simulation  # noqa: E402
 from platforms import (  # noqa: E402
     BENCHMARK_AS_OF,
@@ -507,6 +507,50 @@ async def ingest_outcomes(file: UploadFile = File(...),
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=422,
                             detail=f"Could not parse this export: {str(e)[:300]}")
+
+
+# ===========================================================================
+# Live ad-account connection (Phase 3) — pull REAL performance read-only
+# ===========================================================================
+
+class ConnectionSyncRequest(BaseModel):
+    provider: str = "meta"
+    access_token: str
+    account_id: str
+    since: str                       # YYYY-MM-DD
+    until: str                       # YYYY-MM-DD
+    segment: str = "general"
+    currency: str = "GBP"
+
+
+@app.post("/api/connections/sync")
+def connections_sync(req: ConnectionSyncRequest) -> dict:
+    """Pull REAL ad performance from a connected account (read-only) and return
+    an ingest-shaped payload (calibration + backtest + fatigue + rows) for the
+    frontend to render and persist under the logged-in user (RLS).
+
+    The token is used for THIS request only and is not stored here — persistent,
+    encrypted connections land in the next slice (the ad_connections table).
+    Works today with a Meta access token (e.g. from Graph API Explorer / a
+    System User token) — no registered OAuth app required to try it.
+    """
+    from connectors import pull_outcomes
+    seg = req.segment if req.segment in ("general", "b2b_saas") else "general"
+    try:
+        rows = pull_outcomes(req.provider, req.access_token, req.account_id,
+                             req.since, req.until)
+    except NotImplementedError as e:
+        raise HTTPException(status_code=501, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:                            # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Pull failed: {str(e)[:300]}")
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail="No ads returned for that account / date range.")
+    return calibrate_rows(rows, currency=req.currency, segment=seg,
+                          source=req.provider)
 
 
 # Serve uploaded files back so the wizard can preview them.

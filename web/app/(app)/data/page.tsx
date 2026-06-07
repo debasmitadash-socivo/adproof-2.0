@@ -63,6 +63,12 @@ export default function DataPage() {
   const [result, setResult] = useState<IngestResult | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [existing, setExisting] = useState<AccountCalibration | null>(null);
+  // Live ad-account pull (Phase 3, read-only). Token used per-request, not stored.
+  const [token, setToken] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [since, setSince] = useState(() => new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10));
+  const [until, setUntil] = useState(() => new Date().toISOString().slice(0, 10));
+  const [syncing, setSyncing] = useState(false);
   // Per-workspace: calibration belongs to the active workspace, not the user
   // overall. Reload when the workspace changes.
   const currentCompanyId = useApp((s) => s.currentCompanyId);
@@ -86,6 +92,21 @@ export default function DataPage() {
       setError(e instanceof Error ? e.message : 'Failed to read that file.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function pullLive() {
+    if (!token.trim() || !accountId.trim()) return;
+    setSyncing(true); setError(null); setResult(null); setSaved(null);
+    try {
+      setResult(await api.syncConnection({
+        provider: 'meta', access_token: token.trim(), account_id: accountId.trim(),
+        since, until, segment, currency: existing?.currency || 'GBP',
+      }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not pull from that account.');
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -137,6 +158,45 @@ export default function DataPage() {
         </div>
         <div className="text-[12px] text-ink-faint mt-2">
           .csv or .xlsx · we auto-detect Meta / Google columns · max 25 MB · for the visual side, see the template&apos;s notes.
+        </div>
+      </Card>
+
+      {/* LIVE PULL — read-only ad-account connection (Phase 3, first cut). */}
+      <Card className="mb-5">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="font-heading text-[15px] font-bold">Or pull live from your ad account</div>
+          <Pill tone="violet">beta · Meta</Pill>
+        </div>
+        <p className="text-[12.5px] text-ink-muted mb-3 leading-snug">
+          Read-only. Paste a Meta access token (from Graph API Explorer or a System User) and your
+          ad-account ID — we pull your real performance and calibrate, no CSV needed. We only ever
+          <strong> read</strong> performance, never change your campaigns. The token is used for this
+          request only and isn&apos;t stored yet.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="label">Meta access token</label>
+            <input className="input font-mono text-[12px]" type="password" autoComplete="off"
+              value={token} onChange={(e) => setToken(e.target.value)} placeholder="EAAG…" />
+          </div>
+          <div>
+            <label className="label">Ad account ID</label>
+            <input className="input font-mono" value={accountId} onChange={(e) => setAccountId(e.target.value)}
+              placeholder="act_1234567890 (or just the digits)" />
+          </div>
+          <div>
+            <label className="label">From</label>
+            <input className="input" type="date" value={since} max={until} onChange={(e) => setSince(e.target.value)} />
+          </div>
+          <div>
+            <label className="label">To</label>
+            <input className="input" type="date" value={until} min={since} onChange={(e) => setUntil(e.target.value)} />
+          </div>
+        </div>
+        <div className="mt-3">
+          <Button onClick={pullLive} disabled={syncing || !token.trim() || !accountId.trim()}>
+            {syncing ? 'Pulling…' : 'Pull & calibrate'}
+          </Button>
         </div>
       </Card>
 

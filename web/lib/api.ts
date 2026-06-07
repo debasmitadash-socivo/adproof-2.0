@@ -97,6 +97,16 @@ export const api = {
     }
     return res.json();
   },
+  // Live ad-account pull (read-only): returns the same shape as ingestOutcomes
+  // so the data page renders calibration + backtest + fatigue identically.
+  syncConnection: (payload: {
+    provider: string; access_token: string; account_id: string;
+    since: string; until: string;
+    segment?: 'general' | 'b2b_saas'; currency?: string;
+  }) =>
+    request<IngestResult>('/api/connections/sync', {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
   ingestOutcomes: async (file: File, segment: 'general' | 'b2b_saas' = 'general'): Promise<IngestResult> => {
     const fd = new FormData();
     fd.append('file', file);
