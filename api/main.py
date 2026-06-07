@@ -1303,12 +1303,19 @@ def simulate(req: SimulateRequest) -> dict:
                            f"segment explicitly.")
         match.confidence = 1.0
 
+    # Daily reach is no longer a user input — default it. Fatigue-sensitive
+    # categories (apparel/fashion/beauty) get a lower daily reach so the same
+    # person isn't shown the ad as often (frequency builds more slowly).
+    _cat = (profile.product_category or "").lower()
+    _daily_reach = 0.25 if any(k in _cat for k in
+                               ("apparel", "fashion", "beauty", "cosmetic")) else 0.35
+
     brief = CampaignBrief(
         objective=req.objective,
         platform_id=req.platform_id,
         format_id=req.format_id,
         budget=req.budget, days=req.days,
-        daily_reach=req.daily_reach, n_runs=req.n_runs,
+        daily_reach=_daily_reach, n_runs=req.n_runs,
         target_conversion_rate=req.target_conversion_rate,
         target_ctr_override=req.target_ctr,
         cpm_override=req.cpm_override,
@@ -1356,6 +1363,25 @@ def simulate(req: SimulateRequest) -> dict:
                   max(len(mc_dict["sample_ctrs"]), 1))
     roas = mc_dict["predicted_roas"]["p50"]
 
+    # Break-even probability — the share of Monte Carlo runs that at least return
+    # the budget. Computed ONCE here and reused as the single source of truth for
+    # the break-even messaging, so the headline's risk wording can never
+    # contradict the "X% chance of breaking even" number on the card (the old bug
+    # showed "risky" next to "100% chance").
+    _be_imps = ((mc_dict.get("saturation") or {}).get("effective_impressions")
+                or mc_dict.get("total_impressions", 0))
+    _conv_per_click = (mc_dict.get("predicted_conversions", {}).get("p50", 0)
+                       / max(mc_dict.get("predicted_clicks", {}).get("p50", 1), 1))
+    _aov_be = mc_dict.get("mean_aov", 0)
+    _budget_be = mc_dict.get("budget", 1)
+    _ctrs = mc_dict.get("sample_ctrs") or []
+    break_even_probability = round(
+        sum(1 for r in _ctrs
+            if r * _be_imps * _conv_per_click * _aov_be >= _budget_be)
+        / max(len(_ctrs), 1) * 100, 0)
+
+    # Verdict CLASS is about magnitude of return (ROAS p50); the risk wording is
+    # about the ODDS (break_even_probability) — kept separate so they agree.
     if roas >= 4.0:
         plain = "Likely to be a strong winner."
         verdict_word = "strong"
@@ -1363,11 +1389,20 @@ def simulate(req: SimulateRequest) -> dict:
         plain = "Likely profitable — should pay back well."
         verdict_word = "positive"
     elif roas >= 1.0:
-        plain = "Likely to barely break even — risky."
+        plain = "Around break-even on the median forecast."
         verdict_word = "break_even"
     else:
         plain = "Likely to lose money — don't ship as is."
         verdict_word = "underperforming"
+
+    # Risk clause derived from the SAME probability shown on the card.
+    if verdict_word != "underperforming":
+        if break_even_probability >= 85:
+            plain += f" Very likely to at least break even ({break_even_probability:.0f}% of simulations did)."
+        elif break_even_probability >= 50:
+            plain += f" Not a sure thing — only {break_even_probability:.0f}% of simulations cleared break-even."
+        else:
+            plain += f" Risky — just {break_even_probability:.0f}% of simulations cleared break-even."
 
     # ---- Believability guardrails (so a fantasy number can't read Grade A) --
     _mean_aov = mc_dict.get("mean_aov", 0) or 0
@@ -1483,7 +1518,10 @@ def simulate(req: SimulateRequest) -> dict:
     # Every number here is either the advertiser's own input, a grounded
     # benchmark, or the modelled CTR — no invented revenue.
     # ----------------------------------------------------------------------
-    imps = max(mc_dict.get("total_impressions", 0), 1)
+    # Use EFFECTIVE (post-saturation) impressions so the break-even maths isn't
+    # rosy when budget saturation is on (raw impressions overstate reach).
+    imps = max((mc_dict.get("saturation") or {}).get("effective_impressions")
+               or mc_dict.get("total_impressions", 0), 1)
     conv_rate = max(float(req.target_conversion_rate or 0.0), 1e-9)
     aov_used = float(mc_dict.get("mean_aov", 0.0) or 0.0)
     aov_is_real = brief.avg_order_value is not None and brief.avg_order_value > 0
@@ -1492,11 +1530,20 @@ def simulate(req: SimulateRequest) -> dict:
     break_even_ctr = (brief.budget / denom) if denom > 0 else None
     headroom = ((sample_ctr / break_even_ctr)
                 if break_even_ctr and break_even_ctr > 0 else None)
+    # Plain "% vs break-even": negative = short of break-even, positive = above.
+    # Replaces the unreadable "0.65× headroom" framing.
+    pct_vs_breakeven = (round((sample_ctr - break_even_ctr) / break_even_ctr * 100, 0)
+                        if break_even_ctr and break_even_ctr > 0 else None)
     economics = {
         "currency": req.currency,
         "geo": req.geo,
         "avg_order_value": round(aov_used, 2),
         "avg_order_value_source": "your figure" if aov_is_real else "estimated (no figure supplied)",
+        # Honesty: when we had no real order value we GUESSED one — flag it and
+        # give a soft range instead of a fake-precise number the UI can lean on.
+        "aov_is_estimate": not aov_is_real,
+        "aov_low": (round(aov_used * 0.85, 0) if (not aov_is_real and aov_used) else None),
+        "aov_high": (round(aov_used * 1.15, 0) if (not aov_is_real and aov_used) else None),
         "product_price": req.product_price,
         "conversion_rate": conv_rate,
         "budget": brief.budget,
@@ -1505,6 +1552,7 @@ def simulate(req: SimulateRequest) -> dict:
         "benchmark_ctr": fmt_bench_ctr,
         "break_even_ctr": break_even_ctr,
         "clears_break_even": (sample_ctr >= break_even_ctr) if break_even_ctr else None,
+        "pct_vs_breakeven": pct_vs_breakeven,
         "headroom_x": round(headroom, 2) if headroom else None,
         # Honest verdict on the ECONOMICS (not a revenue promise):
         "verdict": (
@@ -1512,6 +1560,48 @@ def simulate(req: SimulateRequest) -> dict:
             else "marginal" if headroom and headroom >= 1.0
             else "shortfall" if headroom else "unknown"
         ),
+    }
+
+    # ----------------------------------------------------------------------
+    # KPI scoreboard — the plain numbers a marketer expects, derived from the
+    # Monte Carlo bands (clicks/conversions/revenue/roas/roi already carry
+    # p10/p50/p90). Cost metrics invert the band (more clicks => lower CPC).
+    # ----------------------------------------------------------------------
+    _clk = mc_dict.get("predicted_clicks", {})
+    _cnv = mc_dict.get("predicted_conversions", {})
+    _rev = mc_dict.get("predicted_revenue", {})
+    _roas_b = mc_dict.get("predicted_roas", {})
+    _roi_b = mc_dict.get("predicted_roi", {})
+    _raw_imps = max(mc_dict.get("total_impressions", 0), 1)
+    _bud = brief.budget or 0.0
+    # Frequency (avg times each real person sees the ad) is ONLY meaningful when
+    # the user set a reachable audience — otherwise it's impressions ÷ the
+    # synthetic 1,000-persona panel, which is nonsense. Omit it otherwise.
+    _sat_freq = (mc_dict.get("saturation") or {}).get("est_frequency")
+
+    def _div(n, d):
+        return (n / d) if d else 0.0
+
+    kpis = {
+        "currency": req.currency,
+        "impressions": {"value": _raw_imps},
+        "frequency": ({"value": round(_sat_freq, 1)} if _sat_freq else None),
+        "link_clicks": {"p10": round(_clk.get("p10", 0)), "p50": round(_clk.get("p50", 0)),
+                        "p90": round(_clk.get("p90", 0))},
+        "ctr": {"p50": round(sample_ctr, 5), "benchmark": round(fmt_bench_ctr, 5)},
+        "conversions": {"p10": round(_cnv.get("p10", 0), 1), "p50": round(_cnv.get("p50", 0), 1),
+                        "p90": round(_cnv.get("p90", 0), 1)},
+        "conversion_rate": {"p50": round(_div(_cnv.get("p50", 0), _clk.get("p50", 0)), 5)},
+        "cpc": {  # cost per click — band inverts: cheaper when clicks land high
+            "p10": round(_div(_bud, _clk.get("p90", 0)), 2),
+            "p50": round(_div(_bud, _clk.get("p50", 0)), 2),
+            "p90": round(_div(_bud, _clk.get("p10", 0)), 2)},
+        "cost_per_result": {"p50": round(_div(_bud, _cnv.get("p50", 0)), 2)},
+        "revenue": {"p10": round(_rev.get("p10", 0)), "p50": round(_rev.get("p50", 0)),
+                    "p90": round(_rev.get("p90", 0))},
+        "roas": {"p10": round(_roas_b.get("p10", 0), 2), "p50": round(_roas_b.get("p50", 0), 2),
+                 "p90": round(_roas_b.get("p90", 0), 2)},
+        "roi_pct": {"p50": round(_roi_b.get("p50", 0) * 100, 0)},
     }
 
     # Plain-English data provenance / confidence breakdown.
@@ -1630,21 +1720,13 @@ def simulate(req: SimulateRequest) -> dict:
             "roas_p50": round(roas, 2),
             "roi_p50_pct": round(mc_dict["predicted_roi"]["p50"] * 100, 0),
             "ctr_vs_bench_pct": round((sample_ctr - fmt_bench_ctr) / max(fmt_bench_ctr, 1e-6) * 100, 0),
-            "break_even_chance_pct": round(
-                sum(1 for r in (mc_dict.get("sample_ctrs") or [])
-                    if r
-                       # effective (post-saturation) impressions, matching the forecast
-                       * ((mc_dict.get("saturation") or {}).get("effective_impressions")
-                          or mc_dict.get("total_impressions", 0))
-                       # realised expected conversion-per-click (not the input rate)
-                       * (mc_dict.get("predicted_conversions", {}).get("p50", 0)
-                          / max(mc_dict.get("predicted_clicks", {}).get("p50", 1), 1))
-                       * mc_dict.get("mean_aov", 0) >= mc_dict.get("budget", 1))
-                / max(len(mc_dict.get("sample_ctrs") or []), 1) * 100, 0),
+            # Single source of truth — same value the headline's risk wording uses.
+            "break_even_chance_pct": break_even_probability,
         },
         "factor_plain": factor_plain,
         "data_sources": data_sources,
         "economics": economics,
+        "kpis": kpis,
         "viability": viability,
         "confidence": {
             "level": confidence,
