@@ -807,7 +807,6 @@ export default function ResultPage() {
           <div className="space-y-3">
             <div><label className="label">Budget (USD)</label><input className="input" defaultValue={mc.budget} /></div>
             <div><label className="label">Campaign days</label><input className="input" defaultValue={mc.sim_days} /></div>
-            <div><label className="label">Daily reach</label><input className="input" defaultValue="35%" /></div>
             <div><label className="label">Platform · Format</label>
               <select className="input"><option>{result.format.platform} · {result.format.name}</option></select>
             </div>
