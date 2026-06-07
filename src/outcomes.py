@@ -319,6 +319,12 @@ def _weighted_ctr(g: pd.DataFrame) -> float | None:
 # otherwise masquerade as "time" when it's really just row order.
 _MIN_DISTINCT_DATES = 6
 
+# A per-platform base CTR learned from only a handful of training impressions is
+# noise, not signal — one tiny-spend platform row would otherwise produce a
+# garbage anchor for its held-out ads. Below this floor we fall back to the
+# account-wide training rate instead.
+_BACKTEST_MIN_PLATFORM_IMPR = 1000
+
 
 def _trend(d: pd.DataFrame) -> dict | None:
     """Older-half vs recent-half click-through — the performance-decay signal."""
@@ -403,7 +409,9 @@ def backtest(df: pd.DataFrame, min_ads: int = 12) -> dict:
     base: dict[str, float] = {}
     for plat, g in train.groupby("_platform"):
         imp = g["impressions"].sum()
-        if imp:
+        # Min-impression floor: only trust a per-platform anchor backed by
+        # enough volume; otherwise the held-out ads fall back to train_overall.
+        if imp >= _BACKTEST_MIN_PLATFORM_IMPR:
             base[str(plat)] = float(g["clicks"].sum() / imp)
     train_overall = float(train["clicks"].sum() / max(train["impressions"].sum(), 1))
 

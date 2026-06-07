@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { PlotlyChart } from '@/components/Charts';
+import { AccuracyScorecard } from '@/components/AccuracyScorecard';
 import { useApp } from '@/lib/store';
 import { api } from '@/lib/api';
 import type { PolicyCheckResponse, SavedCampaign, SavedVariantResult } from '@/lib/types';
@@ -159,6 +160,12 @@ export default function ResultPage() {
           </div>
         </Card>
       )}
+
+      {/* Credibility hero — our predicted-vs-actual track record on this
+          account, so the forecast below is read against a real accuracy number. */}
+      <div className="mb-6">
+        <AccuracyScorecard />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-7">
         <div>

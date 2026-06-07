@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card, CardTitle } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
+import { AccuracyScorecard } from '@/components/AccuracyScorecard';
 import { useApp } from '@/lib/store';
 import type { SavedCampaign } from '@/lib/types';
 
@@ -72,6 +73,11 @@ export default function DashboardPage() {
           </Button>
         </div>
       </Link>
+
+      {/* Credibility hero — predicted-vs-actual track record on this account. */}
+      <div className="my-4">
+        <AccuracyScorecard />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[

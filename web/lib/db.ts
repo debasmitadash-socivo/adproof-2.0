@@ -278,3 +278,23 @@ export async function getLatestCalibration(companyId?: string): Promise<AccountC
   const { data } = await q.maybeSingle();
   return (data?.params as AccountCalibration) ?? null;
 }
+
+/** Latest stored backtest (the accuracy proof) for a workspace, with the ad
+ *  count and when it was measured. Lets the dashboard / result page show a
+ *  PERSISTENT "how accurate are we on YOUR account" scorecard instead of only
+ *  flashing it once at CSV-upload time. */
+export async function getLatestBacktest(
+  companyId?: string,
+): Promise<{ backtest: Backtest; nAds: number | null; measuredAt: number | null } | null> {
+  const sb = getSupabase(); if (!sb) return null;
+  let q = sb.from('calibrations').select('backtest, n_ads, created_at')
+    .eq('scope', 'account').order('created_at', { ascending: false }).limit(1);
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data } = await q.maybeSingle();
+  if (!data?.backtest) return null;
+  return {
+    backtest: data.backtest as Backtest,
+    nAds: (data.n_ads as number) ?? null,
+    measuredAt: data.created_at ? new Date(data.created_at as string).getTime() : null,
+  };
+}
