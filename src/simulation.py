@@ -28,6 +28,7 @@ as decision-support ranges, not committed forecasts.
 """
 from __future__ import annotations
 
+import gc
 import math
 import sys
 from dataclasses import asdict, dataclass, field
@@ -273,6 +274,14 @@ def monte_carlo(personas,
         aovs.append(r.mean_buyer_aov)        # always non-zero thanks to fallback
         daily_records.append(r.daily_records)
         factor_runs.append(r.aggregate_click_factors)
+        # The agent model + its word-of-mouth graph hold CIRCULAR references
+        # (model <-> agents <-> network), so plain ref-counting never frees
+        # them — all n_runs pile up until the cyclic GC eventually fires, which
+        # on a small (Railway) instance is too late and OOM-kills the worker
+        # (seen as a 502). Drop the refs and force a cyclic collection each run
+        # so peak memory stays at ~one model, not n_runs of them.
+        del model, r
+        gc.collect()
 
     arr_ctr = np.asarray(sample_ctr, dtype=float)
     # Use the expected per-click conversion probability rather than the noisy

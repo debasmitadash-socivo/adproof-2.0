@@ -7,6 +7,7 @@ engine.
 """
 from __future__ import annotations
 
+import gc
 import json
 import sys
 from pathlib import Path
@@ -537,6 +538,11 @@ def run_wizard_simulation(profile: CompanyProfile,
             "your own Gemini API key in Settings.",
             provider_error=perr,
         )
+
+    # Vision (esp. the video path, which buffers the clip + the genai client)
+    # can leave tens of MB resident; release it BEFORE the memory-heavy Monte
+    # Carlo so the two peaks don't stack and OOM a small instance.
+    gc.collect()
 
     _step(0.25, "Building ad stimulus...")
     visual_scores = (visual.scores if visual is not None
