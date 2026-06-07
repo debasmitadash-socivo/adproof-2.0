@@ -23,13 +23,19 @@ const VERDICT_GRADE: Record<string, string> = {
   strong: 'A', positive: 'B', break_even: 'C', underperforming: 'D', void: '✕',
 };
 
-const CHART_TABS = [
-  { key: 'daily', label: 'Daily curve' },
-  { key: 'roi', label: 'ROI distribution' },
-  { key: 'factors', label: 'Click drivers' },
-  { key: 'sens_budget', label: 'Sensitivity · budget' },
-  { key: 'sens_reach', label: 'Sensitivity · reach' },
-  { key: 'visual', label: 'Visual scores' },
+// Plain-English chart cards: a headline + one-sentence explainer always
+// visible; the technical chart sits behind a toggle. The logit "click drivers"
+// chart is dropped (the plain driver bars below replace it) and the reach
+// sensitivity chart is dropped (daily reach is no longer a user input).
+const CHART_CARDS = [
+  { key: 'daily', title: 'How clicks build over the flight',
+    explainer: 'Clicks accumulate day by day. The shaded band is the realistic range; the line is the most likely path.' },
+  { key: 'roi', title: 'How often this turns a profit',
+    explainer: 'We ran the campaign 20 times with different luck — this shows the spread of returns, how many runs made money vs lost it.' },
+  { key: 'sens_budget', title: 'What happens if you spend more or less',
+    explainer: 'How your return shifts as you change the budget — useful for deciding how hard to push this ad.' },
+  { key: 'visual', title: 'How your creative scored',
+    explainer: 'The AI’s read of your creative on four dimensions (0–1). Above ~0.65 is strong, below ~0.45 is weak.' },
 ];
 
 export default function ResultPage() {
@@ -39,7 +45,7 @@ export default function ResultPage() {
   const savedCampaigns = useApp((s) => s.savedCampaigns);
   const setResult = useApp((s) => s.setResult);
   const setCurrentCampaign = useApp((s) => s.setCurrentCampaign);
-  const [tab, setTab] = useState('daily');
+  const [openChart, setOpenChart] = useState<string | null>(null);
   const [activeVariantIdx, setActiveVariantIdx] = useState(0);
 
   // Resilience: the live result/currentCampaign are transient (not persisted),
@@ -305,37 +311,77 @@ export default function ResultPage() {
             </div>
           </div>
 
-          {/* METRICS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
-            {[
-              { label: 'Predicted clicks', value: mc.predicted_clicks.p50.toLocaleString(undefined, { maximumFractionDigits: 0 }), range: `p10 ${mc.predicted_clicks.p10.toLocaleString(undefined, { maximumFractionDigits: 0 })} · p90 ${mc.predicted_clicks.p90.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, bar: 'bg-gradient-sunset' },
-              { label: 'Conversions', value: mc.predicted_conversions.p50.toLocaleString(undefined, { maximumFractionDigits: 0 }), range: `p10 ${mc.predicted_conversions.p10.toLocaleString(undefined, { maximumFractionDigits: 0 })} · p90 ${mc.predicted_conversions.p90.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, bar: 'bg-gradient-to-b from-magenta to-violet' },
-              { label: 'Revenue', value: `$${(mc.predicted_revenue.p50 / 1000).toFixed(1)}k`, range: `p10 $${(mc.predicted_revenue.p10 / 1000).toFixed(0)}k · p90 $${(mc.predicted_revenue.p90 / 1000).toFixed(0)}k`, bar: 'bg-gradient-fresh' },
-              { label: 'Mean AOV', value: `$${mc.mean_aov.toFixed(0)}`, range: 'audience mean', bar: 'bg-gradient-to-b from-sky to-violet' },
-            ].map((m) => (
-              <Card key={m.label} className="!p-0 relative overflow-hidden">
-                <div className={clsx('absolute left-0 top-0 bottom-0 w-1', m.bar)} />
-                <div className="pl-5 pr-5 py-4">
-                  <div className="text-[11.5px] text-ink-muted uppercase tracking-[0.08em] font-bold">{m.label}</div>
-                  <div className="display-italic text-[32px] leading-none mt-1.5">{m.value}</div>
-                  <div className="text-[12px] text-ink-muted mt-1.5 font-mono">{m.range}</div>
+          {/* KPI SCOREBOARD — the plain numbers a marketer expects, each with
+              the realistic p10–p90 range and a one-line meaning. */}
+          {(() => {
+            const cur = result.economics?.currency || 'GBP';
+            const benchCtr = result.economics?.benchmark_ctr ?? 0;
+            const imps = mc.total_impressions;
+            const cl = mc.predicted_clicks, cv = mc.predicted_conversions, rv = mc.predicted_revenue;
+            const ctr50 = imps > 0 ? cl.p50 / imps : 0;
+            const cvr50 = cl.p50 > 0 ? cv.p50 / cl.p50 : 0;
+            const bud = mc.budget;
+            const freq = mc.saturation?.est_frequency ?? null;
+            const num = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 1 : 0 });
+            const money = (n: number) => `${cur} ${n.toLocaleString(undefined, { maximumFractionDigits: n < 100 ? 2 : 0 })}`;
+            const pctv = (x: number) => `${(x * 100).toFixed(2)}%`;
+            const cards: { label: string; value: string; meaning: string; range?: string; tone?: 'good' | 'bad' }[] = [
+              { label: 'Impressions', value: num(imps), meaning: 'times your ad is shown' },
+              { label: 'Link clicks', value: num(cl.p50), meaning: 'people who click through', range: `${num(cl.p10)}–${num(cl.p90)} likely` },
+              { label: 'Click rate (CTR)', value: pctv(ctr50), meaning: `vs ${pctv(benchCtr)} benchmark`, tone: ctr50 >= benchCtr ? 'good' : 'bad' },
+              { label: 'Conversions', value: num(cv.p50), meaning: 'customers / leads', range: `${num(cv.p10)}–${num(cv.p90)} likely` },
+              { label: 'Conversion rate', value: pctv(cvr50), meaning: 'clicks → customers' },
+              { label: 'Cost per click', value: money(bud / Math.max(cl.p50, 1)), meaning: 'what each click costs', range: `${money(bud / Math.max(cl.p90, 1))}–${money(bud / Math.max(cl.p10, 1))}` },
+              { label: 'Cost per result', value: money(bud / Math.max(cv.p50, 0.001)), meaning: 'cost per customer / lead' },
+              { label: 'Revenue', value: money(rv.p50), meaning: 'money back', range: `${money(rv.p10)}–${money(rv.p90)} likely` },
+              { label: 'ROAS', value: `${mc.predicted_roas.p50.toFixed(2)}×`, meaning: `back per ${cur} 1 spent`, range: `${mc.predicted_roas.p10.toFixed(2)}–${mc.predicted_roas.p90.toFixed(2)}×` },
+              { label: 'ROI', value: `${mc.predicted_roi.p50 >= 0 ? '+' : ''}${Math.round(mc.predicted_roi.p50 * 100)}%`, meaning: 'profit margin on spend', tone: mc.predicted_roi.p50 >= 0 ? 'good' : 'bad' },
+              ...(freq ? [{ label: 'Frequency', value: `${freq.toFixed(1)}×`, meaning: 'times each person sees it' }] : []),
+            ];
+            return (
+              <div className="mb-6">
+                <h2 className="display-italic text-[24px] mb-1">The numbers</h2>
+                <p className="text-ink-muted text-[13.5px] mb-3">What this ad is forecast to do over the flight. The range is the realistic spread, not a guarantee.</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {cards.map((m) => (
+                    <Card key={m.label} className="!p-4">
+                      <div className="text-[11px] text-ink-muted uppercase tracking-[0.07em] font-bold">{m.label}</div>
+                      <div className={clsx('display-italic text-[26px] leading-none mt-1.5', m.tone === 'good' && 'text-success', m.tone === 'bad' && 'text-danger')}>{m.value}</div>
+                      <div className="text-[12px] text-ink-muted mt-1 leading-snug">{m.meaning}</div>
+                      {m.range && <div className="text-[11px] text-ink-faint font-mono mt-0.5">{m.range}</div>}
+                    </Card>
+                  ))}
                 </div>
-              </Card>
-            ))}
-          </div>
+              </div>
+            );
+          })()}
 
-          {/* CHARTS */}
-          <div className="inline-flex bg-bg-deep p-1 rounded-xl mb-3">
-            {CHART_TABS.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)} className={clsx(
-                'px-3.5 py-2 rounded-lg text-[13px] font-medium transition-colors',
-                tab === t.key ? 'bg-surface text-ink font-semibold shadow-soft' : 'text-ink-muted',
-              )}>{t.label}</button>
-            ))}
+          {/* CHARTS — plain headline + explainer, technical chart behind a toggle */}
+          <div className="mb-6 space-y-3">
+            {CHART_CARDS.filter((c) => (result.figures as Record<string, unknown>)[c.key]).map((c) => {
+              const open = openChart === c.key;
+              return (
+                <Card key={c.key}>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <div className="font-heading text-[15px] font-bold">{c.title}</div>
+                      <p className="text-[13px] text-ink-muted mt-0.5 leading-snug">{c.explainer}</p>
+                    </div>
+                    <button onClick={() => setOpenChart(open ? null : c.key)}
+                      className="text-coral font-semibold text-[12.5px] whitespace-nowrap shrink-0">
+                      {open ? 'Hide chart ▴' : 'Show detailed chart ▾'}
+                    </button>
+                  </div>
+                  {open && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      <PlotlyChart figure={(result.figures as any)[c.key]} height={300} />
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
-          <Card>
-            <PlotlyChart figure={(result.figures as any)[tab]} height={320} />
-          </Card>
 
           {/* PLAIN-ENGLISH VERDICT */}
           {result.plain_verdict && (
@@ -416,32 +462,46 @@ export default function ResultPage() {
                     <span className="text-[14.5px] font-semibold text-ink">{verdictLine}</span>
                     <span className="ml-auto text-[12px] text-ink-muted">market: {e.geo}</span>
                   </div>
-                  <div className="text-[14px] text-ink leading-relaxed mb-4">
-                    At your <strong>{cur} {e.avg_order_value.toLocaleString()}</strong> order value
-                    {' '}({e.avg_order_value_source}) and <strong>{(e.conversion_rate * 100).toFixed(1)}%</strong> conversion,
-                    you need a <strong>{pct(e.break_even_ctr)}</strong> click-through rate to break even.
-                    We model your creative at <strong>{pct(e.modelled_ctr)}</strong>
-                    {' '}(benchmark {pct(e.benchmark_ctr)}).
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[
-                      { label: 'Break-even CTR', value: pct(e.break_even_ctr), sub: 'what you need' },
-                      { label: 'Modelled CTR', value: pct(e.modelled_ctr), sub: 'what we expect' },
-                      { label: 'Headroom', value: e.headroom_x != null ? `${e.headroom_x}×` : '—', sub: e.headroom_x != null && e.headroom_x >= 1 ? 'above break-even' : 'below break-even' },
-                      { label: 'Order value', value: `${cur} ${e.avg_order_value.toLocaleString()}`, sub: e.avg_order_value_source },
-                    ].map((m) => (
-                      <div key={m.label} className="bg-surface border border-border rounded-md px-3.5 py-3">
-                        <div className="text-[11px] text-ink-muted uppercase tracking-[0.06em] font-bold">{m.label}</div>
-                        <div className="display-italic text-[24px] leading-none mt-1">{m.value}</div>
-                        <div className="text-[11.5px] text-ink-muted mt-1">{m.sub}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {e.avg_order_value_source !== 'your figure' && (
-                    <div className="mt-3 text-[12.5px] text-yellow-800">
-                      ⚠ This used an <strong>estimated</strong> order value. Set your real figure on the <Link href="/company" className="underline">company profile</Link> for accurate break-even maths.
-                    </div>
-                  )}
+                  {(() => {
+                    const shortPct = e.pct_vs_breakeven;  // negative = short, positive = above
+                    const isEst = e.aov_is_estimate ?? (e.avg_order_value_source !== 'your figure');
+                    const aovText = isEst && e.aov_low && e.aov_high
+                      ? `~${cur} ${e.aov_low.toLocaleString()}–${e.aov_high.toLocaleString()}`
+                      : `${cur} ${e.avg_order_value.toLocaleString()}`;
+                    // Gauge: modelled CTR vs break-even; break-even sits at 50%, bar caps at 2×.
+                    const ratio = e.break_even_ctr ? Math.min(e.modelled_ctr / e.break_even_ctr, 2) : 0;
+                    const fillPct = Math.round((ratio / 2) * 100);
+                    return (
+                      <>
+                        <div className="text-[14px] text-ink leading-relaxed mb-4">
+                          On <strong>{cur} {e.budget.toLocaleString()}</strong>, at a <strong>{aovText}</strong>
+                          {isEst ? ' (estimated)' : ''} order value and <strong>{(e.conversion_rate * 100).toFixed(1)}%</strong> conversion,
+                          you need a <strong>{pct(e.break_even_ctr)}</strong> click rate to break even. We expect{' '}
+                          <strong>{pct(e.modelled_ctr)}</strong> —{' '}
+                          {shortPct != null
+                            ? (shortPct >= 0
+                                ? <strong className="text-success">{shortPct}% above break-even.</strong>
+                                : <strong className="text-danger">{Math.abs(shortPct)}% short of break-even.</strong>)
+                            : <span>unknown.</span>}
+                        </div>
+                        {/* Plain gauge: where your CTR sits vs the break-even marker */}
+                        <div className="relative h-8 rounded-full bg-bg-deep overflow-hidden border border-border">
+                          <div className={clsx('absolute left-0 top-0 bottom-0', e.clears_break_even ? 'bg-success/60' : 'bg-danger/50')}
+                            style={{ width: `${fillPct}%` }} />
+                          <div className="absolute top-0 bottom-0 border-l-2 border-ink" style={{ left: '50%' }} />
+                          <div className="absolute inset-0 flex items-center justify-between px-3.5 text-[11.5px] font-semibold">
+                            <span className="text-ink">your CTR {pct(e.modelled_ctr)}</span>
+                            <span className="text-ink-muted">↑ break-even {pct(e.break_even_ctr)}</span>
+                          </div>
+                        </div>
+                        {isEst && (
+                          <div className="mt-3 text-[12.5px] text-yellow-800 bg-warning-soft border border-warning/30 rounded-md p-2.5">
+                            ⚠ We <strong>guessed</strong> your order value ({aovText}) — you haven&apos;t set one. Enter your real figure on the <Link href="/company" className="underline font-semibold">company profile</Link> for an accurate break-even answer.
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </Card>
               </>
             );

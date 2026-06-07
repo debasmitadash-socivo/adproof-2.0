@@ -405,7 +405,28 @@ export interface SimulateResponse {
     break_even_ctr: number | null;
     clears_break_even: boolean | null;
     headroom_x: number | null;
+    // Plain "% vs break-even": negative = short, positive = above.
+    pct_vs_breakeven?: number | null;
+    // Estimated-AOV honesty: flag + soft range shown instead of fake precision.
+    aov_is_estimate?: boolean;
+    aov_low?: number | null;
+    aov_high?: number | null;
     verdict: 'comfortable' | 'marginal' | 'shortfall' | 'unknown';
+  };
+  // KPI scoreboard — the plain numbers a marketer expects, with p10/p50/p90.
+  kpis?: {
+    currency: string;
+    impressions: { value: number };
+    frequency: { value: number } | null;
+    link_clicks: { p10: number; p50: number; p90: number };
+    ctr: { p50: number; benchmark: number };
+    conversions: { p10: number; p50: number; p90: number };
+    conversion_rate: { p50: number };
+    cpc: { p10: number; p50: number; p90: number };
+    cost_per_result: { p50: number };
+    revenue: { p10: number; p50: number; p90: number };
+    roas: { p10: number; p50: number; p90: number };
+    roi_pct: { p50: number };
   };
 }
 

@@ -761,16 +761,6 @@ export default function NewAnalysisPage() {
               </div>
               <div>
                 <label className="label">
-                  Daily reach
-                  <HelpHint label="What is daily reach?">
-                    The fraction of your audience exposed to the ad on any given day. 0.35 means 35% of your audience sees it daily. Higher reach = more total impressions but more <em>frequency</em> (the same person seeing it repeatedly), which triggers ad fatigue.
-                  </HelpHint>
-                </label>
-                <input className="input" type="number" step={0.05} min={0.1} max={1} value={w.dailyReach} onChange={(e) => w.setDailyReach(+e.target.value)} />
-                <div className="help">Fraction of audience exposed/day. Typical: 0.20–0.40.</div>
-              </div>
-              <div>
-                <label className="label">
                   Monte Carlo runs
                   <HelpHint label="What is a Monte Carlo run?">
                     Each "run" is one independent simulation of your entire campaign with a different random seed (different exposure order, different conversion rolls). We run many to get a <em>distribution</em>: that's how you get p10/p50/p90 bands instead of a single overconfident number. 20 is the sweet spot — diminishing returns above 25.
