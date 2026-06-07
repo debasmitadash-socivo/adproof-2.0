@@ -292,10 +292,16 @@ export default function NewAnalysisPage() {
         company_description: w.companyDescription,
       }).catch(() => null);
 
-      const [results, marketContext] = await Promise.all([
-        Promise.all(originalRequests.map((req) => api.simulate(req))),
-        marketContextP,
-      ]);
+      // Run variants/placements SEQUENTIALLY — NOT in parallel. Each forecast
+      // is memory-heavy (a 20-run Monte Carlo + vision); firing several at once
+      // OOM-kills a small backend instance, and when the worker dies EVERY
+      // request 502s until it restarts (not just the heavy one). One-at-a-time
+      // is reliable. Market context (light) still runs concurrently.
+      const results: Awaited<ReturnType<typeof api.simulate>>[] = [];
+      for (const req of originalRequests) {
+        results.push(await api.simulate(req));
+      }
+      const marketContext = await marketContextP;
 
       const firstResult = results[0];
       const hasMultiPlacement = placementRuns.length > 1;

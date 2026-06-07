@@ -786,9 +786,12 @@ function RerunButton({ campaign }: { campaign: SavedCampaign | null }) {
     if (!campaign?.originalRequests) return;
     setRunning(true); setErr(null);
     try {
-      const results = await Promise.all(
-        campaign.originalRequests.map((req) => api.simulate(req)),
-      );
+      // Sequential, not parallel — heavy forecasts must not stack on a small
+      // backend (parallel runs OOM-kill the worker). One at a time.
+      const results: Awaited<ReturnType<typeof api.simulate>>[] = [];
+      for (const req of campaign.originalRequests) {
+        results.push(await api.simulate(req));
+      }
       const firstResult = results[0];
       const savedVariants: SavedVariantResult[] = results.map((r, i) => ({
         label: campaign.variants?.[i]?.label ?? (i === 0 ? 'A' : String.fromCharCode(65 + i)),
