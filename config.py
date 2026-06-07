@@ -72,7 +72,9 @@ OPENROUTER_VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct:free"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 # xAI Grok -- has Grok vision via grok-2-vision endpoint.
-XAI_TEXT_MODEL = "grok-2-1212"
+# grok-2-1212 was retired (xAI lineup is now grok-3 / grok-4); grok-2-vision-1212
+# is still listed, so only the text model needed updating (verified Jun 2026).
+XAI_TEXT_MODEL = "grok-3"
 XAI_VISION_MODEL = "grok-2-vision-1212"
 XAI_BASE_URL = "https://api.x.ai/v1"
 
