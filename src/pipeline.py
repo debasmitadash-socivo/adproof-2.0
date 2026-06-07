@@ -509,14 +509,33 @@ def run_wizard_simulation(profile: CompanyProfile,
     # would be exactly the kind of overclaim this product exists to prevent.
     if creative_path and visual is not None and visual.is_heuristic:
         kind_word = "video" if creative_kind == "video" else "image"
+        perr = getattr(visual, "provider_error", "") or ""
+        perr_l = perr.lower()
+        # Distinguish the cause — a MISSING upload file is NOT a quota problem,
+        # and telling the user to add a Gemini key (which won't help) sends them
+        # down the wrong path. Uploaded files live on the server's temporary
+        # disk, which is wiped on restart/redeploy, so a file can vanish between
+        # upload and analysis.
+        file_missing = ("not found" in perr_l or "no such file" in perr_l
+                        or "errno 2" in perr_l)
+        if file_missing:
+            raise VisionUnavailableError(
+                f"Your uploaded {kind_word} is no longer on the server, so we "
+                f"couldn't analyse it. Uploads are held in temporary storage "
+                f"that's cleared when the app restarts or redeploys — the file "
+                f"can vanish between uploading it and running the forecast. "
+                f"Please re-upload the {kind_word} and run it again.",
+                provider_error=perr,
+            )
+        watch_word = "watching" if creative_kind == "video" else "seeing"
         raise VisionUnavailableError(
             f"We couldn't analyse your {kind_word} — the analysis service is "
             "temporarily unavailable (free-tier quota likely used up). We "
             f"won't show a forecast we can't stand behind: without actually "
-            f"watching the {kind_word} we can't confirm it's policy-safe or "
+            f"{watch_word} the {kind_word} we can't confirm it's policy-safe or "
             "judge its quality. Please try again in a few minutes, or add "
             "your own Gemini API key in Settings.",
-            provider_error=getattr(visual, "provider_error", "") or "",
+            provider_error=perr,
         )
 
     _step(0.25, "Building ad stimulus...")

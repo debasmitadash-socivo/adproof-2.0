@@ -15,6 +15,7 @@ Run with:
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import uuid
@@ -438,7 +439,13 @@ def me() -> dict:
 # Creative upload
 # ===========================================================================
 
-UPLOAD_DIR = _PROJECT_ROOT / "data" / "raw" / "uploads"
+# Uploads default to the repo's data dir (fine for local dev), but on a host
+# with an EPHEMERAL filesystem (e.g. Railway) that folder is wiped on every
+# restart/redeploy — so a creative uploaded one moment can be gone the next,
+# breaking analysis. Point ADPROOF_UPLOAD_DIR at a mounted persistent volume in
+# production so uploads survive deploys.
+UPLOAD_DIR = Path(os.environ.get("ADPROOF_UPLOAD_DIR")
+                  or (_PROJECT_ROOT / "data" / "raw" / "uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 _ALLOWED_MIME = {
