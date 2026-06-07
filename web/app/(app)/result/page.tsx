@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
@@ -38,8 +38,21 @@ export default function ResultPage() {
   const campaign = useApp((s) => s.currentCampaign);
   const savedCampaigns = useApp((s) => s.savedCampaigns);
   const setResult = useApp((s) => s.setResult);
+  const setCurrentCampaign = useApp((s) => s.setCurrentCampaign);
   const [tab, setTab] = useState('daily');
   const [activeVariantIdx, setActiveVariantIdx] = useState(0);
+
+  // Resilience: the live result/currentCampaign are transient (not persisted),
+  // so a refresh — or a hydration race right after a run — can leave them empty
+  // and make a SUCCESSFUL forecast look like it failed ("No forecast yet").
+  // Fall back to the most recent saved campaign so the run always shows.
+  useEffect(() => {
+    if (!baseResult && !campaign && savedCampaigns.length > 0) {
+      const latest = savedCampaigns[0];
+      setCurrentCampaign(latest);
+      if (latest.result) setResult(latest.result);
+    }
+  }, [baseResult, campaign, savedCampaigns, setCurrentCampaign, setResult]);
 
   // Multi-variant campaigns: leaderboard at top + detail below switches
   // depending on which variant tab is active. Single-variant campaigns just
