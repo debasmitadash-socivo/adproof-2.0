@@ -134,6 +134,32 @@ export interface Platform {
   formats: AdFormat[];
 }
 
+// Live LLM/vision provider health — quota-exhaustion + liveness telemetry.
+export interface ProviderHealthEvent {
+  ts: number;
+  provider: string;
+  model: string;
+  kind: 'ok' | 'quota' | 'error';
+  reason: string;
+}
+export interface ProviderHealthSummary {
+  provider: string;
+  last_ok_ts: number | null;
+  last_error_ts: number | null;
+  last_error_kind: 'quota' | 'error' | null;
+  last_error_reason: string;
+  ok_count: number;
+  quota_count: number;
+  error_count: number;
+  exhausted_models: string[];
+}
+export interface ProviderHealthSnapshot {
+  keys: Record<string, boolean>;
+  events: ProviderHealthEvent[];
+  summary: Record<string, ProviderHealthSummary>;
+  now: number;
+}
+
 export interface CampaignBrief {
   objective: 'awareness' | 'consideration' | 'conversion';
   platform_id: string;

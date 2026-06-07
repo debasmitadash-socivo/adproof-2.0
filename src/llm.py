@@ -43,6 +43,23 @@ from config import (  # noqa: E402
     XAI_BASE_URL, XAI_TEXT_MODEL,
 )
 
+# Provider-health telemetry: record quota/ok events so the diagnostics page can
+# surface the moment a provider runs out. Defensive — telemetry must never break
+# the LLM path, hence the no-op fallbacks.
+try:
+    try:
+        from src.provider_health import (  # noqa: E402
+            record_ok as _ph_ok, record_quota as _ph_quota,
+            record_error as _ph_error)
+    except ImportError:
+        from provider_health import (  # noqa: E402
+            record_ok as _ph_ok, record_quota as _ph_quota,
+            record_error as _ph_error)
+except Exception:  # pragma: no cover
+    def _ph_ok(*a, **k): pass
+    def _ph_quota(*a, **k): pass
+    def _ph_error(*a, **k): pass
+
 __all__ = ["text_complete", "extract_json", "have_any_key"]
 
 
@@ -203,6 +220,7 @@ def _call_gemini(prompt: str, system: str, max_tokens: int,
                 _LOG.warning("gemini model %s quota exhausted: %s",
                               model, str(exc)[:160])
                 _EXHAUSTED.add(("gemini", model))
+                _ph_quota("gemini", model, str(exc)[:160])
                 continue
             # Non-quota error (auth/network) — don't burn through all models
             raise
@@ -406,6 +424,7 @@ def text_complete(prompt: str,
             out = _try_provider(prov, prompt, system, max_tokens, json_mode)
             if out:
                 LAST_ERROR = None
+                _ph_ok(prov)
                 if ck:
                     _cache_put(ck, out)
                 return out
@@ -415,7 +434,10 @@ def text_complete(prompt: str,
             _LOG.exception("%s call failed", prov)
             last_exc_text = str(exc)[:240]
             tried.append((prov, last_exc_text))
-            if not _is_quota_error(exc):
+            if _is_quota_error(exc):
+                _ph_quota(prov, "", last_exc_text)
+            else:
+                _ph_error(prov, "", last_exc_text)
                 # Non-quota error: don't keep banging on other providers
                 # for an auth/network/code problem
                 break

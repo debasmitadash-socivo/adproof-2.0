@@ -72,6 +72,20 @@ try:
 except ImportError:  # when run as `python src/visual_analysis.py`
     from data_loader import tag_creative_features
 
+# Provider-health telemetry — records quota/ok events so the diagnostics page
+# can show the moment the vision provider runs out. Defensive: a telemetry
+# import failure must never break the vision path.
+try:
+    try:
+        from src.provider_health import (
+            record_ok as _ph_ok, record_quota as _ph_quota)
+    except ImportError:
+        from provider_health import (
+            record_ok as _ph_ok, record_quota as _ph_quota)
+except Exception:  # pragma: no cover
+    def _ph_ok(*a, **k): pass
+    def _ph_quota(*a, **k): pass
+
 __all__ = [
     "VisualAnalysisResult",
     "analyze_ad",
@@ -949,12 +963,14 @@ def _analyze_gemini_with_brand(b64, media_type, ad_text, audience_hint,
             last_exc = exc
             if _is_quota_error(exc):
                 _VISION_EXHAUSTED.add(("gemini", model_id))
+                _ph_quota("gemini", model_id, str(exc))
                 continue
             raise
         raw_text = response.text
         if not raw_text:
             # Likely thinking budget ate the output. Try next model.
             continue
+        _ph_ok("gemini", model_id)
         return _normalise_raw(_extract_json(raw_text)), model_id
 
     if last_exc is not None:
@@ -1181,10 +1197,12 @@ def _analyze_gemini_video_with_brand(video_bytes, mime_type, ad_text,
             last_exc = exc
             if _is_quota_error(exc):
                 _VISION_EXHAUSTED.add(("gemini-video", model_id))
+                _ph_quota("gemini-video", model_id, str(exc))
                 continue
             raise
         text = getattr(response, "text", None)
         if text:
+            _ph_ok("gemini-video", model_id)
             return _normalise_raw(_extract_json(text)), model_id
         last_exc = RuntimeError("Gemini video response had no text payload.")
     raise (last_exc or RuntimeError("All Gemini video models exhausted."))

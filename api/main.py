@@ -358,6 +358,71 @@ def test_llm() -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Provider health — live "is each LLM working / has any quota run out" view.
+# Powers the diagnostics page so the owner sees the MOMENT a provider's quota
+# runs out instead of only noticing heuristic fallbacks after the fact.
+# ---------------------------------------------------------------------------
+
+# Canonical provider names (matching the event names recorded by llm.py /
+# visual_analysis.py) mapped to their env var.
+_PROVIDER_ENV = {
+    "claude":     "ANTHROPIC_API_KEY",
+    "openai":     "OPENAI_API_KEY",
+    "gemini":     "GEMINI_API_KEY",
+    "groq":       "GROQ_API_KEY",
+    "mistral":    "MISTRAL_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "xai":        "XAI_API_KEY",
+    "together":   "TOGETHER_API_KEY",
+}
+
+
+@app.get("/api/admin/provider-health")
+def provider_health_snapshot() -> dict:
+    """Snapshot of provider liveness: which keys are present, the last ok/error
+    per provider, currently-exhausted models, and recent quota/error events."""
+    import os as _os
+    import provider_health as _ph
+    keys = {p: bool(_os.environ.get(env)) for p, env in _PROVIDER_ENV.items()}
+    return {"keys": keys, **_ph.snapshot()}
+
+
+@app.post("/api/admin/ping-providers")
+def ping_providers() -> dict:
+    """Actively test each provider that has a key, in ISOLATION (no fallback),
+    recording each outcome so the health snapshot reflects live state. Lets the
+    owner click one button and see exactly which providers answer right now."""
+    import os as _os
+    from llm import _try_provider, _is_quota_error  # noqa: E402
+    import provider_health as _ph
+    results = []
+    for prov, env in _PROVIDER_ENV.items():
+        if not _os.environ.get(env):
+            results.append({"provider": prov, "status": "no_key"})
+            continue
+        try:
+            out = _try_provider(
+                prov, "Reply with the single word: ok",
+                "You are a connectivity test. Reply with exactly: ok", 8, False)
+            if out and "ok" in out.lower():
+                _ph.record_ok(prov)
+                results.append({"provider": prov, "status": "ok"})
+            else:
+                _ph.record_error(prov, "", "empty/None response")
+                results.append({"provider": prov, "status": "error",
+                                "reason": "empty response"})
+        except Exception as exc:                       # noqa: BLE001
+            reason = str(exc)[:200]
+            if _is_quota_error(exc):
+                _ph.record_quota(prov, "", reason)
+                results.append({"provider": prov, "status": "quota", "reason": reason})
+            else:
+                _ph.record_error(prov, "", reason)
+                results.append({"provider": prov, "status": "error", "reason": reason})
+    return {"results": results, **_ph.snapshot()}
+
+
 @app.get("/api/me")
 def me() -> dict:
     """Returns a marker the frontend uses to know auth is stubbed.

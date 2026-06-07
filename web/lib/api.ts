@@ -11,6 +11,7 @@ import type {
   SimulateResponse,
   UploadResponse,
   IngestResult,
+  ProviderHealthSnapshot,
 } from './types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -46,6 +47,10 @@ export const api = {
     version: string;
   }>('/api/healthz'),
   platforms: () => request<{ platforms: Platform[] }>('/api/platforms'),
+  providerHealth: () => request<ProviderHealthSnapshot>('/api/admin/provider-health'),
+  pingProviders: () =>
+    request<ProviderHealthSnapshot & { results: { provider: string; status: string; reason?: string }[] }>(
+      '/api/admin/ping-providers', { method: 'POST' }),
   parseCompany: (description: string) =>
     request<CompanyProfile>('/api/parse-company', {
       method: 'POST',

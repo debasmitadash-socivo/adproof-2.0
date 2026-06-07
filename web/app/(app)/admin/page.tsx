@@ -12,7 +12,17 @@ import { Card } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { useApp } from '@/lib/store';
 import { api } from '@/lib/api';
-import type { SavedCampaign } from '@/lib/types';
+import type { SavedCampaign, ProviderHealthSnapshot, ProviderHealthSummary } from '@/lib/types';
+
+// Relative "x ago" for telemetry timestamps (provider-health ts are epoch secs).
+function ago(tsSec: number | null, nowSec: number): string {
+  if (!tsSec) return 'never';
+  const s = Math.max(0, Math.round(nowSec - tsSec));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+}
 
 type Health = Awaited<ReturnType<typeof api.health>>;
 
@@ -183,6 +193,9 @@ export default function AdminDiagnosticsPage() {
         )}
       </Card>
 
+      {/* ─── Live provider health (quota + liveness) ────────────────────── */}
+      <LiveProviderHealth />
+
       {/* ─── Headline KPI strip ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <Card>
@@ -297,5 +310,152 @@ export default function AdminDiagnosticsPage() {
         )}
       </Card>
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Live provider health — quota + liveness. Reads /api/admin/provider-health
+// (recorded by the LLM + vision layers as they run) and lets the owner force
+// an active "ping all" round-trip. Answers "is each API working, and has any
+// quota run out RIGHT NOW" — not just "after the fact" like the run table.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Friendly labels for the canonical provider keys the backend returns.
+const PROVIDER_LABELS: Record<string, string> = {
+  claude: 'Anthropic (Claude)', openai: 'OpenAI (GPT-4o)', gemini: 'Gemini',
+  groq: 'Groq', mistral: 'Mistral', openrouter: 'OpenRouter', xai: 'xAI (Grok)',
+  together: 'Together',
+};
+
+function LiveProviderHealth() {
+  const [snap, setSnap] = useState<ProviderHealthSnapshot | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [pinging, setPinging] = useState(false);
+
+  async function load() {
+    setLoading(true); setErr(null);
+    try { setSnap(await api.providerHealth()); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setLoading(false); }
+  }
+  async function ping() {
+    setPinging(true); setErr(null);
+    try { setSnap(await api.pingProviders()); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setPinging(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  const now = snap?.now ?? Date.now() / 1000;
+  const keys = snap?.keys ?? {};
+  const summary = snap?.summary ?? {};
+
+  // A keyed provider is "down right now" if it has exhausted models OR its most
+  // recent event was a quota/error (last_error after last_ok).
+  const downNow: string[] = Object.keys(keys).filter((p) => {
+    if (!keys[p]) return false;
+    const s = summary[p];
+    if (!s) return false;
+    if ((s.exhausted_models ?? []).length > 0) return true;
+    return !!s.last_error_ts && (!s.last_ok_ts || s.last_error_ts > s.last_ok_ts);
+  });
+
+  function statusFor(p: string): { tone: 'success' | 'warning' | 'danger' | 'muted'; label: string } {
+    if (!keys[p]) return { tone: 'muted', label: 'no key' };
+    const s = summary[p];
+    if (!s || (s.ok_count === 0 && s.quota_count === 0 && s.error_count === 0))
+      return { tone: 'muted', label: 'untested' };
+    if ((s.exhausted_models ?? []).length > 0) return { tone: 'danger', label: 'quota out' };
+    if (s.last_error_ts && (!s.last_ok_ts || s.last_error_ts > s.last_ok_ts))
+      return { tone: s.last_error_kind === 'quota' ? 'danger' : 'warning', label: s.last_error_kind === 'quota' ? 'quota out' : 'erroring' };
+    return { tone: 'success', label: 'healthy' };
+  }
+
+  return (
+    <Card className="mb-6">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="font-heading text-[16px] font-bold tracking-tight">Live provider health — quota &amp; liveness</h2>
+        <div className="flex items-center gap-3">
+          <button onClick={load} disabled={loading}
+            className="text-coral font-semibold text-[12.5px] disabled:opacity-50">
+            {loading ? 'Loading…' : '↻ Refresh'}
+          </button>
+          <button onClick={ping} disabled={pinging}
+            className="text-[12.5px] font-semibold px-3 py-1.5 rounded-md bg-ink text-white disabled:opacity-50">
+            {pinging ? 'Pinging…' : '⚡ Ping all'}
+          </button>
+        </div>
+      </div>
+      <p className="text-ink-muted text-[12.5px] mb-3 leading-snug">
+        Recorded automatically as runs happen (so you see the moment a quota runs out), plus an on-demand active test.
+        <span className="text-ink-faint"> In-memory — resets when the backend restarts.</span>
+      </p>
+
+      {err && (
+        <div className="text-[12.5px] text-danger bg-danger-soft border border-danger/30 rounded-md p-2.5 mb-3">
+          Couldn&apos;t reach the backend: {err}
+        </div>
+      )}
+
+      {downNow.length > 0 && (
+        <div className="text-[13px] text-red-800 bg-danger-soft border border-danger/40 rounded-md p-3 mb-3 font-semibold">
+          ⚠ {downNow.length} provider{downNow.length > 1 ? 's' : ''} currently failing:
+          {' '}{downNow.map((p) => PROVIDER_LABELS[p] ?? p).join(', ')}. Forecasts are falling back down the chain.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+        {Object.keys(PROVIDER_LABELS).map((p) => {
+          const s: ProviderHealthSummary | undefined = summary[p];
+          const st = statusFor(p);
+          return (
+            <div key={p} className="border border-border rounded-md p-3 bg-surface">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-[13px] truncate">{PROVIDER_LABELS[p]}</span>
+                <Pill tone={st.tone} dot>{st.label}</Pill>
+              </div>
+              {keys[p] ? (
+                <div className="text-[11.5px] text-ink-muted mt-1.5 space-y-0.5">
+                  <div>last ok: <span className="text-ink">{ago(s?.last_ok_ts ?? null, now)}</span></div>
+                  {s?.last_error_ts && (
+                    <div className="truncate" title={s.last_error_reason}>
+                      last {s.last_error_kind}: <span className="text-danger">{ago(s.last_error_ts, now)}</span>
+                    </div>
+                  )}
+                  {(s?.exhausted_models ?? []).length > 0 && (
+                    <div className="text-danger truncate" title={(s?.exhausted_models ?? []).join(', ')}>
+                      exhausted: {(s?.exhausted_models ?? []).length} model(s)
+                    </div>
+                  )}
+                  {s && (
+                    <div className="text-ink-faint">{s.ok_count} ok · {s.quota_count} quota · {s.error_count} err</div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-[11.5px] text-ink-faint mt-1.5">No API key configured.</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {(snap?.events?.length ?? 0) > 0 && (
+        <div className="mt-4">
+          <div className="text-[11px] text-ink-muted font-bold uppercase tracking-[0.07em] mb-1.5">Recent events</div>
+          <div className="space-y-1">
+            {snap!.events.slice(0, 12).map((ev, i) => (
+              <div key={i} className="text-[11.5px] flex items-center gap-2">
+                <span className="text-ink-faint font-mono w-[60px] shrink-0">{ago(ev.ts, now)}</span>
+                <Pill tone={ev.kind === 'ok' ? 'success' : ev.kind === 'quota' ? 'danger' : 'warning'}>{ev.kind}</Pill>
+                <span className="font-semibold">{ev.provider}</span>
+                {ev.model && <span className="text-ink-muted">{ev.model}</span>}
+                {ev.reason && <span className="text-ink-faint truncate" title={ev.reason}>— {ev.reason}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
