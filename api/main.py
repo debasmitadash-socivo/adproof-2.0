@@ -18,6 +18,7 @@ import json
 import os
 import shutil
 import sys
+import threading
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -1271,6 +1272,17 @@ def _strip_unserialisable(obj: Any) -> Any:
     return obj
 
 
+# Concurrency gate for the heavy forecast path. The wizard fires variants /
+# placements in PARALLEL, so without this several 20-run Monte Carlos + video
+# analyses pile up at once and OOM-kill the whole worker on a small instance —
+# which takes the entire app down (every request 502s) until it restarts, not
+# just the heavy one. Serialise the heavy work (default 1 at a time) so a burst
+# queues instead of crashing. Bump ADPROOF_SIMULATE_CONCURRENCY if the host has
+# memory headroom.
+_SIMULATE_GATE = threading.Semaphore(
+    max(1, int(os.environ.get("ADPROOF_SIMULATE_CONCURRENCY", "1") or "1")))
+
+
 @app.post("/api/simulate")
 def simulate(req: SimulateRequest) -> dict:
     if req.format_id not in FORMATS:
@@ -1313,10 +1325,13 @@ def simulate(req: SimulateRequest) -> dict:
     )
 
     try:
-        result = run_wizard_simulation(
-            profile=profile, match=match, brief=brief, assets=assets,
-            visual_provider=req.visual_provider,
-        )
+        # Serialise the memory-heavy section so parallel variant runs queue
+        # instead of stacking memory and OOM-killing the worker.
+        with _SIMULATE_GATE:
+            result = run_wizard_simulation(
+                profile=profile, match=match, brief=brief, assets=assets,
+                visual_provider=req.visual_provider,
+            )
     except VisionUnavailableError as exc:
         # The image couldn't be inspected by a real vision model, so the run
         # is refused (no forecast). 422 = the request was valid but we can't
