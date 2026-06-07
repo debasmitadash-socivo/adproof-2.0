@@ -42,6 +42,7 @@ CANONICAL_FIELDS: dict[str, list[str]] = {
     "spend":         ["amount spent", "spend", "cost", "total spent"],
     "impressions":   ["impressions", "impr."],
     "reach":         ["reach"],
+    "frequency":     ["frequency", "freq"],
     "clicks":        ["link clicks", "clicks (all)", "clicks", "link click"],
     "ctr_reported":  ["ctr (all)", "ctr (link click-through rate)", "ctr (link)", "ctr"],
     "cpc_reported":  ["cpc (cost per link click)", "cpc (all)", "cpc", "cost per click"],
@@ -65,8 +66,9 @@ CANONICAL_FIELDS: dict[str, list[str]] = {
 _HEADER_HINTS = {"ad name", "campaign name", "impressions", "amount spent",
                  "link clicks", "reach", "placement"}
 
-_NUMERIC_FIELDS = {"spend", "impressions", "reach", "clicks", "ctr_reported",
-                   "cpc_reported", "conversions", "cost_per_result", "revenue"}
+_NUMERIC_FIELDS = {"spend", "impressions", "reach", "frequency", "clicks",
+                   "ctr_reported", "cpc_reported", "conversions",
+                   "cost_per_result", "revenue"}
 
 
 def _norm(s: Any) -> str:
@@ -447,11 +449,26 @@ def backtest(df: pd.DataFrame, min_ads: int = 12) -> dict:
     }
 
 
-def ingest_and_calibrate(data: bytes | str, filename: str = "") -> dict:
-    """End-to-end: normalize a file then calibrate + backtest. JSON-able dict."""
+def ingest_and_calibrate(data: bytes | str, filename: str = "",
+                         segment: str = "general") -> dict:
+    """End-to-end: normalize a file then calibrate + backtest + fatigue.
+
+    ``segment`` tags the fatigue thresholds (b2b_saas audiences fatigue sooner
+    than a broad/general one). JSON-able dict.
+    """
     df, report = normalize_export(data, filename)
     cal = calibrate(df, currency=report.currency)
     bt = backtest(df)
+    # Creative-fatigue screen — best-effort, never break a calibration.
+    try:
+        try:
+            from src.fatigue import analyze_fatigue
+        except ImportError:
+            from fatigue import analyze_fatigue
+        fat = analyze_fatigue(df, segment=segment)
+    except Exception as exc:                          # noqa: BLE001
+        fat = {"usable": False, "segment": segment,
+               "reason": f"Fatigue analysis unavailable: {exc}"}
     # A compact preview of the cleaned rows for the UI.
     preview_cols = [c for c in ("ad_name", "platform", "placement", "spend",
                                 "impressions", "clicks", "real_ctr", "real_cpm",
@@ -462,6 +479,7 @@ def ingest_and_calibrate(data: bytes | str, filename: str = "") -> dict:
         "report": asdict(report),
         "calibration": cal,
         "backtest": bt,
+        "fatigue": fat,
         "preview": preview,
         "rows": df.replace({np.nan: None}).to_dict("records"),
     }

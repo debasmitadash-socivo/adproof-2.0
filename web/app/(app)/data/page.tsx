@@ -11,6 +11,9 @@ import type { IngestResult, AccountCalibration, PlatformCalibration } from '@/li
 const CONF_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
   high: 'success', medium: 'warning', low: 'danger',
 };
+const FAT_TONE: Record<'healthy' | 'warning' | 'urgent' | 'depleted', 'success' | 'warning' | 'danger'> = {
+  healthy: 'success', warning: 'warning', urgent: 'danger', depleted: 'danger',
+};
 const PLATFORM_LABEL: Record<string, string> = {
   meta_facebook: 'Facebook', meta_instagram: 'Instagram', linkedin: 'LinkedIn',
   tiktok: 'TikTok', youtube: 'YouTube', google_search: 'Google Search',
@@ -63,6 +66,12 @@ export default function DataPage() {
   // Per-workspace: calibration belongs to the active workspace, not the user
   // overall. Reload when the workspace changes.
   const currentCompanyId = useApp((s) => s.currentCompanyId);
+  const profile = useApp((s) => s.companyProfile);
+  // B2B audiences are smaller and fatigue sooner — tag the fatigue thresholds
+  // by the workspace's business model so a B2B account and a DTC account
+  // aren't judged on the same frequency ceiling.
+  const segment: 'general' | 'b2b_saas' =
+    (profile?.business_model || '').toLowerCase().includes('b2b') ? 'b2b_saas' : 'general';
 
   useEffect(() => {
     getLatestCalibration(currentCompanyId ?? undefined).then(setExisting).catch(() => {});
@@ -72,7 +81,7 @@ export default function DataPage() {
     if (!file) return;
     setBusy(true); setError(null); setResult(null); setSaved(null);
     try {
-      setResult(await api.ingestOutcomes(file));
+      setResult(await api.ingestOutcomes(file, segment));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to read that file.');
     } finally {
@@ -199,6 +208,54 @@ export default function DataPage() {
               </div>
             )}
           </Card>
+
+          {/* CREATIVE FATIGUE — segment-tagged, from frequency + CTR-over-time */}
+          {result.fatigue && (
+            <Card className="mb-4">
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <div className="display-italic text-[20px]">Creative fatigue</div>
+                <Pill tone="muted">{result.fatigue.segment === 'b2b_saas' ? 'B2B thresholds' : 'general thresholds'}</Pill>
+              </div>
+              {result.fatigue.usable ? (
+                <>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {(['depleted', 'urgent', 'warning', 'healthy'] as const).map((s) => (
+                      <Pill key={s} tone={FAT_TONE[s]} dot>
+                        {result.fatigue.counts?.[s] ?? 0} {s}
+                      </Pill>
+                    ))}
+                  </div>
+                  {(result.fatigue.needs_attention ?? 0) > 0 ? (
+                    <div className="space-y-2">
+                      {(result.fatigue.ads ?? []).filter((a) => a.status !== 'healthy').slice(0, 12).map((a, i) => (
+                        <div key={i} className="flex items-start gap-2.5 border-b border-border-soft pb-2 last:border-0">
+                          <Pill tone={FAT_TONE[a.status]}>{a.status}</Pill>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13.5px] font-semibold text-ink truncate">{a.ad_name}</div>
+                            <div className="text-[12px] text-ink-muted">
+                              {a.frequency != null && <>freq {a.frequency} · </>}
+                              {a.ctr_change_pct != null && <>CTR {a.ctr_change_pct >= 0 ? '+' : ''}{Math.round(a.ctr_change_pct * 100)}% · </>}
+                              {a.impressions.toLocaleString()} impressions
+                            </div>
+                            <div className="text-[12px] text-ink mt-0.5">{a.reasons.join(' · ')}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[13.5px] text-ink-muted">No fatiguing ads detected — frequencies and click-through look healthy.</div>
+                  )}
+                  <div className="text-[11.5px] text-ink-faint mt-2">
+                    Signals: {result.fatigue.signals_used?.join(', ') || '—'}. {result.fatigue.note}
+                  </div>
+                </>
+              ) : (
+                <div className="text-[13.5px] text-ink-muted">
+                  <strong>No fatigue signal yet.</strong> {result.fatigue.reason}
+                </div>
+              )}
+            </Card>
+          )}
 
           {result.preview.length > 0 && (
             <Card className="!p-0 overflow-hidden">

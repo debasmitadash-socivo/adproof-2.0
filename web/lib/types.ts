@@ -253,10 +253,31 @@ export interface IngestReport {
   warnings: string[];
   sheet: string | null;
 }
+export interface FatigueAd {
+  ad_name: string;
+  platform: string;
+  status: 'healthy' | 'warning' | 'urgent' | 'depleted';
+  frequency: number | null;
+  ctr_change_pct: number | null;
+  impressions: number;
+  reasons: string[];
+}
+export interface Fatigue {
+  usable: boolean;
+  reason?: string;
+  segment: string;
+  n_ads?: number;
+  counts?: Record<'healthy' | 'warning' | 'urgent' | 'depleted', number>;
+  needs_attention?: number;
+  signals_used?: string[];
+  ads?: FatigueAd[];
+  note?: string;
+}
 export interface IngestResult {
   report: IngestReport;
   calibration: AccountCalibration;
   backtest: Backtest;
+  fatigue: Fatigue;
   preview: Record<string, unknown>[];
   rows: Record<string, unknown>[];
 }

@@ -22,7 +22,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -479,7 +479,8 @@ async def upload_creative(file: UploadFile = File(...)) -> dict:
 
 
 @app.post("/api/ingest-outcomes")
-async def ingest_outcomes(file: UploadFile = File(...)) -> dict:
+async def ingest_outcomes(file: UploadFile = File(...),
+                          segment: str = Form("general")) -> dict:
     """Parse a real ad-performance export (Meta/Google/our template) and
     compute per-account real benchmarks — CTR/CPM/CPC, plus conversion-rate
     and ROAS where the file actually contains that data.
@@ -500,8 +501,9 @@ async def ingest_outcomes(file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=400, detail="Empty file.")
     if len(data) > 25 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large (max 25 MB).")
+    seg = segment if segment in ("general", "b2b_saas") else "general"
     try:
-        return ingest_and_calibrate(data, file.filename or "upload")
+        return ingest_and_calibrate(data, file.filename or "upload", segment=seg)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=422,
                             detail=f"Could not parse this export: {str(e)[:300]}")
