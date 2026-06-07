@@ -10,7 +10,11 @@ import { PlotlyChart } from '@/components/Charts';
 import { AccuracyScorecard } from '@/components/AccuracyScorecard';
 import { useApp } from '@/lib/store';
 import { api } from '@/lib/api';
-import type { PolicyCheckResponse, SavedCampaign, SavedVariantResult } from '@/lib/types';
+import { getLatestCalibration } from '@/lib/db';
+import type {
+  AccountCalibration, BenchmarkRefreshResponse, PolicyCheckResponse,
+  SavedCampaign, SavedVariantResult, SimulateResponse,
+} from '@/lib/types';
 
 const VERDICT_GRADIENT: Record<string, string> = {
   strong: 'from-success to-ink',
@@ -382,6 +386,9 @@ export default function ResultPage() {
               );
             })}
           </div>
+
+          {/* HOW YOU COMPARE — forecast vs benchmark vs your account + live cited */}
+          <BenchmarkPanel result={result} />
 
           {/* PLAIN-ENGLISH VERDICT */}
           {result.plain_verdict && (
@@ -829,6 +836,102 @@ export default function ResultPage() {
         </aside>
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// "How you compare" — this forecast vs the format/industry benchmark vs the
+// user's own account (from uploaded data), plus a live Gemini-grounded
+// industry benchmark with sources. Honest: format/industry level, not the
+// user's exact audience (nobody publishes that).
+// ---------------------------------------------------------------------------
+function BenchmarkPanel({ result }: { result: SimulateResponse }) {
+  const companyId = useApp((s) => s.currentCompanyId);
+  const profile = useApp((s) => s.companyProfile);
+  const [cal, setCal] = useState<AccountCalibration | null>(null);
+  const [live, setLive] = useState<BenchmarkRefreshResponse | null>(null);
+  const [pulling, setPulling] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    getLatestCalibration(companyId ?? undefined).then(setCal).catch(() => {});
+  }, [companyId]);
+
+  const fmt = result.format;
+  const bench = fmt.benchmarks;
+  const cur = result.economics?.currency || 'GBP';
+  const imps = result.mc.total_impressions;
+  const fcstCtr = imps > 0 ? result.mc.predicted_clicks.p50 / imps : 0;
+  const acct = cal?.overall as { real_ctr?: number; real_cpm?: number; real_cpc?: number } | undefined;
+  const hasAcct = !!(acct && (acct.real_ctr || acct.real_cpm || acct.real_cpc));
+  const pctv = (x?: number | null) => (x == null ? '—' : `${(x * 100).toFixed(2)}%`);
+  const money = (x?: number | null) => (x == null ? '—' : `${cur} ${x.toFixed(2)}`);
+
+  async function pullLive() {
+    setPulling(true); setErr(null);
+    try { setLive(await api.refreshBenchmarks(fmt.id, profile?.industry, result.economics?.geo)); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setPulling(false); }
+  }
+
+  const rows = [
+    { label: 'Click rate (CTR)', forecast: pctv(fcstCtr), bench: pctv(bench.ctr),
+      acct: pctv(acct?.real_ctr), live: live?.fetched.ctr != null ? pctv(live.fetched.ctr) : '—' },
+    { label: 'CPM', forecast: '—', bench: bench.cpm ? money(bench.cpm) : '—',
+      acct: money(acct?.real_cpm), live: live?.fetched.cpm != null ? money(live.fetched.cpm) : '—' },
+    { label: 'CPC', forecast: money(result.mc.budget / Math.max(result.mc.predicted_clicks.p50, 1)),
+      bench: bench.cpc ? money(bench.cpc) : '—', acct: money(acct?.real_cpc), live: '—' },
+  ];
+
+  return (
+    <div className="mb-6">
+      <h2 className="display-italic text-[24px] mb-1">How you compare</h2>
+      <p className="text-ink-muted text-[13.5px] mb-3">
+        Your forecast vs the {fmt.name} benchmark{hasAcct ? ' and your own account' : ''}. Benchmarks are
+        format/industry level (as of {bench.as_of || '2026'}) — not your exact audience.
+      </p>
+      <Card className="!p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13.5px]">
+            <thead className="bg-bg-deep text-[11px] text-ink-muted uppercase tracking-[0.06em] font-bold">
+              <tr>
+                <th className="text-left px-4 py-2.5">Metric</th>
+                <th className="text-right px-4 py-2.5">This forecast</th>
+                <th className="text-right px-4 py-2.5">Industry benchmark</th>
+                {hasAcct && <th className="text-right px-4 py-2.5">Your account</th>}
+                {live && <th className="text-right px-4 py-2.5 text-lime-deep">Live (cited)</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.label} className="border-t border-border-soft">
+                  <td className="text-left px-4 py-2.5 font-semibold">{r.label}</td>
+                  <td className="text-right px-4 py-2.5 font-mono">{r.forecast}</td>
+                  <td className="text-right px-4 py-2.5 font-mono text-ink-muted">{r.bench}</td>
+                  {hasAcct && <td className="text-right px-4 py-2.5 font-mono">{r.acct}</td>}
+                  {live && <td className="text-right px-4 py-2.5 font-mono text-lime-deep">{r.live}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-4 py-3 bg-surface border-t border-border flex items-center gap-3 flex-wrap">
+          <Button size="sm" variant="secondary" onClick={pullLive} disabled={pulling}>
+            {pulling ? '🔎 Searching…' : '🔎 Pull live benchmark (cited)'}
+          </Button>
+          <span className="text-[12px] text-ink-muted">Current published {profile?.industry || 'industry'} numbers via Gemini, with sources.</span>
+          {bench.trend_note && <span className="text-[12px] text-ink-faint italic w-full sm:w-auto">{bench.trend_note}</span>}
+        </div>
+        {err && <div className="px-4 py-2 text-[12px] text-danger">{err}</div>}
+        {live && live.grounding_sources?.length > 0 && (
+          <div className="px-4 py-2 text-[11.5px] text-ink-muted border-t border-border">
+            Sources: {live.grounding_sources.map((s, i) => (
+              <span key={i}>{i > 0 ? ' · ' : ''}<a className="underline" href={s.uri} target="_blank" rel="noreferrer">{s.title || 'link'}</a></span>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }
 
