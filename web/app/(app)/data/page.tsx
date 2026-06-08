@@ -22,6 +22,99 @@ const PLATFORM_LABEL: Record<string, string> = {
 function pct(x: number | null | undefined) { return x == null ? '—' : `${(x * 100).toFixed(2)}%`; }
 function money(x: number | null | undefined, cur: string) { return x == null ? '—' : `${cur} ${x.toFixed(2)}`; }
 
+// Pillar B+: pretty labels — must match the slugs in outcomes.INTEREST_BUCKETS
+// and api/main.py's _INTEREST_LABEL / _SEGMENT_LABEL.
+const SEGMENT_LABEL: Record<string, string> = {
+  all: 'All', gen_z: 'Gen Z', millennials: 'Millennials', gen_x: 'Gen X',
+  boomers: 'Boomers', high_income: 'High income', budget_conscious: 'Budget',
+  early_adopters: 'Early adopters', socially_influenced: 'Socially influenced',
+};
+const INTEREST_LABEL: Record<string, string> = {
+  fitness: 'Fitness', fashion: 'Fashion', beauty: 'Beauty', tech: 'Tech',
+  travel: 'Travel', food: 'Food / drink', home: 'Home / DIY',
+  finance: 'Finance', automotive: 'Auto', entertainment: 'Entertainment',
+  business: 'Business', wellness: 'Wellness',
+};
+
+function CrossTabMatrix({ cal }: { cal: AccountCalibration }) {
+  const xtab = cal.by_segment_interest;
+  if (!xtab || !Object.keys(xtab).length) return null;
+
+  // Collect every segment + interest that appears in any cell, ordered by
+  // total n_ads (highest first) so the densest combos sit top-left.
+  const segTotals: Record<string, number> = {};
+  const intTotals: Record<string, number> = {};
+  for (const [seg, cells] of Object.entries(xtab)) {
+    for (const [interest, agg] of Object.entries(cells)) {
+      segTotals[seg] = (segTotals[seg] ?? 0) + (agg.n_ads ?? 0);
+      intTotals[interest] = (intTotals[interest] ?? 0) + (agg.n_ads ?? 0);
+    }
+  }
+  const segments = Object.keys(segTotals).sort((a, b) => segTotals[b] - segTotals[a]);
+  const interests = Object.keys(intTotals).sort((a, b) => intTotals[b] - intTotals[a]);
+
+  // Find the best cell by CTR so the UI can highlight where the user's
+  // account actually wins — the whole point of this surface.
+  let bestKey: string | null = null;
+  let bestCtr = 0;
+  for (const seg of segments) {
+    for (const interest of interests) {
+      const c = xtab[seg]?.[interest];
+      if (c?.real_ctr && c.real_ctr > bestCtr) {
+        bestCtr = c.real_ctr;
+        bestKey = `${seg}::${interest}`;
+      }
+    }
+  }
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="font-heading text-[14.5px] font-bold">What&apos;s working — audience × interest</div>
+        <Pill tone="violet">cross-tab</Pill>
+      </div>
+      <div className="text-[12.5px] text-ink-muted mb-2">
+        Real CTR for every (audience × interest) cell with enough ads to be trustworthy (≥3 ads + ≥5k impressions). Highlighted cell is your best-performing combo on real data.
+      </div>
+      <div className="overflow-x-auto">
+        <table className="text-[12.5px] border-collapse">
+          <thead>
+            <tr>
+              <th className="text-left px-3 py-2 bg-bg-deep text-[11px] text-ink-muted uppercase tracking-[0.06em] font-bold sticky left-0">Segment ↓ / Interest →</th>
+              {interests.map((i) => (
+                <th key={i} className="text-right px-3 py-2 bg-bg-deep text-[11px] text-ink-muted uppercase tracking-[0.06em] font-bold">{INTEREST_LABEL[i] ?? i}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {segments.map((seg) => (
+              <tr key={seg} className="border-b border-border-soft last:border-b-0">
+                <td className="text-left px-3 py-2 font-semibold text-ink bg-bg-deep/50 sticky left-0">{SEGMENT_LABEL[seg] ?? seg}</td>
+                {interests.map((interest) => {
+                  const cell = xtab[seg]?.[interest];
+                  const isBest = bestKey === `${seg}::${interest}`;
+                  return (
+                    <td key={interest} className={`text-right px-3 py-2 mono whitespace-nowrap ${isBest ? 'bg-lime-soft text-ink font-bold' : ''}`}>
+                      {cell?.real_ctr != null
+                        ? <>{(cell.real_ctr * 100).toFixed(2)}%<span className="text-ink-faint ml-1">({cell.n_ads}a)</span></>
+                        : <span className="text-ink-faint">—</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {cal.by_segment_unknown != null && cal.by_segment_unknown > 0 && (
+        <div className="text-[11.5px] text-ink-muted mt-2">
+          {cal.by_segment_unknown} ad{cal.by_segment_unknown === 1 ? '' : 's'} couldn&apos;t be classified to an audience segment — name your ad sets clearly (e.g. &quot;Gen Z fitness drop&quot;) to lift coverage.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CalTable({ cal }: { cal: AccountCalibration }) {
   const rows = Object.entries(cal.by_platform) as [string, PlatformCalibration][];
   return (
@@ -143,6 +236,7 @@ export default function DataPage() {
             <div className="text-[14px] font-semibold text-ink">Your forecasts are calibrated to your account ({existing.currency}).</div>
           </div>
           <CalTable cal={existing} />
+          <CrossTabMatrix cal={existing} />
           <div className="text-[12px] text-ink-faint mt-2">Upload a fresh export below to update it.</div>
         </Card>
       )}
@@ -224,6 +318,7 @@ export default function DataPage() {
               <Button onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save to my account'}</Button>
             </div>
             <CalTable cal={result.calibration} />
+            <CrossTabMatrix cal={result.calibration} />
             {result.report.warnings.length > 0 && (
               <ul className="mt-3 space-y-1">
                 {result.report.warnings.map((w, i) => (

@@ -224,6 +224,12 @@ async function persistCreativeScores(
       platform_id: req?.platform_id ?? null,
       format_id: req?.format_id ?? null,
       audience_segment: req?.audience_segment ?? null,
+      // Pillar B+: store the user's mapped interests + the dominant bucket
+      // so the future per-account model can learn on (segment × interest)
+      // tuples without re-running the wizard's classifier.
+      interests: ((req?.interests as string[] | undefined) ?? null) as unknown,
+      dominant_interest:
+        (req?.interests as string[] | undefined)?.[0] ?? null,
       vision_scores: vis as unknown,
       reel_quality: (r.reel_quality ?? null) as unknown,
       forecast_ctr_p50: r.kpis?.ctr?.p50 ?? null,

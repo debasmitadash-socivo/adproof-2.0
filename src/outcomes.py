@@ -342,6 +342,94 @@ def _segment_key(row: pd.Series) -> str:
     return "unknown"
 
 
+# Pillar B+: 12-bucket interest taxonomy for the (segment × interest) cross-tab.
+# Patterns are ordered shortest-to-most-specific within each bucket so the
+# first-match wins consistently. The buckets deliberately overlap with the
+# wizard's product_category vocabulary (see _CATEGORY_INTEREST_HINTS in
+# agent.py) so the same words land the same place from either side.
+_INTEREST_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("fitness",       ("fitness", "gym", "workout", "yoga", "running",
+                        "cycling", "crossfit", "athleisure")),
+    ("fashion",       ("fashion", "apparel", "clothing", "streetwear",
+                        "luxury wear", "menswear", "womenswear")),
+    ("beauty",        ("beauty", "skincare", "makeup", "cosmetic",
+                        "haircare", "fragrance")),
+    ("tech",          ("tech", "electronics", "gadget", "saas", "software",
+                        "ai ", " ai", "gaming", "developer", "startup")),
+    ("travel",        ("travel", "vacation", "holiday", "flights", "hotels",
+                        "tourism", "adventure travel")),
+    ("food",          ("food", "drink", "beverage", "restaurant", "cooking",
+                        "recipe", "foodie", "coffee", "wine")),
+    ("home",          ("home", "diy", "furniture", "interior", "decor",
+                        "garden", "kitchen")),
+    ("finance",       ("finance", "investing", "crypto", "trading",
+                        "wealth", "personal finance", "loans", "mortgage")),
+    ("automotive",    ("automotive", "auto", "cars", "ev", "electric vehicle",
+                        "motorbike", "trucks")),
+    ("entertainment", ("entertainment", "movies", "music", "streaming",
+                        "podcast", "reading", "books")),
+    ("business",      ("business", "b2b", "professional", "decision maker",
+                        "decision-maker", "marketing", "sales", "hr ",
+                        "operations", "c-suite", "leadership")),
+    ("wellness",      ("wellness", "mindfulness", "mental health", "self-care",
+                        "self care", "meditation", "sleep")),
+)
+
+# A flat slug list — useful for the API + UI to know the full taxonomy
+# without re-parsing the patterns tuple.
+INTEREST_BUCKETS: tuple[str, ...] = tuple(slug for slug, _ in _INTEREST_PATTERNS)
+
+
+def _interest_keys(row: pd.Series) -> list[str]:
+    """Return all interest buckets matched by the row's audience / ad set /
+    targeting text. Empty list when nothing matches.
+
+    Used at calibrate() time to tag each row, and re-used by the wizard's
+    consumer code to map the user's chosen filters into the same taxonomy
+    so lookups across sides use the same vocabulary.
+    """
+    hay = " ".join(str(row.get(k, "")) for k in
+                   ("audience", "ad_set_name", "targeting", "campaign",
+                    "placement", "ad_copy")).lower()
+    if not hay.strip():
+        return []
+    hits = []
+    for slug, patterns in _INTEREST_PATTERNS:
+        if any(p in hay for p in patterns):
+            hits.append(slug)
+    return hits
+
+
+def _dominant_interest(interests: list[str]) -> str:
+    """Pick the top interest from a row's matches.
+
+    Order in _INTEREST_PATTERNS is the priority (more-specific first), so
+    we return the FIRST hit. 'unknown' when the list is empty — consumer
+    treats it like the segment 'unknown' and excludes the cell from the
+    cross-tab.
+    """
+    return interests[0] if interests else "unknown"
+
+
+def interests_from_chip_ids(chip_ids: list[str]) -> list[str]:
+    """Map wizard filter-chip IDs (e.g. 'interest:fitness', 'custom:yoga')
+    onto the canonical taxonomy. Used by the wizard at request-build time
+    so the same row of words maps the same place from either side of the
+    boundary.
+    """
+    if not chip_ids:
+        return []
+    bag = " ".join(c.split(":", 1)[-1].lower() for c in chip_ids
+                   if not c.startswith(("gender:", "location:", "age:")))
+    if not bag.strip():
+        return []
+    hits = []
+    for slug, patterns in _INTEREST_PATTERNS:
+        if any(p in bag for p in patterns):
+            hits.append(slug)
+    return hits
+
+
 def _confidence(n_ads: int, impressions: float) -> str:
     if n_ads >= 20 and impressions >= 200_000:
         return "high"
@@ -426,10 +514,16 @@ def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120) -
     """
     if df.empty or "impressions" not in df.columns:
         return {"currency": currency, "overall": {},
-                "by_platform": {}, "by_segment": {}, "usable": False}
+                "by_platform": {}, "by_segment": {},
+                "by_interest": {}, "by_segment_interest": {},
+                "usable": False}
     d = df.copy()
     d["_platform"] = d.apply(_platform_key, axis=1)
     d["_segment"] = d.apply(_segment_key, axis=1)
+    # Pillar B+: per-row interest tagging. _interests is the full list,
+    # _interest is the dominant bucket for the cross-tab.
+    d["_interests"] = d.apply(_interest_keys, axis=1)
+    d["_interest"] = d["_interests"].apply(_dominant_interest)
     d["_date"] = (pd.to_datetime(d["date_start"], errors="coerce")
                   if "date_start" in d.columns else pd.NaT)
 
@@ -445,23 +539,52 @@ def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120) -
     # The threshold (3+ ads, 5k+ impressions) is deliberately low because
     # most users won't have huge per-segment volumes; the per-segment
     # _agg() also returns a confidence band that the UI can degrade on.
+    def _ok(grp: pd.DataFrame) -> bool:
+        if len(grp) < 3:
+            return False
+        return ("impressions" not in grp.columns
+                or float(grp["impressions"].sum()) >= 5_000)
+
     by_segment: dict = {}
     for seg, grp in used.groupby("_segment"):
         seg_name = str(seg)
-        if seg_name == "unknown" or len(grp) < 3:
-            continue
-        if "impressions" in grp.columns and float(grp["impressions"].sum()) < 5_000:
+        if seg_name == "unknown" or not _ok(grp):
             continue
         by_segment[seg_name] = _agg(grp)
-    # n_unknown — how many rows we couldn't classify, so the UI can be
-    # honest about calibration coverage.
+    # Pillar B+: flat by-interest aggregation — useful for users whose
+    # uploaded data doesn't carry audience info but DOES carry interest
+    # hints (e.g. ad_set_name has "fitness campaign" but no age band).
+    by_interest: dict = {}
+    for interest, grp in used.groupby("_interest"):
+        i_name = str(interest)
+        if i_name == "unknown" or not _ok(grp):
+            continue
+        by_interest[i_name] = _agg(grp)
+    # Pillar B+: the (segment × interest) cross-tab — the actual answer to
+    # "which audience + interest combo wins for my account". Each cell
+    # has to clear the same ≥3 ads + ≥5k impressions threshold; thin cells
+    # are not emitted so the consumer's 4-level fallback chain stays clean
+    # (segment×interest → segment → platform → overall).
+    by_segment_interest: dict = {}
+    for (seg, interest), grp in used.groupby(["_segment", "_interest"]):
+        seg_name, i_name = str(seg), str(interest)
+        if seg_name == "unknown" or i_name == "unknown":
+            continue
+        if not _ok(grp):
+            continue
+        by_segment_interest.setdefault(seg_name, {})[i_name] = _agg(grp)
+
     n_unknown = int((used["_segment"] == "unknown").sum())
+    n_interest_unknown = int((used["_interest"] == "unknown").sum())
     return {
         "currency": currency,
         "overall": _agg(used),
         "by_platform": by_platform,
         "by_segment": by_segment,
+        "by_interest": by_interest,
+        "by_segment_interest": by_segment_interest,
         "by_segment_unknown": n_unknown,
+        "by_interest_unknown": n_interest_unknown,
         "usable": True,
         "window": window,
         "trend": _trend(d),

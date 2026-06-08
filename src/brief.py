@@ -54,6 +54,11 @@ class CampaignBrief:
     # Target market for this campaign. Drives per-geo benchmark grounding,
     # currency, and the cultural/regulatory lens in LLM prompts.
     geo: str = "UK"
+    # Pillar B+: user-chosen interests, mapped to the canonical taxonomy
+    # in outcomes.INTEREST_BUCKETS. Drives the (segment × interest) cell
+    # in the calibration anchor chain. Empty list when the user didn't
+    # pick filters / their description didn't yield a clean taxonomy match.
+    interests: list = field(default_factory=list)
 
     def __post_init__(self):
         if self.objective not in _VALID_OBJECTIVES:

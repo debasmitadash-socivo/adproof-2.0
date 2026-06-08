@@ -200,10 +200,14 @@ export interface SimulateRequest {
   // generic format benchmarks when they've uploaded their ad history.
   target_ctr?: number | null;
   cpm_override?: number | null;
-  // Pillar B: which calibration layer fed the anchor (so the report can be
-  // honest about whether this is segment- / platform- / overall-calibrated).
-  calibration_source?: string | null;       // 'segment:<seg>' | 'platform:<plat>' | 'overall' | null
+  // Pillar B / B+: which calibration layer fed the anchor (so the report can
+  // be honest about whether this is segment-interest- / segment- / interest-
+  // / platform- / overall-calibrated).
+  calibration_source?: string | null;       // 'segment:<seg>:interest:<int>' | 'segment:<seg>' | 'interest:<int>' | 'platform:<plat>' | 'overall' | null
   calibration_n_ads?: number | null;
+  // Pillar B+: the user-chosen interests after wizard mapping to the
+  // canonical taxonomy (see outcomes.INTEREST_BUCKETS).
+  interests?: string[];
   // Opt-in budget saturation (assumption-based): realistically reachable people.
   reachable_audience?: number | null;
 }
@@ -236,9 +240,18 @@ export interface AccountCalibration {
   // when ≥3 ads + ≥5k impressions matched; lower coverage falls back to
   // by_platform → overall.
   by_segment?: Record<string, PlatformCalibration>;
-  // Count of rows that couldn't be tagged to a segment — surfaces in UI
-  // as honest coverage info ("calibrated against X ads, Y unclassified").
+  // Pillar B+: flat by-interest aggregation (when the upload carries
+  // interest hints but no audience info). Used by the anchor chain
+  // when segment can't be matched but a clean interest cell exists.
+  by_interest?: Record<string, PlatformCalibration>;
+  // Pillar B+: the (segment × interest) cross-tab — the actual answer
+  // to "which audience+interest combo wins for me". Surfaced on the
+  // data page as a "What's working" matrix.
+  by_segment_interest?: Record<string, Record<string, PlatformCalibration>>;
+  // Count of rows that couldn't be tagged to a segment / interest —
+  // surfaces in UI as honest coverage info.
   by_segment_unknown?: number;
+  by_interest_unknown?: number;
   usable: boolean;
   window?: string;
   trend?: CalibrationTrend | null;

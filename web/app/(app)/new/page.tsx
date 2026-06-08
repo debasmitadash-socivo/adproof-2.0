@@ -23,6 +23,121 @@ function calibrationPlatformKey(platformId: string): string {
   if (p.includes('google') || p.includes('search')) return 'google_search';
   return platformId;
 }
+
+// Pillar B+: same interest taxonomy as outcomes.INTEREST_BUCKETS (Python).
+// Keep these two lists in sync — same slug + same priority order so the
+// frontend's calibration lookup matches what the backend's ingest tagged.
+const INTEREST_PATTERNS: ReadonlyArray<readonly [string, readonly string[]]> = [
+  ['fitness',       ['fitness', 'gym', 'workout', 'yoga', 'running', 'cycling', 'crossfit', 'athleisure']],
+  ['fashion',       ['fashion', 'apparel', 'clothing', 'streetwear', 'menswear', 'womenswear']],
+  ['beauty',        ['beauty', 'skincare', 'makeup', 'cosmetic', 'haircare', 'fragrance']],
+  ['tech',          ['tech', 'electronics', 'gadget', 'saas', 'software', 'ai', 'gaming', 'developer', 'startup']],
+  ['travel',        ['travel', 'vacation', 'holiday', 'flights', 'hotels', 'tourism']],
+  ['food',          ['food', 'drink', 'beverage', 'restaurant', 'cooking', 'recipe', 'foodie', 'coffee', 'wine']],
+  ['home',          ['home', 'diy', 'furniture', 'interior', 'decor', 'garden', 'kitchen']],
+  ['finance',       ['finance', 'investing', 'crypto', 'trading', 'wealth', 'loans', 'mortgage']],
+  ['automotive',    ['automotive', 'auto', 'cars', 'ev', 'electric vehicle', 'motorbike']],
+  ['entertainment', ['entertainment', 'movies', 'music', 'streaming', 'podcast', 'reading', 'books']],
+  ['business',      ['business', 'b2b', 'professional', 'decision maker', 'marketing', 'sales', 'operations', 'c-suite', 'leadership']],
+  ['wellness',      ['wellness', 'mindfulness', 'mental health', 'self-care', 'meditation', 'sleep']],
+];
+
+function interestsFromText(text: string): string[] {
+  const hay = (text || '').toLowerCase();
+  if (!hay.trim()) return [];
+  const hits: string[] = [];
+  for (const [slug, patterns] of INTEREST_PATTERNS) {
+    if (patterns.some((p) => hay.includes(p))) hits.push(slug);
+  }
+  return hits;
+}
+
+function interestsFromChipIds(chipIds: string[]): string[] {
+  if (!chipIds.length) return [];
+  const bag = chipIds
+    .filter((c) => !c.startsWith('gender:') && !c.startsWith('location:') && !c.startsWith('age:'))
+    .map((c) => c.split(':').slice(1).join(' ').toLowerCase())
+    .join(' ');
+  return interestsFromText(bag);
+}
+
+// 4-level anchor chain: (segment × interest) → segment → interest → platform → overall.
+// Returns the matching cell + a source label the backend will render in the
+// data-provenance row. Each cell still has to clear the calibration's own
+// per-cell threshold (3 ads + 5k impressions) — those checks happen at
+// outcomes.calibrate() time, so a present cell is already trustworthy.
+type AnchorPick = {
+  source: string | null;
+  nAds: number | null;
+  ctr: number | null;
+  cpm: number | null;
+  cvr: number | null;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function pickCalibrationAnchor(
+  cal: import('@/lib/types').AccountCalibration,
+  segment: string | null,
+  interests: string[],
+  platformKey: string,
+): AnchorPick {
+  const take = (pc: import('@/lib/types').PlatformCalibration | undefined, source: string): AnchorPick | null => {
+    if (!pc || !pc.real_ctr) return null;
+    return {
+      source, nAds: pc.n_ads ?? null,
+      ctr: pc.real_ctr ?? null, cpm: pc.real_cpm ?? null,
+      cvr: pc.real_cvr ?? null,
+    };
+  };
+  // 1) segment × interest — pick the largest cell across the user's interests
+  if (segment && interests.length && cal.by_segment_interest?.[segment]) {
+    const segCells = cal.by_segment_interest[segment];
+    let best: { cell: import('@/lib/types').PlatformCalibration; interest: string } | null = null;
+    for (const interest of interests) {
+      const cell = segCells[interest];
+      if (cell && cell.real_ctr && (!best || (cell.n_ads ?? 0) > (best.cell.n_ads ?? 0))) {
+        best = { cell, interest };
+      }
+    }
+    if (best) {
+      const picked = take(best.cell, `segment:${segment}:interest:${best.interest}`);
+      if (picked) return picked;
+    }
+  }
+  // 2) segment only
+  if (segment) {
+    const picked = take(cal.by_segment?.[segment], `segment:${segment}`);
+    if (picked) return picked;
+  }
+  // 3) interest only (when segment didn't match but interest did)
+  if (interests.length && cal.by_interest) {
+    let best: { cell: import('@/lib/types').PlatformCalibration; interest: string } | null = null;
+    for (const interest of interests) {
+      const cell = cal.by_interest[interest];
+      if (cell && cell.real_ctr && (!best || (cell.n_ads ?? 0) > (best.cell.n_ads ?? 0))) {
+        best = { cell, interest };
+      }
+    }
+    if (best) {
+      const picked = take(best.cell, `interest:${best.interest}`);
+      if (picked) return picked;
+    }
+  }
+  // 4) platform average
+  const ppicked = take(cal.by_platform?.[platformKey], `platform:${platformKey}`);
+  if (ppicked) return ppicked;
+  // 5) overall account average
+  if (cal.overall?.real_ctr) {
+    return {
+      source: 'overall',
+      nAds: cal.overall.n_ads ?? null,
+      ctr: cal.overall.real_ctr ?? null,
+      cpm: cal.overall.real_cpm ?? null,
+      cvr: cal.overall.real_cvr ?? null,
+    };
+  }
+  return { source: null, nAds: null, ctr: null, cpm: null, cvr: null };
+}
 import {
   filtersForPlatform,
   suggestedChips,
@@ -215,46 +330,44 @@ export default function NewAnalysisPage() {
         }
       }
 
-      // Per-account calibration (Path B + Pillar B): if the user has uploaded
-      // their ad history, use THEIR real CTR / CPM for THIS audience first
-      // (segment-keyed), then THIS platform, then overall. The chosen layer
-      // is recorded on the request so the report can label it honestly
-      // ("calibrated to your gen_z audience, 23 ads").
+      // Pillar B+ : 4-level anchor chain — (segment × interest) → segment →
+      // interest → platform → overall. Interests are inferred from whichever
+      // audience-picker mode is active (filter chips / free text / saved +
+      // company product_category), then mapped to the same taxonomy as
+      // outcomes.INTEREST_BUCKETS so frontend and backend agree.
       let calCtr: number | null = null;
       let calCpm: number | null = null;
       let calCvr: number | null = null;
-      let calSource: string | null = null;       // 'segment:gen_z' | 'platform:meta_facebook' | 'overall' | null
+      let calSource: string | null = null;
       let calNAds: number | null = null;
+      // Build the user's interest list from the active mode.
+      const profileInterestText = [
+        w.companyProfile?.product_category ?? '',
+        w.companyProfile?.industry ?? '',
+        w.companyProfile?.value_proposition ?? '',
+      ].join(' ');
+      let userInterests: string[] = [];
+      if (audienceMethod === 'filters') {
+        userInterests = interestsFromChipIds(Object.keys(w.filterSelections ?? {}));
+      } else if (audienceMethod === 'words') {
+        userInterests = interestsFromText(
+          (w.audienceDescription || '') + ' ' + profileInterestText);
+      } else {
+        // 'saved' — saved audiences don't yet carry their own interests,
+        // so derive from the company profile as a soft proxy.
+        userInterests = interestsFromText(profileInterestText);
+      }
       try {
         const cal = await getLatestCalibration(w.currentCompanyId ?? undefined);
         if (cal) {
-          // 1) Try segment-keyed first — matches the wizard's chosen audience.
           const seg = audienceMethod === 'saved' ? w.audienceSegment : null;
-          const sc = (seg && cal.by_segment) ? cal.by_segment[seg] : null;
-          if (sc && sc.real_ctr) {
-            calCtr = sc.real_ctr;
-            calCpm = sc.real_cpm;
-            calCvr = sc.real_cvr;
-            calSource = `segment:${seg}`;
-            calNAds = sc.n_ads;
-          } else {
-            // 2) Fall back to per-platform.
-            const pc = cal.by_platform?.[calibrationPlatformKey(w.platformId)];
-            if (pc && pc.real_ctr) {
-              calCtr = pc.real_ctr;
-              calCpm = pc.real_cpm;
-              calCvr = pc.real_cvr;
-              calSource = `platform:${calibrationPlatformKey(w.platformId)}`;
-              calNAds = pc.n_ads;
-            } else if (cal.overall?.real_ctr) {
-              // 3) Last resort: overall account average.
-              calCtr = cal.overall.real_ctr ?? null;
-              calCpm = cal.overall.real_cpm ?? null;
-              calCvr = cal.overall.real_cvr ?? null;
-              calSource = 'overall';
-              calNAds = cal.overall.n_ads ?? null;
-            }
-          }
+          const platformKey = calibrationPlatformKey(w.platformId);
+          const pick = pickCalibrationAnchor(cal, seg ?? null, userInterests, platformKey);
+          calCtr = pick.ctr;
+          calCpm = pick.cpm;
+          calCvr = pick.cvr;
+          calSource = pick.source;
+          calNAds = pick.nAds;
         }
       } catch { /* calibration is best-effort — never block a run */ }
 
@@ -280,10 +393,13 @@ export default function NewAnalysisPage() {
         // Calibrated click + cost benchmarks (null = fall back to generic).
         target_ctr: calCtr,
         cpm_override: calCpm,
-        // Pillar B: which calibration layer fed the anchor + how many ads
-        // it was built from — surfaced in the report's data-provenance row.
+        // Pillar B / B+: which calibration layer fed the anchor + how many
+        // ads it was built from — surfaced in the report's data-provenance row.
         calibration_source: calSource,
         calibration_n_ads: calNAds,
+        // Pillar B+: the user's mapped interests, sent so the backend can
+        // store them on creative_scores + label the calibration source.
+        interests: userInterests,
         // Opt-in budget saturation (assumption-based; blank = linear).
         reachable_audience: reachAudience ? Math.round(Number(reachAudience)) : null,
         avg_order_value: aov ? Number(aov) : null,

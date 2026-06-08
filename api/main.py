@@ -211,8 +211,15 @@ class SimulateRequest(BaseModel):
     # result page's data-provenance row so users can see whether the
     # forecast leaned on their AUDIENCE segment, the platform average, or
     # the overall account.
-    calibration_source: Optional[str] = None  # 'segment:<seg>' | 'platform:<plat>' | 'overall' | None
+    # Pillar B+ widens 'segment:<seg>' to 'segment:<seg>:interest:<int>'
+    # when a (segment × interest) cell was matched. The label parser in
+    # _calibration_provenance_value handles both shapes.
+    calibration_source: Optional[str] = None  # 'segment:<seg>[:interest:<int>]' | 'interest:<int>' | 'platform:<plat>' | 'overall' | None
     calibration_n_ads: Optional[int] = None
+    # Pillar B+: the user-chosen interests (after wizard mapping to the
+    # canonical taxonomy). Stored on creative_scores and surfaced in the
+    # report's provenance row. Empty list = no interest signal.
+    interests: List[str] = []
     reachable_audience: Optional[int] = None   # opt-in budget saturation
     # --- Real economics (the honest inputs that replace synthetic AOV) -----
     avg_order_value: Optional[float] = None   # customer value in `currency`
@@ -1458,6 +1465,7 @@ def simulate(req: SimulateRequest) -> dict:
         product_price=req.product_price,
         currency=req.currency,
         geo=req.geo,
+        interests=list(req.interests or []),
     )
     assets = CreativeAssets(
         image_path=req.image_path, video_path=req.video_path,
@@ -1988,28 +1996,71 @@ _PLATFORM_LABEL = {
     "google_search":  "Google Search",
 }
 
+# Pillar B+: pretty labels for the interest taxonomy (mirrors the slugs in
+# outcomes.INTEREST_BUCKETS so they stay in sync).
+_INTEREST_LABEL = {
+    "fitness": "fitness", "fashion": "fashion", "beauty": "beauty",
+    "tech": "tech", "travel": "travel", "food": "food / drink",
+    "home": "home / DIY", "finance": "finance", "automotive": "automotive",
+    "entertainment": "entertainment", "business": "business / B2B",
+    "wellness": "wellness",
+}
+
+
+def _parse_calibration_source(source: str | None) -> dict:
+    """Split a calibration_source string into structured parts.
+
+    Recognises:
+      'segment:gen_z:interest:fitness' -> {kind:'segment_interest', seg, interest}
+      'segment:gen_z'                  -> {kind:'segment', seg}
+      'interest:fitness'               -> {kind:'interest', interest}
+      'platform:meta_facebook'         -> {kind:'platform', plat}
+      'overall'                        -> {kind:'overall'}
+      ''/None                          -> {kind:'none'}
+    """
+    if not source:
+        return {"kind": "none"}
+    if source == "overall":
+        return {"kind": "overall"}
+    if source.startswith("segment:"):
+        rest = source[len("segment:"):]
+        if ":interest:" in rest:
+            seg, interest = rest.split(":interest:", 1)
+            return {"kind": "segment_interest", "seg": seg, "interest": interest}
+        return {"kind": "segment", "seg": rest}
+    if source.startswith("interest:"):
+        return {"kind": "interest", "interest": source[len("interest:"):]}
+    if source.startswith("platform:"):
+        return {"kind": "platform", "plat": source[len("platform:"):]}
+    return {"kind": "raw", "raw": source}
+
 
 def _calibration_provenance_value(source: str | None,
                                   n_ads: int | None,
                                   currency: str) -> str:
     """Headline label for the calibration row.
 
-    Examples: 'your Gen Z audience · 23 ads' / 'Meta/Facebook average · 41 ads'
-    / 'your account average · 64 ads'. None of these are inferred —
-    the value is purely descriptive of what the frontend selected.
+    Examples: 'your Gen Z · fitness audience · 12 ads' / 'your Gen Z audience
+    · 23 ads' / 'Meta/Facebook average · 41 ads' / 'your account average ·
+    64 ads'. Purely descriptive of what the frontend selected.
     """
-    if not source:
+    parts = _parse_calibration_source(source)
+    if parts["kind"] == "none":
         return "synthetic CTR dataset (replaceable)"
     n_str = f" · {n_ads} ads" if n_ads else ""
-    if source.startswith("segment:"):
-        seg = source.split(":", 1)[1]
-        return f"your {_SEGMENT_LABEL.get(seg, seg)} audience{n_str}"
-    if source.startswith("platform:"):
-        plat = source.split(":", 1)[1]
-        return f"{_PLATFORM_LABEL.get(plat, plat)} average{n_str}"
-    if source == "overall":
+    if parts["kind"] == "segment_interest":
+        seg = _SEGMENT_LABEL.get(parts["seg"], parts["seg"])
+        interest = _INTEREST_LABEL.get(parts["interest"], parts["interest"])
+        return f"your {seg} · {interest} audience{n_str}"
+    if parts["kind"] == "segment":
+        return f"your {_SEGMENT_LABEL.get(parts['seg'], parts['seg'])} audience{n_str}"
+    if parts["kind"] == "interest":
+        return f"your {_INTEREST_LABEL.get(parts['interest'], parts['interest'])} ads{n_str}"
+    if parts["kind"] == "platform":
+        return f"{_PLATFORM_LABEL.get(parts['plat'], parts['plat'])} average{n_str}"
+    if parts["kind"] == "overall":
         return f"your account average{n_str}"
-    return source
+    return source or ""
 
 
 def _calibration_provenance_note(source: str | None,
@@ -2018,26 +2069,36 @@ def _calibration_provenance_note(source: str | None,
                                  cpm_override: float | None,
                                  currency: str) -> str:
     """Plain-English explanation of which layer anchored the forecast."""
+    parts = _parse_calibration_source(source)
     ctr_part = f"CTR anchor {target_ctr*100:.2f}%" if target_ctr else "CTR anchor unset"
     cpm_part = f"CPM anchor {currency} {cpm_override:.2f}" if cpm_override else "CPM anchor unset"
     nums = f" · {ctr_part}, {cpm_part}"
-    if not source:
+    if parts["kind"] == "none":
         return "No real-data calibration applied."
-    if source.startswith("segment:"):
-        seg = source.split(":", 1)[1]
-        return (f"The forecast was anchored to YOUR uploaded performance on "
-                f"the '{_SEGMENT_LABEL.get(seg, seg)}' audience — the closest "
-                f"match to the audience you picked.{nums}")
-    if source.startswith("platform:"):
-        plat = source.split(":", 1)[1]
-        return (f"Your uploaded data didn't have enough rows tagged to this "
-                f"specific audience, so the forecast fell back to your "
-                f"{_PLATFORM_LABEL.get(plat, plat)} platform average.{nums}")
-    if source == "overall":
-        return (f"Your uploaded data didn't have enough rows for this audience "
-                f"OR platform, so the forecast fell back to your overall "
-                f"account average. Upload more data segmented by audience to "
-                f"sharpen the calibration.{nums}")
+    if parts["kind"] == "segment_interest":
+        seg = _SEGMENT_LABEL.get(parts["seg"], parts["seg"])
+        interest = _INTEREST_LABEL.get(parts["interest"], parts["interest"])
+        return (f"Tightest match — your uploaded ads for the '{seg}' audience "
+                f"AND '{interest}' interest combined anchored the forecast.{nums}")
+    if parts["kind"] == "segment":
+        seg = _SEGMENT_LABEL.get(parts["seg"], parts["seg"])
+        return (f"Your uploaded data didn't have enough rows for the chosen "
+                f"audience + interest combination, so the forecast fell back "
+                f"to your '{seg}' audience average across all interests.{nums}")
+    if parts["kind"] == "interest":
+        interest = _INTEREST_LABEL.get(parts["interest"], parts["interest"])
+        return (f"Your uploaded data didn't tag audiences, but it did carry "
+                f"interest hints, so the forecast was anchored to your "
+                f"'{interest}' ads.{nums}")
+    if parts["kind"] == "platform":
+        plat = _PLATFORM_LABEL.get(parts["plat"], parts["plat"])
+        return (f"Your uploaded data didn't have enough rows for this "
+                f"audience or interest, so the forecast fell back to your "
+                f"{plat} platform average.{nums}")
+    if parts["kind"] == "overall":
+        return (f"Your uploaded data didn't have enough rows for this "
+                f"audience / interest / platform, so the forecast fell back "
+                f"to your overall account average.{nums}")
     return f"Calibration source: {source}{nums}"
 
 
