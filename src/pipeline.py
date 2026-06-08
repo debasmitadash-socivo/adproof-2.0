@@ -539,6 +539,22 @@ def run_wizard_simulation(profile: CompanyProfile,
             provider_error=perr,
         )
 
+    # Reel Quality Rubric — short-video craft scorecard (hook / sound-off /
+    # pain-benefit / pacing / emotion + actionable suggestions). Video-only,
+    # one extra Gemini call, ~£0.002 per 30s reel. Silently skipped for
+    # images, when ADPROOF_REEL_QUALITY_ENABLED=0, or when Gemini is down.
+    # NOT a virality signal — labelled as paid-ad craft quality in the UI.
+    reel_quality = None
+    if video_path and visual is not None and not visual.is_heuristic:
+        try:
+            from src.reel_quality import score_reel_quality
+        except ImportError:                               # `python src/...`
+            from reel_quality import score_reel_quality
+        try:
+            reel_quality = score_reel_quality(video_path, ad_text_combined)
+        except Exception:                                 # noqa: BLE001
+            reel_quality = None         # never fail the run on the extra pass
+
     # Vision (esp. the video path, which buffers the clip + the genai client)
     # can leave tens of MB resident; release it BEFORE the memory-heavy Monte
     # Carlo so the two peaks don't stack and OOM a small instance.
@@ -675,4 +691,5 @@ def run_wizard_simulation(profile: CompanyProfile,
         "mc": mc, "ad": ad, "visual": visual, "insights": insights,
         "profile": profile, "match": match, "brief": brief,
         "assets": assets, "validation": validation,
+        "reel_quality": reel_quality,
     }

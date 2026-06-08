@@ -1781,6 +1781,8 @@ def simulate(req: SimulateRequest) -> dict:
         "insights": result["insights"],
         "visual": (result["visual"].to_dict()
                    if result["visual"] is not None else None),
+        "reel_quality": (result["reel_quality"].to_dict()
+                         if result.get("reel_quality") is not None else None),
         "figures": figures,
         "validation": result["validation"],
         "headline_md": result["headline_md"],

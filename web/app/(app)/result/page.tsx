@@ -434,6 +434,80 @@ export default function ResultPage() {
           {/* HOW YOU COMPARE — forecast vs benchmark vs your account + live cited */}
           <BenchmarkPanel result={result} />
 
+          {/* REEL QUALITY — short-video creative craft scorecard (video only).
+              Five sub-scores + composite + actionable suggestions. Surfaced
+              as a SEPARATE panel so it cannot be misread as a virality or
+              CTR prediction; the footer makes that explicit. */}
+          {result.reel_quality && !result.reel_quality.is_skipped && (() => {
+            const rq = result.reel_quality!;
+            const dims: { key: keyof typeof rq.scores; label: string }[] = [
+              { key: 'hook_strength', label: 'Hook strength (first 3s)' },
+              { key: 'sound_off_comprehension', label: 'Sound-off comprehension' },
+              { key: 'pain_benefit_clarity', label: 'Pain / benefit clarity' },
+              { key: 'pacing_retention', label: 'Pacing & retention' },
+              { key: 'emotional_resonance', label: 'Emotional resonance' },
+            ];
+            const gradeTone = rq.grade === 'A' ? 'text-success'
+              : rq.grade === 'B' ? 'text-coral'
+              : rq.grade === 'C' ? 'text-warning' : 'text-danger';
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Reel Quality</h2>
+                <p className="text-ink-muted text-[14px] mb-3">
+                  Five-axis craft scorecard for short-video paid ads — hook, muted-feed clarity, pacing, emotion.
+                  This rates the creative, not the auction or the offer.
+                </p>
+                <Card className="!p-0 overflow-hidden border-2 !border-violet/30">
+                  <div className="px-6 py-5 bg-gradient-to-br from-violet-soft to-magenta-soft flex items-center gap-6 flex-wrap">
+                    <div className="flex-1 min-w-[200px]">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.14em]">Composite</div>
+                      <div className="display-italic text-[64px] leading-none mt-1">
+                        {rq.composite.toFixed(0)}<span className="text-[24px] font-sans not-italic align-top opacity-70">/100</span>
+                      </div>
+                      <div className="text-[13px] text-ink-muted mt-1">Hook 30% · Sound-off 20% · Clarity 20% · Pacing 15% · Emotion 15%</div>
+                    </div>
+                    <div className="w-28 h-28 rounded-full bg-white/30 backdrop-blur flex flex-col items-center justify-center border-2 border-white/60">
+                      <div className="text-[10.5px] uppercase tracking-[0.14em] font-bold opacity-80">Grade</div>
+                      <div className={clsx('display-italic text-[60px] leading-[0.85] mt-0.5', gradeTone)}>{rq.grade}</div>
+                    </div>
+                  </div>
+                  <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 bg-surface">
+                    {dims.map((d) => {
+                      const score = rq.scores[d.key];
+                      const explain = rq.explanations?.[d.key] || '';
+                      const tone = score >= 8 ? 'bg-success' : score >= 6 ? 'bg-coral' : score >= 4 ? 'bg-warning' : 'bg-danger';
+                      return (
+                        <div key={d.key}>
+                          <div className="flex items-baseline gap-2 mb-1">
+                            <div className="text-[12.5px] font-semibold text-ink flex-1">{d.label}</div>
+                            <div className="mono text-[14px] font-bold">{score}<span className="text-ink-muted text-[11px]">/10</span></div>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-bg-deep overflow-hidden">
+                            <div className={clsx('h-full', tone)} style={{ width: `${score * 10}%` }} />
+                          </div>
+                          {explain && <div className="text-[11.5px] text-ink-muted mt-1 leading-snug">{explain}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {rq.suggestions && rq.suggestions.length > 0 && (
+                    <div className="px-6 py-4 border-t border-violet/20 bg-violet-soft/40">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-1.5">How to improve</div>
+                      <ul className="space-y-1.5">
+                        {rq.suggestions.map((s, i) => (
+                          <li key={i} className="text-[13px] text-ink flex gap-2"><span className="text-violet">→</span>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-violet/20 bg-bg-deep">
+                    <strong>Honest caveat:</strong> Reel Quality rates the creative under paid-ad constraints (muted feeds, 3-second attention budgets). It is NOT a virality score and NOT a guarantee of CTR — a strong reel can still underperform on a weak offer; a weaker reel can still convert on a strong one. Used here as one input to the per-objective verdict above.
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
+
           {/* PLAIN-ENGLISH VERDICT — sub-line + the three small cards change
               per objective so an awareness brief isn't sold as ROAS-math. */}
           {result.plain_verdict && (() => {

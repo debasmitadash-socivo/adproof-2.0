@@ -423,6 +423,25 @@ export interface SimulateResponse {
     aov_high?: number | null;
     verdict: 'comfortable' | 'marginal' | 'shortfall' | 'unknown';
   };
+  // Reel Quality — short-video craft rubric (only when a video was uploaded
+  // and Gemini was available). NOT a virality score; rates paid-ad craft.
+  reel_quality?: {
+    scores: {
+      hook_strength: number;
+      sound_off_comprehension: number;
+      pain_benefit_clarity: number;
+      pacing_retention: number;
+      emotional_resonance: number;
+    };
+    composite: number;                 // 0-100 weighted composite
+    grade: string;                     // 'A' | 'B' | 'C' | 'D' | '—'
+    explanations: Record<string, string>;
+    suggestions: string[];
+    provider: string;
+    model: string;
+    is_skipped: boolean;
+    skipped_reason: string;
+  } | null;
   // KPI scoreboard — the plain numbers a marketer expects, with p10/p50/p90.
   kpis?: {
     currency: string;
