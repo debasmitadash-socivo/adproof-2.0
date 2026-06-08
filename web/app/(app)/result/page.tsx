@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
@@ -17,14 +17,25 @@ import type {
 } from '@/lib/types';
 
 const VERDICT_GRADIENT: Record<string, string> = {
+  // Conversion-objective verdicts (ROAS-based)
   strong: 'from-success to-ink',
   positive: 'from-coral via-magenta to-violet',
   break_even: 'from-warning to-ink',
   underperforming: 'from-danger to-ink',
   void: 'from-danger to-ink',
+  // Awareness-objective verdicts (CPM-based)
+  wide_reach: 'from-success to-ink',
+  moderate_reach: 'from-coral via-magenta to-violet',
+  narrow_reach: 'from-danger to-ink',
+  // Consideration-objective verdicts (CTR-based)
+  strong_engagement: 'from-success to-ink',
+  fair_engagement: 'from-coral via-magenta to-violet',
+  weak_engagement: 'from-danger to-ink',
 };
 const VERDICT_GRADE: Record<string, string> = {
   strong: 'A', positive: 'B', break_even: 'C', underperforming: 'D', void: '✕',
+  wide_reach: 'A', moderate_reach: 'B', narrow_reach: 'D',
+  strong_engagement: 'A', fair_engagement: 'B', weak_engagement: 'D',
 };
 
 // Plain-English chart cards: a headline + one-sentence explainer always
@@ -256,44 +267,77 @@ export default function ResultPage() {
             </Card>
           )}
 
-          {/* HERO */}
-          <div className={clsx(
-            'relative text-white rounded-md px-9 py-8 mb-5 flex items-center gap-8 overflow-hidden',
-            `bg-gradient-to-br ${verdictGradient}`,
-          )} style={{ boxShadow: '0 16px 40px rgba(16,163,74,0.20)' }}>
-            <div className="absolute inset-0 mesh-overlay" />
-            <div className="absolute -right-20 -top-24 w-80 h-80 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.35), transparent 65%)' }} />
-            <div className="relative z-10 flex-1">
-              <div className="text-[11.5px] font-bold uppercase tracking-[0.14em] opacity-92">
-                {forecastVoid
-                  ? (notRunnable ? "Won't run — policy violation" : 'Forecast void — broken creative')
-                  : `${insights.verdict_class.replace('_', ' ')} forecast`}
-              </div>
-              <div className="display-italic text-[96px] leading-none mt-1.5">
-                {forecastVoid ? (
-                  <span className="opacity-90">N/A <span className="text-[26px] font-sans not-italic align-middle line-through opacity-70">{mc.predicted_roas.p50.toFixed(2)}× ROAS</span></span>
-                ) : (
-                  <>{mc.predicted_roas.p50.toFixed(2)}× <span className="text-[28px] font-sans not-italic align-top opacity-90">ROAS</span></>
-                )}
-              </div>
-              <div className="text-[15px] mt-3 opacity-95 max-w-md">
-                {forecastVoid
-                  ? <>A ROAS forecast only applies to an ad that runs. Fix the issue{viability && viability.blockers.length > 1 ? 's' : ''} flagged above, then re-run for a real number.</>
-                  : <>Median return <strong>{(mc.predicted_roi.p50 * 100).toFixed(0)}%</strong>. p10–p90 band <strong>{mc.predicted_roas.p10.toFixed(2)}× → {mc.predicted_roas.p90.toFixed(2)}×</strong>.</>}
-              </div>
-              {!forecastVoid && insights.benchmark_note && (
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/22 backdrop-blur-md text-[13px] font-semibold mt-3.5">
-                  {insights.benchmark_note}
+          {/* HERO — the big metric switches per campaign objective.
+              Awareness leads on CPM/reach, consideration on CTR/CPC,
+              conversion on ROAS/ROI. Same creative, different headline
+              when the brief asks for a different thing. */}
+          {(() => {
+            const lead = result.kpis?.lead ?? result.plain_verdict?.lead ?? 'roas';
+            const obj = result.kpis?.objective ?? result.plain_verdict?.objective ?? 'conversion';
+            const cur = result.kpis?.currency ?? result.economics?.currency ?? 'GBP';
+            const objLabel = obj === 'awareness' ? 'Awareness'
+              : obj === 'consideration' ? 'Consideration' : 'Conversion';
+
+            // Pick the hero number + sub-line based on which metric leads.
+            let bigNumber: ReactNode;
+            let subLine: ReactNode;
+            if (lead === 'cpm') {
+              const cpmVal = result.kpis?.cpm?.value ?? result.plain_verdict?.cpm_p50 ?? 0;
+              const cpmBench = result.kpis?.cpm?.benchmark ?? 0;
+              const reach = result.kpis?.reach?.value ?? result.plain_verdict?.reach_value ?? mc.total_impressions;
+              const freq = mc.saturation?.est_frequency ?? null;
+              bigNumber = <>{cur} {cpmVal.toFixed(2)} <span className="text-[28px] font-sans not-italic align-top opacity-90">CPM</span></>;
+              subLine = <>Reach <strong>{Math.round(reach).toLocaleString()}</strong> people{freq ? <> at <strong>{freq.toFixed(1)}×</strong> frequency</> : null}{cpmBench ? <>. Format benchmark <strong>{cur} {cpmBench.toFixed(2)}</strong>.</> : null}</>;
+            } else if (lead === 'ctr') {
+              const ctrVal = result.kpis?.ctr?.p50 ?? result.plain_verdict?.ctr_p50 ?? 0;
+              const ctrBench = result.kpis?.ctr?.benchmark ?? 0;
+              const clicksP50 = result.kpis?.link_clicks?.p50 ?? mc.predicted_clicks.p50;
+              const cpcP50 = result.kpis?.cpc?.p50 ?? (mc.budget / Math.max(clicksP50, 1));
+              bigNumber = <>{(ctrVal * 100).toFixed(2)}% <span className="text-[28px] font-sans not-italic align-top opacity-90">CTR</span></>;
+              subLine = <>About <strong>{Math.round(clicksP50).toLocaleString()}</strong> link clicks at <strong>{cur} {cpcP50.toFixed(2)}</strong> per click. Format benchmark CTR <strong>{(ctrBench * 100).toFixed(2)}%</strong>.</>;
+            } else {                                          // 'roas' — conversion
+              bigNumber = <>{mc.predicted_roas.p50.toFixed(2)}× <span className="text-[28px] font-sans not-italic align-top opacity-90">ROAS</span></>;
+              subLine = <>Median return <strong>{(mc.predicted_roi.p50 * 100).toFixed(0)}%</strong>. p10–p90 band <strong>{mc.predicted_roas.p10.toFixed(2)}× → {mc.predicted_roas.p90.toFixed(2)}×</strong>.</>;
+            }
+
+            return (
+              <div className={clsx(
+                'relative text-white rounded-md px-9 py-8 mb-5 flex items-center gap-8 overflow-hidden',
+                `bg-gradient-to-br ${verdictGradient}`,
+              )} style={{ boxShadow: '0 16px 40px rgba(16,163,74,0.20)' }}>
+                <div className="absolute inset-0 mesh-overlay" />
+                <div className="absolute -right-20 -top-24 w-80 h-80 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.35), transparent 65%)' }} />
+                <div className="relative z-10 flex-1">
+                  <div className="text-[11.5px] font-bold uppercase tracking-[0.14em] opacity-92">
+                    {forecastVoid
+                      ? (notRunnable ? "Won't run — policy violation" : 'Forecast void — broken creative')
+                      : <>{objLabel} brief · {insights.verdict_class.replace(/_/g, ' ')}</>}
+                  </div>
+                  <div className="display-italic text-[96px] leading-none mt-1.5">
+                    {forecastVoid ? (
+                      <span className="opacity-90">N/A <span className="text-[26px] font-sans not-italic align-middle line-through opacity-70">{mc.predicted_roas.p50.toFixed(2)}× ROAS</span></span>
+                    ) : bigNumber}
+                  </div>
+                  <div className="text-[15px] mt-3 opacity-95 max-w-md">
+                    {forecastVoid
+                      ? <>A forecast only applies to an ad that runs. Fix the issue{viability && viability.blockers.length > 1 ? 's' : ''} flagged above, then re-run for a real number.</>
+                      : subLine}
+                  </div>
+                  {!forecastVoid && insights.benchmark_note && (
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/22 backdrop-blur-md text-[13px] font-semibold mt-3.5">
+                      {insights.benchmark_note}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <div className="relative z-10">
-              <div className="w-36 h-36 rounded-full bg-white/18 backdrop-blur-md flex flex-col items-center justify-center border-2 border-white/45">
-                <div className="text-[10.5px] uppercase tracking-[0.16em] font-bold opacity-88">Verdict</div>
-                <div className="display-italic text-[78px] leading-[0.85] mt-1">{grade}</div>
+                <div className="relative z-10">
+                  <div className="w-36 h-36 rounded-full bg-white/18 backdrop-blur-md flex flex-col items-center justify-center border-2 border-white/45">
+                    <div className="text-[10.5px] uppercase tracking-[0.16em] font-bold opacity-88">Verdict</div>
+                    <div className="display-italic text-[78px] leading-[0.85] mt-1">{grade}</div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* CONTEXT */}
           <div className="flex flex-wrap gap-2.5 mb-5">
@@ -390,39 +434,70 @@ export default function ResultPage() {
           {/* HOW YOU COMPARE — forecast vs benchmark vs your account + live cited */}
           <BenchmarkPanel result={result} />
 
-          {/* PLAIN-ENGLISH VERDICT */}
-          {result.plain_verdict && (
-          <Card className="!p-0 overflow-hidden border-2 !border-coral/30">
-            <div className="px-6 py-5 bg-gradient-to-br from-coral-soft to-magenta-soft">
-              <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.14em]">Plain English</div>
-              <div className="display-italic text-[26px] mt-1 leading-tight">{result.plain_verdict.headline}</div>
-              <div className="text-ink text-[14px] mt-2">
-                For every <strong className="text-ink">$1 spent</strong>, you'll get back about{' '}
-                <strong className="text-ink">${result.plain_verdict.roas_p50.toFixed(2)}</strong>{' '}
-                — that's {result.plain_verdict.ctr_vs_bench_pct >= 0 ? '+' : ''}
-                <strong className="text-ink">{Math.round(result.plain_verdict.ctr_vs_bench_pct)}%</strong>{' '}
-                {result.plain_verdict.ctr_vs_bench_pct >= 0 ? 'above' : 'below'} the typical {result.format.name} CTR.
-              </div>
-            </div>
-            <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-[13.5px] bg-surface">
-              <div>
-                <div className="text-ink-muted text-[11.5px] uppercase tracking-[0.06em] font-bold">Chance of breaking even</div>
-                <div className="display-italic text-[28px] mt-1 leading-none">{result.plain_verdict.break_even_chance_pct}%</div>
-                <div className="text-[12px] text-ink-muted mt-1">of simulated runs hit ≥ $1 back per $1 spent</div>
-              </div>
-              <div>
-                <div className="text-ink-muted text-[11.5px] uppercase tracking-[0.06em] font-bold">Expected return</div>
-                <div className="display-italic text-[28px] mt-1 leading-none">{result.plain_verdict.roi_p50_pct >= 0 ? '+' : ''}{result.plain_verdict.roi_p50_pct}%</div>
-                <div className="text-[12px] text-ink-muted mt-1">on your ${mc.budget.toLocaleString()} spend</div>
-              </div>
-              <div>
-                <div className="text-ink-muted text-[11.5px] uppercase tracking-[0.06em] font-bold">vs benchmark CTR</div>
-                <div className="display-italic text-[28px] mt-1 leading-none">{result.plain_verdict.ctr_vs_bench_pct >= 0 ? '+' : ''}{result.plain_verdict.ctr_vs_bench_pct}%</div>
-                <div className="text-[12px] text-ink-muted mt-1">{result.format.name} industry mid-range</div>
-              </div>
-            </div>
-          </Card>
-          )}
+          {/* PLAIN-ENGLISH VERDICT — sub-line + the three small cards change
+              per objective so an awareness brief isn't sold as ROAS-math. */}
+          {result.plain_verdict && (() => {
+            const pv = result.plain_verdict;
+            const obj = pv.objective ?? result.kpis?.objective ?? 'conversion';
+            const lead = pv.lead ?? result.kpis?.lead ?? 'roas';
+            const cur = result.kpis?.currency ?? result.economics?.currency ?? 'GBP';
+            const fmtName = result.format.name;
+
+            let subLine: ReactNode;
+            const cards: { label: string; value: string; meaning: string }[] = [];
+
+            if (lead === 'cpm') {
+              const cpm = pv.cpm_p50 ?? 0;
+              const cpmDelta = pv.cpm_vs_bench_pct ?? 0;
+              const reach = pv.reach_value ?? mc.total_impressions;
+              subLine = <>You reach about <strong className="text-ink">{Math.round(reach).toLocaleString()}</strong> people at <strong className="text-ink">{cur} {cpm.toFixed(2)} CPM</strong>{cpmDelta !== 0 ? <> — that's <strong className="text-ink">{cpmDelta <= 0 ? Math.abs(cpmDelta) + '%' : cpmDelta + '%'} {cpmDelta <= 0 ? 'below' : 'above'}</strong> the typical {fmtName} CPM.</> : '.'}</>;
+              cards.push(
+                { label: 'CPM (your forecast)', value: `${cur} ${cpm.toFixed(2)}`, meaning: 'cost per 1,000 impressions' },
+                { label: 'vs benchmark CPM', value: `${cpmDelta >= 0 ? '+' : ''}${Math.round(cpmDelta)}%`, meaning: `${fmtName} format average` },
+                { label: 'Reach', value: Math.round(reach).toLocaleString(), meaning: 'unique people the budget buys' },
+              );
+            } else if (lead === 'ctr') {
+              const ctr = pv.ctr_p50 ?? 0;
+              const ctrDelta = pv.ctr_vs_bench_pct ?? 0;
+              const clicksP50 = result.kpis?.link_clicks?.p50 ?? mc.predicted_clicks.p50;
+              const cpcP50 = result.kpis?.cpc?.p50 ?? (mc.budget / Math.max(clicksP50, 1));
+              subLine = <>The ad earns a <strong className="text-ink">{(ctr * 100).toFixed(2)}% CTR</strong>{ctrDelta !== 0 ? <> — that's <strong className="text-ink">{ctrDelta >= 0 ? '+' : ''}{Math.round(ctrDelta)}%</strong> {ctrDelta >= 0 ? 'above' : 'below'} the typical {fmtName} CTR</> : null}, costing <strong className="text-ink">{cur} {cpcP50.toFixed(2)}</strong> per click.</>;
+              cards.push(
+                { label: 'CTR (your forecast)', value: `${(ctr * 100).toFixed(2)}%`, meaning: `vs ${((result.kpis?.ctr?.benchmark ?? 0) * 100).toFixed(2)}% benchmark` },
+                { label: 'vs benchmark CTR', value: `${ctrDelta >= 0 ? '+' : ''}${Math.round(ctrDelta)}%`, meaning: `${fmtName} format average` },
+                { label: 'Cost per click', value: `${cur} ${cpcP50.toFixed(2)}`, meaning: 'what each click costs' },
+              );
+            } else {                                              // conversion
+              subLine = <>For every <strong className="text-ink">{cur} 1 spent</strong>, you'll get back about <strong className="text-ink">{cur} {pv.roas_p50.toFixed(2)}</strong> — that's {pv.ctr_vs_bench_pct >= 0 ? '+' : ''}<strong className="text-ink">{Math.round(pv.ctr_vs_bench_pct)}%</strong> {pv.ctr_vs_bench_pct >= 0 ? 'above' : 'below'} the typical {fmtName} CTR.</>;
+              cards.push(
+                { label: 'Chance of breaking even', value: `${pv.break_even_chance_pct}%`, meaning: `of simulated runs hit ≥ ${cur} 1 back per ${cur} 1 spent` },
+                { label: 'Expected return', value: `${pv.roi_p50_pct >= 0 ? '+' : ''}${pv.roi_p50_pct}%`, meaning: `on your ${cur} ${mc.budget.toLocaleString()} spend` },
+                { label: 'vs benchmark CTR', value: `${pv.ctr_vs_bench_pct >= 0 ? '+' : ''}${pv.ctr_vs_bench_pct}%`, meaning: `${fmtName} industry mid-range` },
+              );
+            }
+
+            const objLabel = obj === 'awareness' ? 'Awareness brief'
+              : obj === 'consideration' ? 'Consideration brief' : 'Conversion brief';
+
+            return (
+              <Card className="!p-0 overflow-hidden border-2 !border-coral/30">
+                <div className="px-6 py-5 bg-gradient-to-br from-coral-soft to-magenta-soft">
+                  <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.14em]">Plain English · {objLabel}</div>
+                  <div className="display-italic text-[26px] mt-1 leading-tight">{pv.headline}</div>
+                  <div className="text-ink text-[14px] mt-2">{subLine}</div>
+                </div>
+                <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-[13.5px] bg-surface">
+                  {cards.map((c) => (
+                    <div key={c.label}>
+                      <div className="text-ink-muted text-[11.5px] uppercase tracking-[0.06em] font-bold">{c.label}</div>
+                      <div className="display-italic text-[28px] mt-1 leading-none">{c.value}</div>
+                      <div className="text-[12px] text-ink-muted mt-1">{c.meaning}</div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            );
+          })()}
 
           {/* BUDGET SATURATION — only when the user supplied a reachable audience */}
           {mc.saturation && mc.saturation.assumption && (

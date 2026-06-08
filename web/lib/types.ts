@@ -320,7 +320,11 @@ export interface SimulateResponse {
     };
   };
   insights: {
-    verdict_class: 'strong' | 'positive' | 'break_even' | 'underperforming';
+    verdict_class:
+      | 'strong' | 'positive' | 'break_even' | 'underperforming'
+      | 'wide_reach' | 'moderate_reach' | 'narrow_reach'
+      | 'strong_engagement' | 'fair_engagement' | 'weak_engagement'
+      | 'wont_run' | 'broken_creative';
     headline: string;
     one_liner: string;
     benchmark_note: string;
@@ -366,10 +370,16 @@ export interface SimulateResponse {
   // Plain-English additions surfaced by the API for the marketer view.
   plain_verdict: {
     headline: string;
-    class: 'strong' | 'positive' | 'break_even' | 'underperforming';
+    class: string;                       // widened — per-objective verdict words
+    objective?: 'awareness' | 'consideration' | 'conversion';
+    lead?: 'cpm' | 'ctr' | 'roas';
     roas_p50: number;
     roi_p50_pct: number;
+    ctr_p50?: number;
     ctr_vs_bench_pct: number;
+    cpm_p50?: number;
+    cpm_vs_bench_pct?: number;
+    reach_value?: number;
     break_even_chance_pct: number;
   };
   factor_plain: { name: string; share: number; direction: '+' | '-'; label: string }[];
@@ -416,7 +426,11 @@ export interface SimulateResponse {
   // KPI scoreboard — the plain numbers a marketer expects, with p10/p50/p90.
   kpis?: {
     currency: string;
+    objective?: 'awareness' | 'consideration' | 'conversion';
+    lead?: 'cpm' | 'ctr' | 'roas';
     impressions: { value: number };
+    reach?: { value: number };
+    cpm?: { value: number; benchmark: number };
     frequency: { value: number } | null;
     link_clicks: { p10: number; p50: number; p90: number };
     ctr: { p50: number; benchmark: number };
@@ -462,7 +476,11 @@ export interface SavedVariantResult {
   roasP50: number;
   roiP50: number;
   ctrPct: number;
-  verdictClass: 'strong' | 'positive' | 'break_even' | 'underperforming' | 'void';
+  verdictClass:
+    | 'strong' | 'positive' | 'break_even' | 'underperforming'
+    | 'wide_reach' | 'moderate_reach' | 'narrow_reach'
+    | 'strong_engagement' | 'fair_engagement' | 'weak_engagement'
+    | 'wont_run' | 'broken_creative' | 'void';
 }
 
 export interface SavedCampaign {
@@ -478,7 +496,11 @@ export interface SavedCampaign {
   roasP50: number;          // aggregate (mean of variant ROAS)
   roiP50: number;
   ctrPct: number;
-  verdictClass: 'strong' | 'positive' | 'break_even' | 'underperforming' | 'void';
+  verdictClass:
+    | 'strong' | 'positive' | 'break_even' | 'underperforming'
+    | 'wide_reach' | 'moderate_reach' | 'narrow_reach'
+    | 'strong_engagement' | 'fair_engagement' | 'weak_engagement'
+    | 'wont_run' | 'broken_creative' | 'void';
   thumbnailUrl: string | null;
   result: SimulateResponse; // first variant's result (back-compat)
   variants?: SavedVariantResult[];

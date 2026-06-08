@@ -75,6 +75,8 @@ __all__ = [
     "compute_conversion_probability",
     "base_logit_for_channel",
     "DEFAULT_VISUAL_WEIGHTS",
+    "OBJECTIVE_VISUAL_WEIGHTS",
+    "visual_weights_for",
 ]
 
 
@@ -84,12 +86,53 @@ __all__ = [
 
 # Logit weight applied to each 0-1 visual score. Attention and emotion drive
 # the click; clarity and relevance-potential matter but less at the click.
+# DEFAULT_VISUAL_WEIGHTS == the "consideration" objective baseline -- kept as
+# the fallback so callers that don't pass weights stay backwards-compatible.
 DEFAULT_VISUAL_WEIGHTS = {
     "emotional_arousal": 0.35,
     "visual_clarity": 0.25,
     "attention_capture": 0.45,
     "relevance_potential": 0.40,
 }
+
+# Per-objective visual weighting. The same creative scores differently for
+# different campaign objectives because different axes of "good" matter:
+#   awareness    -- get noticed (stop the scroll, feel something).
+#                   attention + emotion dominate, relevance is near-zero
+#                   (you're not asking for the click yet).
+#   consideration -- earn the click (clarity that something is on offer +
+#                    attention to start the journey).
+#   conversion   -- convert intent into purchase (relevance to the buyer's
+#                   problem + clarity of the offer; emotion is noise here).
+# Each dict sums to a similar magnitude so the anchor-to-benchmark step in
+# AdSimulationModel still produces deviations of comparable size across
+# objectives.
+OBJECTIVE_VISUAL_WEIGHTS = {
+    "awareness": {
+        "emotional_arousal": 0.50,
+        "visual_clarity": 0.20,
+        "attention_capture": 0.55,
+        "relevance_potential": 0.10,
+    },
+    "consideration": dict(DEFAULT_VISUAL_WEIGHTS),
+    "conversion": {
+        "emotional_arousal": 0.20,
+        "visual_clarity": 0.45,
+        "attention_capture": 0.30,
+        "relevance_potential": 0.60,
+    },
+}
+
+
+def visual_weights_for(objective: str) -> dict:
+    """Return the visual logit weights for a campaign objective.
+
+    Unknown objectives fall back to the consideration baseline, which equals
+    DEFAULT_VISUAL_WEIGHTS -- so a caller that doesn't know about objectives
+    yet behaves exactly as before this refactor.
+    """
+    return dict(OBJECTIVE_VISUAL_WEIGHTS.get(
+        (objective or "").lower(), DEFAULT_VISUAL_WEIGHTS))
 
 # Conversion (buy | click) base rate -- a typical post-click conversion of
 # ~10% expressed on the logit scale.

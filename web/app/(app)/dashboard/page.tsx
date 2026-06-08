@@ -9,17 +9,41 @@ import { useApp } from '@/lib/store';
 import type { SavedCampaign } from '@/lib/types';
 
 const VERDICT_TONE: Record<SavedCampaign['verdictClass'], 'success' | 'coral' | 'warning' | 'danger'> = {
+  // Conversion
   strong: 'success',
   positive: 'coral',
   break_even: 'warning',
   underperforming: 'danger',
+  // Awareness
+  wide_reach: 'success',
+  moderate_reach: 'coral',
+  narrow_reach: 'danger',
+  // Consideration
+  strong_engagement: 'success',
+  fair_engagement: 'coral',
+  weak_engagement: 'danger',
+  // Gates
+  wont_run: 'danger',
+  broken_creative: 'danger',
   void: 'danger',
 };
 const VERDICT_LABEL: Record<SavedCampaign['verdictClass'], string> = {
+  // Conversion
   strong: 'Strong',
   positive: 'Positive',
   break_even: 'Break-even',
   underperforming: 'Underperforming',
+  // Awareness
+  wide_reach: 'Wide reach',
+  moderate_reach: 'Moderate reach',
+  narrow_reach: 'Narrow reach',
+  // Consideration
+  strong_engagement: 'Strong engagement',
+  fair_engagement: 'Fair engagement',
+  weak_engagement: 'Weak engagement',
+  // Gates
+  wont_run: "Won't run",
+  broken_creative: 'Broken creative',
   void: "Won't run",
 };
 

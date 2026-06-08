@@ -17,7 +17,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 try:
-    from src.agent import AdStimulus
+    from src.agent import AdStimulus, visual_weights_for
     from src.audience_match import AudienceMatch, match_audience
     from src.brief import CampaignBrief, CreativeAssets, validate_creative
     from src.calibration import load_calibration, run_calibration
@@ -33,7 +33,7 @@ try:
     from src.simulation import monte_carlo, sensitivity_sweep
     from src.visual_analysis import analyze_ad, available_providers  # noqa
 except ImportError:                                # `python src/pipeline.py`
-    from agent import AdStimulus
+    from agent import AdStimulus, visual_weights_for
     from audience_match import AudienceMatch, match_audience
     from brief import CampaignBrief, CreativeAssets, validate_creative
     from calibration import load_calibration, run_calibration
@@ -567,6 +567,11 @@ def run_wizard_simulation(profile: CompanyProfile,
     aov_override = brief.avg_order_value
     aov_mult = 1.0 if aov_override else _aov_multiplier_for_profile(profile)
 
+    # Objective-aware creative weighting: an awareness ad rewards different
+    # axes than a conversion ad, so the same visual scores feed the click
+    # logit through different weights depending on brief.objective.
+    obj_visual_weights = visual_weights_for(brief.objective)
+
     _step(0.45,
           f"Running Monte Carlo: {brief.n_runs} runs x {brief.days} days...")
     mc = monte_carlo(
@@ -580,6 +585,7 @@ def run_wizard_simulation(profile: CompanyProfile,
         reachable_audience=brief.reachable_audience,
         aov_multiplier=aov_mult,
         aov_override=aov_override,
+        visual_weights=obj_visual_weights,
     )
 
     _step(0.78, "Running sensitivity sweeps (budget + reach)...")
@@ -595,7 +601,8 @@ def run_wizard_simulation(profile: CompanyProfile,
                      "cpm_override": brief.effective_cpm,
                      "reachable_audience": brief.reachable_audience,
                      "aov_multiplier": aov_mult,
-                     "aov_override": aov_override},
+                     "aov_override": aov_override,
+                     "visual_weights": obj_visual_weights},
         n_runs=small_runs,
     )
     reach_sweep = sensitivity_sweep(
@@ -608,7 +615,8 @@ def run_wizard_simulation(profile: CompanyProfile,
                      "cpm_override": brief.effective_cpm,
                      "reachable_audience": brief.reachable_audience,
                      "aov_multiplier": aov_mult,
-                     "aov_override": aov_override},
+                     "aov_override": aov_override,
+                     "visual_weights": obj_visual_weights},
         n_runs=small_runs,
     )
 

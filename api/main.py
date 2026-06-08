@@ -1380,50 +1380,105 @@ def simulate(req: SimulateRequest) -> dict:
             if r * _be_imps * _conv_per_click * _aov_be >= _budget_be)
         / max(len(_ctrs), 1) * 100, 0)
 
-    # Verdict CLASS is about magnitude of return (ROAS p50); the risk wording is
-    # about the ODDS (break_even_probability) — kept separate so they agree.
-    if roas >= 4.0:
-        plain = "Likely to be a strong winner."
-        verdict_word = "strong"
-    elif roas >= 2.0:
-        plain = "Likely profitable — should pay back well."
-        verdict_word = "positive"
-    elif roas >= 1.0:
-        plain = "Around break-even on the median forecast."
-        verdict_word = "break_even"
-    else:
-        plain = "Likely to lose money — don't ship as is."
-        verdict_word = "underperforming"
-
-    # Risk clause derived from the SAME probability shown on the card.
-    if verdict_word != "underperforming":
-        if break_even_probability >= 85:
-            plain += f" Very likely to at least break even ({break_even_probability:.0f}% of simulations did)."
-        elif break_even_probability >= 50:
-            plain += f" Not a sure thing — only {break_even_probability:.0f}% of simulations cleared break-even."
-        else:
-            plain += f" Risky — just {break_even_probability:.0f}% of simulations cleared break-even."
-
-    # ---- Believability guardrails (so a fantasy number can't read Grade A) --
+    # Objective-aware verdict. Each campaign objective is graded on the
+    # metric that actually matters to it — an awareness campaign judged on
+    # ROAS would be marked "underperforming" even when it's doing its job.
+    #   awareness    -> CPM / reach (ROAS is irrelevant; nobody's buying yet)
+    #   consideration -> CTR / CPC (engagement is the unit of success)
+    #   conversion   -> ROAS (existing logic, the only objective with revenue)
+    objective = (brief.objective or "conversion").lower()
     _mean_aov = mc_dict.get("mean_aov", 0) or 0
     _conv = (brief.target_conversion_rate or 0.025)
     _cur = brief.currency or "GBP"
-    if roas > 12.0:
-        # An implausibly high ROAS is almost always an overstated input, not a
-        # real forecast. Refuse to celebrate it; point at the likely culprits.
-        verdict_word = "underperforming" if verdict_word == "underperforming" else "break_even"
-        plain = (f"A {roas:.0f}× ROAS is implausibly high — real campaigns are "
-                 f"usually 1–8×. This almost always means an input is overstated: "
-                 f"check your conversion rate ({_conv*100:.1f}%) and order value "
-                 f"({_cur} {_mean_aov:,.0f}). Treat the number as a red flag, not "
-                 f"a result.")
-    elif sample_ctr < fmt_bench_ctr * 0.90 and verdict_word in ("strong", "positive"):
-        # A below-benchmark click-through is not a strong creative — any decent
-        # return is coming from economics, not the ad itself.
-        verdict_word = "break_even"
-        plain = ("The ad's click-through is below the format benchmark, so this "
-                 "isn't a strong creative — any decent return is coming from your "
-                 "economics, not the ad. Strengthen the creative before scaling.")
+
+    # CPM in real money: budget per thousand impressions. The format benchmark
+    # CPM is used as the comparison anchor for the awareness verdict.
+    _bench_cpm = brief.format.benchmarks.get("cpm", 8.0) or 8.0
+    _raw_imps_for_cpm = max(mc_dict.get("total_impressions", 0), 1)
+    _cpm_value = (brief.budget / _raw_imps_for_cpm) * 1000
+
+    if objective == "awareness":
+        if _cpm_value <= _bench_cpm * 0.75:
+            verdict_word = "wide_reach"
+            plain = (f"Wide reach — {_cur} {_cpm_value:.2f} CPM beats the "
+                     f"{_cur} {_bench_cpm:.2f} format benchmark by "
+                     f"{(1 - _cpm_value/_bench_cpm)*100:.0f}%. Strong "
+                     f"awareness-campaign economics.")
+        elif _cpm_value <= _bench_cpm * 1.10:
+            verdict_word = "moderate_reach"
+            plain = (f"Reach is in line with benchmark — {_cur} {_cpm_value:.2f} "
+                     f"CPM vs the {_cur} {_bench_cpm:.2f} format average. The "
+                     f"creative is doing its job for an awareness brief.")
+        else:
+            verdict_word = "narrow_reach"
+            plain = (f"Reach is expensive — {_cur} {_cpm_value:.2f} CPM is "
+                     f"{(_cpm_value/_bench_cpm - 1)*100:.0f}% above the "
+                     f"{_cur} {_bench_cpm:.2f} format benchmark. Strengthen the "
+                     f"hook / attention before scaling spend.")
+    elif objective == "consideration":
+        if sample_ctr >= fmt_bench_ctr * 1.25:
+            verdict_word = "strong_engagement"
+            plain = (f"Strong engagement — {sample_ctr*100:.2f}% CTR is "
+                     f"{(sample_ctr/fmt_bench_ctr - 1)*100:.0f}% above the "
+                     f"{fmt_bench_ctr*100:.2f}% format benchmark. The creative "
+                     f"earns the click.")
+        elif sample_ctr >= fmt_bench_ctr * 0.90:
+            verdict_word = "fair_engagement"
+            plain = (f"Engagement in line with benchmark — {sample_ctr*100:.2f}% "
+                     f"CTR vs the {fmt_bench_ctr*100:.2f}% format average. Fine "
+                     f"for a consideration brief; not a runaway winner.")
+        else:
+            verdict_word = "weak_engagement"
+            plain = (f"Engagement below benchmark — {sample_ctr*100:.2f}% CTR "
+                     f"vs {fmt_bench_ctr*100:.2f}% format average "
+                     f"({(1 - sample_ctr/fmt_bench_ctr)*100:.0f}% short). The "
+                     f"ad isn't earning the click — improve the hook or "
+                     f"relevance.")
+    else:                                            # "conversion" (or unknown)
+        # Verdict CLASS is about magnitude of return (ROAS p50); the risk
+        # wording is about the ODDS (break_even_probability) — kept separate
+        # so they agree.
+        if roas >= 4.0:
+            plain = "Likely to be a strong winner."
+            verdict_word = "strong"
+        elif roas >= 2.0:
+            plain = "Likely profitable — should pay back well."
+            verdict_word = "positive"
+        elif roas >= 1.0:
+            plain = "Around break-even on the median forecast."
+            verdict_word = "break_even"
+        else:
+            plain = "Likely to lose money — don't ship as is."
+            verdict_word = "underperforming"
+
+        # Risk clause derived from the SAME probability shown on the card.
+        if verdict_word != "underperforming":
+            if break_even_probability >= 85:
+                plain += f" Very likely to at least break even ({break_even_probability:.0f}% of simulations did)."
+            elif break_even_probability >= 50:
+                plain += f" Not a sure thing — only {break_even_probability:.0f}% of simulations cleared break-even."
+            else:
+                plain += f" Risky — just {break_even_probability:.0f}% of simulations cleared break-even."
+
+        # ---- Believability guardrails (conversion objective only — the
+        # ROAS guardrails don't apply to awareness/consideration) ----
+        if roas > 12.0:
+            # An implausibly high ROAS is almost always an overstated input,
+            # not a real forecast. Refuse to celebrate it; point at the
+            # likely culprits.
+            verdict_word = "underperforming" if verdict_word == "underperforming" else "break_even"
+            plain = (f"A {roas:.0f}× ROAS is implausibly high — real campaigns are "
+                     f"usually 1–8×. This almost always means an input is overstated: "
+                     f"check your conversion rate ({_conv*100:.1f}%) and order value "
+                     f"({_cur} {_mean_aov:,.0f}). Treat the number as a red flag, not "
+                     f"a result.")
+        elif sample_ctr < fmt_bench_ctr * 0.90 and verdict_word in ("strong", "positive"):
+            # A below-benchmark click-through is not a strong creative — any
+            # decent return is coming from economics, not the ad itself.
+            verdict_word = "break_even"
+            plain = ("The ad's click-through is below the format benchmark, so this "
+                     "isn't a strong creative — any decent return is coming from your "
+                     "economics, not the ad. Strengthen the creative before scaling.")
 
     # ----------------------------------------------------------------------
     # VIABILITY GATE — the forecast assumes the ad actually RUNS. If the
@@ -1582,9 +1637,27 @@ def simulate(req: SimulateRequest) -> dict:
     def _div(n, d):
         return (n / d) if d else 0.0
 
+    # CPM and Reach — needed for the awareness hero card. Reach is unique
+    # people; with frequency it's impressions/frequency, else impressions
+    # (which is already a unique-person cap once saturation kicks in).
+    _cpm_kpi = round((_bud / _raw_imps) * 1000, 2) if _raw_imps else 0
+    _reach_kpi = round(_raw_imps / _sat_freq) if _sat_freq else _raw_imps
+
+    # The hero metric for the result page — different per objective so an
+    # awareness campaign isn't graded on ROAS.
+    _lead = {
+        "awareness": "cpm",
+        "consideration": "ctr",
+        "conversion": "roas",
+    }.get(objective, "roas")
+
     kpis = {
         "currency": req.currency,
+        "objective": objective,
+        "lead": _lead,
         "impressions": {"value": _raw_imps},
+        "reach": {"value": _reach_kpi},
+        "cpm": {"value": _cpm_kpi, "benchmark": round(_bench_cpm, 2)},
         "frequency": ({"value": round(_sat_freq, 1)} if _sat_freq else None),
         "link_clicks": {"p10": round(_clk.get("p10", 0)), "p50": round(_clk.get("p50", 0)),
                         "p90": round(_clk.get("p90", 0))},
@@ -1717,9 +1790,17 @@ def simulate(req: SimulateRequest) -> dict:
         "plain_verdict": {
             "headline": plain,
             "class": verdict_word,
+            # Objective drives which hero card the report renders — the same
+            # campaign read on different objectives now shows the right metric.
+            "objective": objective,
+            "lead": _lead,
             "roas_p50": round(roas, 2),
             "roi_p50_pct": round(mc_dict["predicted_roi"]["p50"] * 100, 0),
+            "ctr_p50": round(sample_ctr, 5),
             "ctr_vs_bench_pct": round((sample_ctr - fmt_bench_ctr) / max(fmt_bench_ctr, 1e-6) * 100, 0),
+            "cpm_p50": _cpm_kpi,
+            "cpm_vs_bench_pct": round((_cpm_value - _bench_cpm) / max(_bench_cpm, 1e-6) * 100, 0),
+            "reach_value": _reach_kpi,
             # Single source of truth — same value the headline's risk wording uses.
             "break_even_chance_pct": break_even_probability,
         },
