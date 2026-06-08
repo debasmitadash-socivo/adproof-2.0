@@ -161,7 +161,82 @@ export async function saveCampaign(c: SavedCampaign): Promise<string | null> {
   await sb.from('campaign_variants').delete().eq('campaign_id', c.id);
   const rows = variantRows(c, user_id).map((r) => ({ ...r, campaign_id: c.id }));
   await sb.from('campaign_variants').insert(rows);
+
+  // Pillar C: stamp one creative_scores row per variant for the future
+  // per-account creative->CTR model. Best-effort — never block the
+  // campaign save on this.
+  try {
+    await persistCreativeScores(c, user_id);
+  } catch (e) {
+    console.error('[db] persistCreativeScores', e);
+  }
+
   return c.id;
+}
+
+// ============================== Pillar C: creative_scores ==================
+// Banks every forecast's creative + scores + headline for the future
+// per-account learned model. Joined later against ad_outcomes by
+// (user_id, creative_url) to fit predicted-vs-actual per account.
+
+async function persistCreativeScores(
+  c: SavedCampaign, user_id: string,
+): Promise<void> {
+  const sb = getSupabase(); if (!sb) return;
+  const vs: SavedVariantResult[] = c.variants && c.variants.length
+    ? c.variants
+    : [{
+        label: 'A', headline: c.name, thumbnailUrl: c.thumbnailUrl,
+        result: c.result, roasP50: c.roasP50, roiP50: c.roiP50,
+        ctrPct: c.ctrPct, verdictClass: c.verdictClass,
+      }];
+  // Defensive: skip if all variants have no result (a draft).
+  const usable = vs.filter((v) => !!v.result);
+  if (!usable.length) return;
+
+  const rows = usable.map((v, i) => {
+    const r = v.result!;
+    const req = c.originalRequests?.[i];
+    // 7-key VisualAnalysisResult-ish shape stays in vision_scores. We add
+    // ban_risk + brand_relevance + image_copy_coherence alongside the four
+    // numeric scores so the row is self-describing.
+    const vis = r.visual ? {
+      ...r.visual.scores,
+      ban_risk: r.visual.ban_risk ?? null,
+      brand_relevance: r.visual.brand_relevance ?? null,
+      image_copy_coherence: r.visual.image_copy_coherence ?? null,
+    } : null;
+    const creativeUrl = v.thumbnailUrl
+      ?? req?.image_path
+      ?? req?.video_path
+      ?? null;
+    const creativeKind = req?.video_path ? 'video'
+      : req?.image_path ? 'image' : null;
+    return {
+      user_id,
+      company_id: c.companyId ?? null,
+      campaign_id: c.id,
+      creative_url: creativeUrl,
+      thumbnail_url: v.thumbnailUrl ?? null,
+      creative_kind: creativeKind,
+      ad_name: v.label,
+      objective: req?.objective ?? null,
+      platform_id: req?.platform_id ?? null,
+      format_id: req?.format_id ?? null,
+      audience_segment: req?.audience_segment ?? null,
+      vision_scores: vis as unknown,
+      reel_quality: (r.reel_quality ?? null) as unknown,
+      forecast_ctr_p50: r.kpis?.ctr?.p50 ?? null,
+      forecast_roas_p50: v.roasP50 ?? null,
+      forecast_cpm_p50: r.kpis?.cpm?.value ?? null,
+      verdict_class: v.verdictClass,
+      visual_provider: r.visual?.provider ?? 'none',
+      visual_model: r.visual?.model ?? '',
+      is_heuristic: r.visual?.is_heuristic ?? false,
+    };
+  });
+  const { error } = await sb.from('creative_scores').insert(rows);
+  if (error) console.error('[db] creative_scores insert', error.message);
 }
 
 export async function listCampaigns(companyId?: string): Promise<SavedCampaign[]> {
