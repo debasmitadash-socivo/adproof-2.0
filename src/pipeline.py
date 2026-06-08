@@ -457,7 +457,40 @@ def run_wizard_simulation(profile: CompanyProfile,
         raise ValueError("; ".join(v["message"] for v in blocking))
 
     ad_text_combined = _best_ad_text(assets)
-    creative_kind, creative_path = _resolve_creative_for_visual(assets)
+    creative_kind, creative_source = _resolve_creative_for_visual(assets)
+
+    # Tier 2: when the wizard uploaded straight to Supabase Storage,
+    # creative_source is a signed URL — not a local path. Download it
+    # ONCE per run into a per-request temp file the rest of the pipeline
+    # (PIL specs check + vision providers) can read like any local file.
+    # The RemoteFile context manager guarantees the temp file is deleted
+    # even if a later step raises, so the worker never accumulates state.
+    try:
+        from src.storage import RemoteFile
+    except ImportError:                                   # `python src/...`
+        from storage import RemoteFile
+
+    with RemoteFile(creative_source) as creative_path:
+        return _run_simulation_inner(
+            profile=profile, match=match, brief=brief, assets=assets,
+            fmt=fmt, ad_text_combined=ad_text_combined,
+            creative_kind=creative_kind, creative_path=creative_path,
+            validation=validation, _step=_step,
+            visual_provider=visual_provider, personas=personas,
+            calibration=calibration,
+        )
+
+
+def _run_simulation_inner(*, profile, match, brief, assets, fmt,
+                           ad_text_combined, creative_kind, creative_path,
+                           validation, _step, visual_provider,
+                           personas, calibration):
+    """The bulk of run_wizard_simulation, factored so the parent function
+    can wrap it in a RemoteFile context (Tier 2). Same return shape.
+
+    ``creative_path`` here is ALWAYS a local Path (or None) — the URL
+    download already happened upstream.
+    """
     image_path = creative_path if creative_kind == "image" else None
     video_path = creative_path if creative_kind == "video" else None
 

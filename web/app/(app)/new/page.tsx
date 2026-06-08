@@ -10,6 +10,7 @@ import { HelpHint } from '@/components/ui/HelpHint';
 import { useApp } from '@/lib/store';
 import { api } from '@/lib/api';
 import { getLatestCalibration } from '@/lib/db';
+import { uploadCreativeToSupabase } from '@/lib/storage';
 import type { BenchmarkRefreshResponse, Platform, SavedCampaign, SavedVariantResult } from '@/lib/types';
 
 // Map a wizard platform id to the calibration bucket produced by the ingest.
@@ -211,7 +212,10 @@ export default function NewAnalysisPage() {
     setUploading(true);
     setError(null);
     try {
-      const r = await api.upload(file);
+      // Tier 2: upload direct to Supabase Storage so files survive Railway
+      // redeploys. Returns the same shape as the legacy /api/upload so the
+      // rest of this handler is unchanged.
+      const r = await uploadCreativeToSupabase(file);
       const isVideo = r.kind === 'video';
       // Route to the active variant. Variant A lives in the base store fields;
       // B/C/D live in extraVariants[idx-1].
