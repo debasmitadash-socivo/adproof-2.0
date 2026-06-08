@@ -215,19 +215,46 @@ export default function NewAnalysisPage() {
         }
       }
 
-      // Per-account calibration (Path B): if the user has uploaded their ad
-      // history, use THEIR real CTR / CPM for this platform instead of the
-      // generic format benchmark — so the forecast reflects their account.
+      // Per-account calibration (Path B + Pillar B): if the user has uploaded
+      // their ad history, use THEIR real CTR / CPM for THIS audience first
+      // (segment-keyed), then THIS platform, then overall. The chosen layer
+      // is recorded on the request so the report can label it honestly
+      // ("calibrated to your gen_z audience, 23 ads").
       let calCtr: number | null = null;
       let calCpm: number | null = null;
       let calCvr: number | null = null;
+      let calSource: string | null = null;       // 'segment:gen_z' | 'platform:meta_facebook' | 'overall' | null
+      let calNAds: number | null = null;
       try {
         const cal = await getLatestCalibration(w.currentCompanyId ?? undefined);
-        const pc = cal?.by_platform?.[calibrationPlatformKey(w.platformId)];
-        if (pc && pc.real_ctr) {
-          calCtr = pc.real_ctr;
-          calCpm = pc.real_cpm;
-          calCvr = pc.real_cvr;
+        if (cal) {
+          // 1) Try segment-keyed first — matches the wizard's chosen audience.
+          const seg = audienceMethod === 'saved' ? w.audienceSegment : null;
+          const sc = (seg && cal.by_segment) ? cal.by_segment[seg] : null;
+          if (sc && sc.real_ctr) {
+            calCtr = sc.real_ctr;
+            calCpm = sc.real_cpm;
+            calCvr = sc.real_cvr;
+            calSource = `segment:${seg}`;
+            calNAds = sc.n_ads;
+          } else {
+            // 2) Fall back to per-platform.
+            const pc = cal.by_platform?.[calibrationPlatformKey(w.platformId)];
+            if (pc && pc.real_ctr) {
+              calCtr = pc.real_ctr;
+              calCpm = pc.real_cpm;
+              calCvr = pc.real_cvr;
+              calSource = `platform:${calibrationPlatformKey(w.platformId)}`;
+              calNAds = pc.n_ads;
+            } else if (cal.overall?.real_ctr) {
+              // 3) Last resort: overall account average.
+              calCtr = cal.overall.real_ctr ?? null;
+              calCpm = cal.overall.real_cpm ?? null;
+              calCvr = cal.overall.real_cvr ?? null;
+              calSource = 'overall';
+              calNAds = cal.overall.n_ads ?? null;
+            }
+          }
         }
       } catch { /* calibration is best-effort — never block a run */ }
 
@@ -253,6 +280,10 @@ export default function NewAnalysisPage() {
         // Calibrated click + cost benchmarks (null = fall back to generic).
         target_ctr: calCtr,
         cpm_override: calCpm,
+        // Pillar B: which calibration layer fed the anchor + how many ads
+        // it was built from — surfaced in the report's data-provenance row.
+        calibration_source: calSource,
+        calibration_n_ads: calNAds,
         // Opt-in budget saturation (assumption-based; blank = linear).
         reachable_audience: reachAudience ? Math.round(Number(reachAudience)) : null,
         avg_order_value: aov ? Number(aov) : null,

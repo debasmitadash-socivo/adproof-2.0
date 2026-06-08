@@ -206,6 +206,13 @@ class SimulateRequest(BaseModel):
     # from their ad history, override the generic format benchmarks. ---------
     target_ctr: Optional[float] = None
     cpm_override: Optional[float] = None
+    # Pillar B: provenance for the anchor — which calibration layer the
+    # frontend picked + how many ads it was built from. Surfaced in the
+    # result page's data-provenance row so users can see whether the
+    # forecast leaned on their AUDIENCE segment, the platform average, or
+    # the overall account.
+    calibration_source: Optional[str] = None  # 'segment:<seg>' | 'platform:<plat>' | 'overall' | None
+    calibration_n_ads: Optional[int] = None
     reachable_audience: Optional[int] = None   # opt-in budget saturation
     # --- Real economics (the honest inputs that replace synthetic AOV) -----
     avg_order_value: Optional[float] = None   # customer value in `currency`
@@ -1738,9 +1745,19 @@ def simulate(req: SimulateRequest) -> dict:
          "note": ("Revenue = conversions × this value. Because you supplied your real order value, the break-even math below is grounded in YOUR economics, not a synthetic guess."
                   if aov_is_real
                   else "No order value supplied — we estimated from your category, which is a weak guess. Enter your real average order value for accurate break-even math.")},
-        {"label": "Calibration",
-         "value": "synthetic CTR dataset (replaceable)",
-         "note": "Psychology-rule weights fitted on a generated dataset, not your past performance. Upload your Meta/Google/LinkedIn CSV exports (coming) to recalibrate against YOUR campaigns."},
+        # Pillar B: when the frontend picked a calibration layer, that layer
+        # — segment / platform / overall — replaces the generic "synthetic"
+        # row so the user can see exactly what anchored their forecast.
+        ({"label": "Calibration",
+          "value": _calibration_provenance_value(
+              req.calibration_source, req.calibration_n_ads, req.currency),
+          "note": _calibration_provenance_note(
+              req.calibration_source, req.calibration_n_ads, req.target_ctr,
+              req.cpm_override, req.currency)}
+         if req.calibration_source else
+         {"label": "Calibration",
+          "value": "synthetic CTR dataset (replaceable)",
+          "note": "Psychology-rule weights fitted on a generated dataset, not your past performance. Upload your Meta/Google/LinkedIn CSV exports on the Data page to recalibrate against YOUR campaigns."}),
     ]
 
     # Confidence rating: stricter when key inputs are heuristic.
@@ -1817,6 +1834,84 @@ def simulate(req: SimulateRequest) -> dict:
             "heuristic_count": heuristic_count,
         },
     }
+
+
+# --------------------------------------------------------------------------
+# Pillar B: calibration-provenance helpers (used by the data_sources block)
+# --------------------------------------------------------------------------
+
+_SEGMENT_LABEL = {
+    "all":                 "all audiences",
+    "gen_z":               "Gen Z",
+    "millennials":         "Millennials",
+    "gen_x":               "Gen X",
+    "boomers":             "Boomers",
+    "high_income":         "high-income",
+    "budget_conscious":    "budget-conscious",
+    "early_adopters":      "early adopters",
+    "socially_influenced": "socially-influenced",
+}
+
+_PLATFORM_LABEL = {
+    "meta_facebook":  "Meta / Facebook",
+    "meta_instagram": "Meta / Instagram",
+    "linkedin":       "LinkedIn",
+    "tiktok":         "TikTok",
+    "youtube":        "YouTube",
+    "google_search":  "Google Search",
+}
+
+
+def _calibration_provenance_value(source: str | None,
+                                  n_ads: int | None,
+                                  currency: str) -> str:
+    """Headline label for the calibration row.
+
+    Examples: 'your Gen Z audience · 23 ads' / 'Meta/Facebook average · 41 ads'
+    / 'your account average · 64 ads'. None of these are inferred —
+    the value is purely descriptive of what the frontend selected.
+    """
+    if not source:
+        return "synthetic CTR dataset (replaceable)"
+    n_str = f" · {n_ads} ads" if n_ads else ""
+    if source.startswith("segment:"):
+        seg = source.split(":", 1)[1]
+        return f"your {_SEGMENT_LABEL.get(seg, seg)} audience{n_str}"
+    if source.startswith("platform:"):
+        plat = source.split(":", 1)[1]
+        return f"{_PLATFORM_LABEL.get(plat, plat)} average{n_str}"
+    if source == "overall":
+        return f"your account average{n_str}"
+    return source
+
+
+def _calibration_provenance_note(source: str | None,
+                                 n_ads: int | None,
+                                 target_ctr: float | None,
+                                 cpm_override: float | None,
+                                 currency: str) -> str:
+    """Plain-English explanation of which layer anchored the forecast."""
+    ctr_part = f"CTR anchor {target_ctr*100:.2f}%" if target_ctr else "CTR anchor unset"
+    cpm_part = f"CPM anchor {currency} {cpm_override:.2f}" if cpm_override else "CPM anchor unset"
+    nums = f" · {ctr_part}, {cpm_part}"
+    if not source:
+        return "No real-data calibration applied."
+    if source.startswith("segment:"):
+        seg = source.split(":", 1)[1]
+        return (f"The forecast was anchored to YOUR uploaded performance on "
+                f"the '{_SEGMENT_LABEL.get(seg, seg)}' audience — the closest "
+                f"match to the audience you picked.{nums}")
+    if source.startswith("platform:"):
+        plat = source.split(":", 1)[1]
+        return (f"Your uploaded data didn't have enough rows tagged to this "
+                f"specific audience, so the forecast fell back to your "
+                f"{_PLATFORM_LABEL.get(plat, plat)} platform average.{nums}")
+    if source == "overall":
+        return (f"Your uploaded data didn't have enough rows for this audience "
+                f"OR platform, so the forecast fell back to your overall "
+                f"account average. Upload more data segmented by audience to "
+                f"sharpen the calibration.{nums}")
+    return f"Calibration source: {source}{nums}"
 
 
 def _pretty_factor_label(key: str, value: float) -> str:

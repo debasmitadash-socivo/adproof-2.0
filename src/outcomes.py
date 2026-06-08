@@ -60,6 +60,14 @@ CANONICAL_FIELDS: dict[str, list[str]] = {
     "objective":     ["objective"],
     "ad_copy":       ["body", "primary text", "ad copy", "title", "headline"],
     "test_group":    ["test group", "test_group", "experiment"],
+    # Audience targeting hint — used by Pillar B segment-keyed calibration.
+    # Meta/LinkedIn exports vary: sometimes a literal audience name, sometimes
+    # tucked into ad_set_name. We capture any of them; _segment_key() unions
+    # everything we know about the row and pattern-matches.
+    "audience":      ["audience", "audience name", "saved audience"],
+    "ad_set_name":   ["ad set name", "ad set", "adset name", "adset",
+                      "ad group", "ad group name"],
+    "targeting":     ["targeting", "audience targeting", "demographics"],
 }
 
 # Header synonyms we scan for when locating the header row under title rows.
@@ -280,6 +288,60 @@ def _platform_key(row: pd.Series) -> str:
     return "meta_facebook"   # Meta exports default here when placement is "All"
 
 
+# Pillar B: map an uploaded ad row to one of the simulator's 9
+# AUDIENCE_SEGMENTS (see src/personas.py). The output of calibrate() can then
+# expose by_segment alongside by_platform, so when the wizard's chosen
+# audience matches a segment with enough real ads, that segment's CTR/CPM
+# anchors the forecast — not just the platform average.
+#
+# Heuristic by design: real exports don't carry the simulator's segment
+# vocabulary, so we substring-match on what the user typed (audience name,
+# ad set name, campaign, placement, targeting). When nothing matches we
+# return "unknown" — better to be honestly unsegmented than to fake it.
+_SEGMENT_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    # Generational — age-band shorthand or explicit labels.
+    ("gen_z",         ("gen z", "gen-z", "genz", "18-24", "18 to 24",
+                        "tiktok native", "young adult", "students",
+                        "uni students", "college")),
+    ("millennials",   ("millennial", "millennials", "25-34", "25-40",
+                        "25 to 34", "25 to 40", "young profession")),
+    ("gen_x",         ("gen x", "gen-x", "genx", "35-54", "41-55",
+                        "middle aged", "parents")),
+    ("boomers",       ("boomer", "boomers", "55+", "56+", "65+",
+                        "seniors", "retirees", "older adults")),
+    # Wallet / lifestyle.
+    ("high_income",   ("high income", "affluent", "luxury", "premium",
+                        "wealth", "executives", "c-suite", "c suite",
+                        "decision makers", "decision-makers", "vip")),
+    ("budget_conscious", ("budget", "discount", "value", "deal seekers",
+                          "deal-seekers", "thrifty", "savings", "save",
+                          "bargain", "low income")),
+    # Adopter / influence.
+    ("early_adopters", ("early adopter", "innovators", "tech enthusiast",
+                         "beta", "tech savvy", "tech-savvy", "geeks")),
+    ("socially_influenced", ("social", "influencer", "community", "trend",
+                              "trendy", "trendsetter", "fomo", "viral")),
+)
+
+
+def _segment_key(row: pd.Series) -> str:
+    """Bucket a row to one of the simulator's 9 AUDIENCE_SEGMENTS.
+
+    Returns the segment slug or 'unknown' when no signal is present — the
+    calibration consumer treats 'unknown' as no segment data, falling back
+    to the per-platform anchor.
+    """
+    hay = " ".join(str(row.get(k, "")) for k in
+                   ("audience", "ad_set_name", "targeting", "campaign",
+                    "placement")).lower()
+    if not hay.strip():
+        return "unknown"
+    for seg, patterns in _SEGMENT_PATTERNS:
+        if any(p in hay for p in patterns):
+            return seg
+    return "unknown"
+
+
 def _confidence(n_ads: int, impressions: float) -> str:
     if n_ads >= 20 and impressions >= 200_000:
         return "high"
@@ -352,11 +414,22 @@ def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120) -
     Calibrates on RECENT data when dates allow (click-rates decay over time, so
     old ads mislead the forecast), falling back to all history when sparse.
     Also returns a trend signal so the UI can warn about decay.
+
+    Pillar B (segment-keyed): when the upload carries audience hints
+    (audience / ad_set_name / targeting / campaign keywords), each row is
+    additionally tagged to one of the simulator's 9 AUDIENCE_SEGMENTS, and
+    a ``by_segment`` block is emitted alongside ``by_platform``. The wizard
+    can then anchor the forecast to the chosen audience's real numbers, not
+    just the platform average. Rows that can't be classified group as
+    'unknown' and are intentionally excluded from ``by_segment`` so the
+    consumer's fallback chain (segment → platform → overall) stays honest.
     """
     if df.empty or "impressions" not in df.columns:
-        return {"currency": currency, "overall": {}, "by_platform": {}, "usable": False}
+        return {"currency": currency, "overall": {},
+                "by_platform": {}, "by_segment": {}, "usable": False}
     d = df.copy()
     d["_platform"] = d.apply(_platform_key, axis=1)
+    d["_segment"] = d.apply(_segment_key, axis=1)
     d["_date"] = (pd.to_datetime(d["date_start"], errors="coerce")
                   if "date_start" in d.columns else pd.NaT)
 
@@ -367,10 +440,28 @@ def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120) -
             used, window = recent, f"most recent {recent_days} days ({len(recent)} ads)"
 
     by_platform = {str(plat): _agg(grp) for plat, grp in used.groupby("_platform")}
+    # Pillar B: only emit segments that have ENOUGH ads to be trustworthy
+    # and aren't 'unknown' (which means we couldn't classify the row).
+    # The threshold (3+ ads, 5k+ impressions) is deliberately low because
+    # most users won't have huge per-segment volumes; the per-segment
+    # _agg() also returns a confidence band that the UI can degrade on.
+    by_segment: dict = {}
+    for seg, grp in used.groupby("_segment"):
+        seg_name = str(seg)
+        if seg_name == "unknown" or len(grp) < 3:
+            continue
+        if "impressions" in grp.columns and float(grp["impressions"].sum()) < 5_000:
+            continue
+        by_segment[seg_name] = _agg(grp)
+    # n_unknown — how many rows we couldn't classify, so the UI can be
+    # honest about calibration coverage.
+    n_unknown = int((used["_segment"] == "unknown").sum())
     return {
         "currency": currency,
         "overall": _agg(used),
         "by_platform": by_platform,
+        "by_segment": by_segment,
+        "by_segment_unknown": n_unknown,
         "usable": True,
         "window": window,
         "trend": _trend(d),

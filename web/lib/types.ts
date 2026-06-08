@@ -200,6 +200,10 @@ export interface SimulateRequest {
   // generic format benchmarks when they've uploaded their ad history.
   target_ctr?: number | null;
   cpm_override?: number | null;
+  // Pillar B: which calibration layer fed the anchor (so the report can be
+  // honest about whether this is segment- / platform- / overall-calibrated).
+  calibration_source?: string | null;       // 'segment:<seg>' | 'platform:<plat>' | 'overall' | null
+  calibration_n_ads?: number | null;
   // Opt-in budget saturation (assumption-based): realistically reachable people.
   reachable_audience?: number | null;
 }
@@ -225,6 +229,16 @@ export interface AccountCalibration {
   currency: string;
   overall: Partial<PlatformCalibration>;
   by_platform: Record<string, PlatformCalibration>;
+  // Pillar B: per-audience-segment calibration when the upload carried
+  // audience hints. Keys are the simulator's AUDIENCE_SEGMENTS slugs
+  // (gen_z, millennials, gen_x, boomers, high_income, budget_conscious,
+  // early_adopters, socially_influenced, all). Segments are only present
+  // when ≥3 ads + ≥5k impressions matched; lower coverage falls back to
+  // by_platform → overall.
+  by_segment?: Record<string, PlatformCalibration>;
+  // Count of rows that couldn't be tagged to a segment — surfaces in UI
+  // as honest coverage info ("calibrated against X ads, Y unclassified").
+  by_segment_unknown?: number;
   usable: boolean;
   window?: string;
   trend?: CalibrationTrend | null;
