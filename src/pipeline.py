@@ -538,6 +538,27 @@ def run_wizard_simulation(profile: CompanyProfile,
                 provider_error=perr,
             )
         watch_word = "watching" if creative_kind == "video" else "seeing"
+        # Distinguish a malformed-JSON response (the model returned garbled
+        # JSON for THIS specific creative — retrying usually works) from a
+        # genuine quota / unavailable signal (waiting won't help, the user
+        # needs to add a key). Telling the user "wait for quota" when the
+        # actual cause was a one-off parse blip would be misleading.
+        perr_l = perr.lower()
+        is_parse = ("malformed json" in perr_l
+                    or "json" in perr_l and "decode" in perr_l
+                    or "expecting" in perr_l
+                    or "no json object" in perr_l
+                    or "unbalanced json" in perr_l)
+        if is_parse:
+            raise VisionUnavailableError(
+                f"We couldn't analyse your {kind_word} — the analysis service "
+                f"returned an unexpected response on this attempt. This is "
+                f"usually a one-off; please try again. Without actually "
+                f"{watch_word} the {kind_word} we can't confirm it's policy-"
+                f"safe or judge its quality, so we won't show a forecast we "
+                f"can't stand behind.",
+                provider_error=perr,
+            )
         raise VisionUnavailableError(
             f"We couldn't analyse your {kind_word} — the analysis service is "
             "temporarily unavailable (free-tier quota likely used up). We "

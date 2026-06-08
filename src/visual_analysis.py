@@ -484,7 +484,17 @@ _VISION_EXHAUSTED: set = set()
 # ===========================================================================
 
 def _extract_json(text: str) -> dict:
-    """Extract the first balanced JSON object from an LLM response."""
+    """Extract the first balanced JSON object from an LLM response.
+
+    Real LLM responses often violate strict JSON: trailing commas before
+    ``}`` / ``]``, single-quoted keys ('foo': 1), comments, smart quotes.
+    Gemini in particular sometimes drops trailing commas after the last
+    field of a long object (the 'Expecting property name' error). We try
+    strict ``json.loads`` first (fast path); if it fails, we apply a small
+    set of cleanups (NOT a full JSON5 parser — just the common LLM slips)
+    and retry. Helpers raise the ORIGINAL parse error on final failure so
+    the caller can decide whether to rotate models.
+    """
     text = text.strip()
     if text.startswith("```"):                       # strip markdown fences
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
@@ -493,14 +503,36 @@ def _extract_json(text: str) -> dict:
     if start == -1:
         raise ValueError("No JSON object found in model response.")
     depth = 0
+    end = -1
     for i in range(start, len(text)):
         if text[i] == "{":
             depth += 1
         elif text[i] == "}":
             depth -= 1
             if depth == 0:
-                return json.loads(text[start:i + 1])
-    raise ValueError("Unbalanced JSON in model response.")
+                end = i + 1
+                break
+    if end == -1:
+        raise ValueError("Unbalanced JSON in model response.")
+    candidate = text[start:end]
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError as primary:
+        # Cleanup pass — the failures we actually see from Gemini in prod:
+        #   1. trailing comma before } or ]   {"a": 1,}
+        #   2. single-quoted property names    {'a': 1}
+        #   3. smart double quotes              {“a”: 1}
+        # Whitespace-only normalisation; never alters string contents.
+        cleaned = re.sub(r",(\s*[}\]])", r"\1", candidate)
+        cleaned = cleaned.replace("“", '"').replace("”", '"')
+        cleaned = re.sub(r"(?<=[{,]\s)\'([A-Za-z_][\w\-]*)\'(?=\s*:)",
+                          r'"\1"', cleaned)
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            # Re-raise the ORIGINAL error so the caller's "is this a quota
+            # vs a parse failure?" check works against the unmodified text.
+            raise primary
 
 
 def _normalise_raw(parsed: dict) -> dict:
@@ -1202,8 +1234,21 @@ def _analyze_gemini_video_with_brand(video_bytes, mime_type, ad_text,
             raise
         text = getattr(response, "text", None)
         if text:
-            _ph_ok("gemini-video", model_id)
-            return _normalise_raw(_extract_json(text)), model_id
+            try:
+                parsed = _normalise_raw(_extract_json(text))
+                _ph_ok("gemini-video", model_id)
+                return parsed, model_id
+            except (ValueError, json.JSONDecodeError) as parse_exc:
+                # Gemini occasionally returns slightly-broken JSON (trailing
+                # commas, smart quotes). Don't poison the whole run on one
+                # bad sample — try the next model in GEMINI_VISION_CHAIN. The
+                # error is tagged with the original parse text so the
+                # heuristic-fallback path can surface a HONEST "service
+                # returned bad data" message instead of "quota exhausted".
+                last_exc = RuntimeError(
+                    f"Gemini video returned malformed JSON ({model_id}): "
+                    f"{str(parse_exc)[:160]}")
+                continue
         last_exc = RuntimeError("Gemini video response had no text payload.")
     raise (last_exc or RuntimeError("All Gemini video models exhausted."))
 
