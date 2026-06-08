@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { PlotlyChart } from '@/components/Charts';
 import { AccuracyScorecard } from '@/components/AccuracyScorecard';
+import { BlotatoPanel } from '@/components/BlotatoPanel';
 import { useApp } from '@/lib/store';
 import { api } from '@/lib/api';
 import { getLatestCalibration } from '@/lib/db';
@@ -724,6 +725,12 @@ export default function ResultPage() {
               </>
             );
           })()}
+
+          {/* BLOTATO TOOLS — variant generation (Pillar E) + competitor URL
+              extraction (Pillar F). Self-hides when BLOTATO_API_KEY is
+              unset on the backend, so a deploy without the key has zero
+              visual footprint. */}
+          <BlotatoPanel />
 
           {/* DRIVERS — plain English with bars, no logit */}
           {result.factor_plain && result.factor_plain.length > 0 && (<>

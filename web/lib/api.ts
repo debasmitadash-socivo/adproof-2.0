@@ -160,4 +160,39 @@ export const api = {
     request<PolicyCheckResponse>('/api/policy-check', {
       method: 'POST', body: JSON.stringify(payload),
     }),
+  // -------- Pillars E + F: Blotato MCP wrappers ------------------------
+  blotatoStatus: () => request<{ enabled: boolean }>('/api/blotato/status'),
+  blotatoTemplates: () =>
+    request<{ templates: { id: string; description: string }[] }>(
+      '/api/blotato/templates'),
+  blotatoGenerateVariants: (payload: {
+    template_id?: string;
+    variables?: Record<string, unknown>;
+    count?: number;
+    wait?: boolean;
+  }) =>
+    request<{
+      template_id: string;
+      variants: {
+        status: string;
+        visual_id?: string;
+        result?: Record<string, unknown>;
+        error?: string;
+      }[];
+    }>('/api/blotato/generate-variants', {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
+  blotatoExtractSource: (payload: {
+    url?: string;
+    text?: string;
+    wait?: boolean;
+  }) =>
+    request<{
+      status: string;
+      source_id?: string;
+      result?: Record<string, unknown>;
+      error?: string;
+    }>('/api/blotato/extract-source', {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
 };

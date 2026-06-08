@@ -573,6 +573,133 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 # ===========================================================================
+# Pillars E + F: Blotato MCP integrations
+# ===========================================================================
+# Live MCP tools list (verified) is publishing/scheduling/asset-generation
+# only — no scoring. So these endpoints use create_visual (for variant
+# generation, Pillar E) and create_source (for competitor / landing-page
+# extraction, Pillar F). All gated on BLOTATO_API_KEY: when unset, every
+# call returns 503 with a friendly "feature disabled" body so the UI can
+# hide the surface entirely.
+
+
+class BlotatoVariantsRequest(BaseModel):
+    template_id: Optional[str] = None     # explicit template; else pick the first
+    variables: dict = {}                  # template-specific variables
+    count: int = 3                        # how many variants to generate
+    wait: bool = True                     # poll until done (synchronous)
+
+
+@app.get("/api/blotato/status")
+def blotato_status() -> dict:
+    """Cheap feature-availability probe for the UI to hide / show panels."""
+    from blotato_client import is_enabled
+    return {"enabled": is_enabled()}
+
+
+@app.get("/api/blotato/templates")
+def blotato_templates() -> dict:
+    """List the visual templates Blotato exposes for this account."""
+    try:
+        from blotato_client import BlotatoClient
+        client = BlotatoClient()
+        return {"templates": client.list_visual_templates()}
+    except Exception as exc:                              # noqa: BLE001
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@app.post("/api/blotato/generate-variants")
+def blotato_generate_variants(req: BlotatoVariantsRequest) -> dict:
+    """Pillar E: generate N visual variants via Blotato MCP create_visual.
+
+    Stateless from AdProof's side: returns the generated visual descriptors
+    (URLs + status). Re-scoring each variant happens through the normal
+    /api/simulate flow once the user wires it back in as an upload.
+
+    Cost gate: count is capped at 3 to keep Blotato credit burn predictable
+    (the owner's primary concern when picking this pillar).
+    """
+    try:
+        from blotato_client import BlotatoClient
+        client = BlotatoClient()
+    except Exception as exc:                              # noqa: BLE001
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    # Pick a template — explicit one wins, else first available.
+    template_id = req.template_id
+    if not template_id:
+        templates = client.list_visual_templates()
+        if not templates:
+            raise HTTPException(status_code=502,
+                                detail="No Blotato visual templates available.")
+        template_id = (templates[0].get("id")
+                       or templates[0].get("templateId")
+                       or "")
+
+    n = max(1, min(int(req.count or 3), 3))               # cap at 3
+    out: list = []
+    for _ in range(n):
+        try:
+            job = client.create_visual(template_id, req.variables)
+        except Exception as exc:                          # noqa: BLE001
+            out.append({"status": "error", "error": str(exc)})
+            continue
+        visual_id = (job.get("visualId") or job.get("id")
+                     if isinstance(job, dict) else None)
+        if req.wait and visual_id:
+            try:
+                final = client.wait_for_visual(visual_id)
+                out.append({"status": (final.get("status") or "").lower(),
+                            "visual_id": visual_id, "result": final})
+            except Exception as exc:                      # noqa: BLE001
+                out.append({"status": "error", "visual_id": visual_id,
+                            "error": str(exc)})
+        else:
+            out.append({"status": "queued", "visual_id": visual_id,
+                        "job": job})
+    return {"template_id": template_id, "variants": out}
+
+
+class BlotatoExtractRequest(BaseModel):
+    url: Optional[str] = None
+    text: Optional[str] = None
+    wait: bool = True
+
+
+@app.post("/api/blotato/extract-source")
+def blotato_extract_source(req: BlotatoExtractRequest) -> dict:
+    """Pillar F: extract a competitor ad / landing page via Blotato create_source.
+
+    Returns the extracted media URLs + text so the frontend can pass them
+    straight into the normal AdProof flow (re-upload as an image / video
+    and analyse). No scoring happens here — extraction only.
+    """
+    if not (req.url or req.text):
+        raise HTTPException(status_code=400,
+                            detail="Provide either url or text.")
+    try:
+        from blotato_client import BlotatoClient
+        client = BlotatoClient()
+    except Exception as exc:                              # noqa: BLE001
+        raise HTTPException(status_code=503, detail=str(exc))
+    try:
+        job = client.create_source(url=req.url, text=req.text)
+    except Exception as exc:                              # noqa: BLE001
+        raise HTTPException(status_code=502, detail=str(exc))
+    source_id = (job.get("sourceId") or job.get("id")
+                 if isinstance(job, dict) else None)
+    if req.wait and source_id:
+        try:
+            final = client.wait_for_source(source_id)
+            return {"status": (final.get("status") or "").lower(),
+                    "source_id": source_id, "result": final}
+        except Exception as exc:                          # noqa: BLE001
+            return {"status": "error", "source_id": source_id,
+                    "error": str(exc)}
+    return {"status": "queued", "source_id": source_id, "job": job}
+
+
+# ===========================================================================
 # Platform / format catalogue
 # ===========================================================================
 
