@@ -377,6 +377,15 @@ def check_image_specs(image_path, fmt):
             im.verify()                       # detects truncation/corruption
         with Image.open(image_path) as im:
             w, h = im.size
+    except FileNotFoundError:
+        # Specific: the upload is gone (typically a Railway redeploy wiped
+        # the ephemeral upload dir). Telling the user the file is "corrupt"
+        # here is wrong and wastes their time — be honest about the cause.
+        return ("Your uploaded image is no longer on the server, so we "
+                "couldn't analyse it. Uploads are held in temporary storage "
+                "that's cleared when the app restarts or redeploys — the file "
+                "can vanish between uploading it and running the forecast. "
+                "Please re-upload the image and run it again."), warnings
     except Exception as exc:                  # noqa: BLE001
         return (f"We couldn't open this image — it looks corrupt or is an "
                 f"unsupported file type. Upload a valid JPG/PNG/WebP, then "
@@ -546,6 +555,11 @@ def run_wizard_simulation(profile: CompanyProfile,
     # NOT a virality signal — labelled as paid-ad craft quality in the UI.
     reel_quality = None
     if video_path and visual is not None and not visual.is_heuristic:
+        # MEMORY: free the main vision pass's video bytes + genai client
+        # state BEFORE loading the file again for the reel-quality call,
+        # otherwise the two video buffers + two genai clients pile on the
+        # Mesa model and OOM-kill the Railway worker (the 502 root cause).
+        gc.collect()
         try:
             from src.reel_quality import score_reel_quality
         except ImportError:                               # `python src/...`
