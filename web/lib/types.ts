@@ -458,6 +458,27 @@ export interface SimulateResponse {
     aov_high?: number | null;
     verdict: 'comfortable' | 'marginal' | 'shortfall' | 'unknown';
   };
+  // Phase B: creative type + objective-aware advice.
+  creative_advice?: {
+    type: string;
+    label: string;
+    explanation: string;
+    objective: 'awareness' | 'consideration' | 'conversion';
+    advice: string[];
+  } | null;
+  // Phase C: talking-head script critique + rewrite (Gemini-powered).
+  // null for non-video / non-talking-head creatives.
+  script_critique?: {
+    transcript: string;
+    critique: string[];
+    rewrite: string;
+    rewrite_explanation: string;
+    objective: string;
+    provider: string;
+    model: string;
+    is_skipped: boolean;
+    skipped_reason: string;
+  } | null;
   // Reel Quality — short-video craft rubric (only when a video was uploaded
   // and Gemini was available). NOT a virality score; rates paid-ad craft.
   reel_quality?: {

@@ -632,6 +632,7 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
     # images, when ADPROOF_REEL_QUALITY_ENABLED=0, or when Gemini is down.
     # NOT a virality signal — labelled as paid-ad craft quality in the UI.
     reel_quality = None
+    script_critique = None
     if video_path and visual is not None and not visual.is_heuristic:
         # MEMORY: free the main vision pass's video bytes + genai client
         # state BEFORE loading the file again for the reel-quality call,
@@ -646,6 +647,22 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
             reel_quality = score_reel_quality(video_path, ad_text_combined)
         except Exception:                                 # noqa: BLE001
             reel_quality = None         # never fail the run on the extra pass
+
+        # Phase C: talking-head script critic — only runs when the main
+        # vision pass tagged the creative as talking_head. One Gemini call,
+        # ~£0.002 per 30s clip, totally skipped otherwise (so a b-roll
+        # video doesn't waste tokens on transcription).
+        if (visual.creative_type or "").lower() == "talking_head":
+            gc.collect()                  # same memory-pressure reasoning
+            try:
+                from src.script_critic import critique_talking_head
+            except ImportError:
+                from script_critic import critique_talking_head
+            try:
+                script_critique = critique_talking_head(
+                    video_path, objective=brief.objective)
+            except Exception:                             # noqa: BLE001
+                script_critique = None    # never fail the run on the critic
 
     # Vision (esp. the video path, which buffers the clip + the genai client)
     # can leave tens of MB resident; release it BEFORE the memory-heavy Monte
@@ -784,4 +801,5 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
         "profile": profile, "match": match, "brief": brief,
         "assets": assets, "validation": validation,
         "reel_quality": reel_quality,
+        "script_critique": script_critique,
     }

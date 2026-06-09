@@ -154,6 +154,8 @@ _RESPONSE_SHAPE = """\
     "flags": ["<specific things in the IMAGE that could get an ad account suspended or rejected: nudity / sexual content, shocking or violent imagery, alcohol/drugs/weapons, before-after body imagery, hateful symbols, deceptive/clickbait visuals, prohibited-category products, visible personal data. Empty array if clean.>"],
     "explanation": "<1-2 sentences. If level is none, say the imagery looks policy-safe.>"
   },
+  "creative_type": "<one of: product_shot | lifestyle | text_heavy | ugc | illustration | screenshot | meme | talking_head | broll | motion_graphic | product_demo | before_after | animated. Choose the SINGLE best fit. For images you'll typically pick one of the first 7; for videos, the last 6. talking_head = a person speaking to camera as the primary focus (lip sync visible); broll = footage cut to music or voiceover with no speaker on camera; motion_graphic = animated text/shapes, no live footage; product_demo = the product in use; before_after = transformation reveal.>",
+  "creative_type_explanation": "<one short sentence — what concretely tells you it's this type. Cite an observable feature.>",
   "strengths": ["<short phrase>", "..."],
   "weaknesses": ["<short phrase>", "..."],
   "overall": "<2-3 sentence summary of how this creative is likely to perform>"
@@ -320,6 +322,13 @@ class VisualAnalysisResult:
         "level": "unknown", "flags": [],
         "explanation": "Image not inspected (heuristic mode).",
     })
+    # Pillar B: creative type detection (image: product_shot, lifestyle,
+    # text_heavy, ugc, illustration, screenshot, meme; video: talking_head,
+    # broll, motion_graphic, product_demo, before_after, animated). Lets the
+    # report give type-specific advice and gates the talking-head script
+    # critic (Phase C).
+    creative_type: str = ""
+    creative_type_explanation: str = ""
     # When the chosen LLM failed and we fell back to the heuristic, this
     # carries the underlying error message so the UI can show "Gemini failed:
     # quota exhausted" instead of leaving the user guessing.
@@ -557,6 +566,15 @@ def _normalise_raw(parsed: dict) -> dict:
         "flags": [str(f).strip() for f in (br_raw.get("flags") or [])][:8],
         "explanation": str(br_raw.get("explanation", "")).strip(),
     }
+    # Pillar B: creative type — accept whichever slug the model returned,
+    # validate against the known taxonomy, fall back to empty (UI hides
+    # the card) if the model picked an unknown label.
+    _ct = str(parsed.get("creative_type", "")).strip().lower()
+    if _ct not in {"product_shot", "lifestyle", "text_heavy", "ugc",
+                   "illustration", "screenshot", "meme", "talking_head",
+                   "broll", "motion_graphic", "product_demo",
+                   "before_after", "animated"}:
+        _ct = ""
     return {
         "scores": parsed.get("scores", {}),
         "explanations": parsed.get("explanations", {}),
@@ -571,6 +589,9 @@ def _normalise_raw(parsed: dict) -> dict:
         "strengths": list(parsed.get("strengths", []))[:6],
         "weaknesses": list(parsed.get("weaknesses", []))[:6],
         "overall": str(parsed.get("overall", "")).strip(),
+        "creative_type": _ct,
+        "creative_type_explanation": str(
+            parsed.get("creative_type_explanation", "")).strip(),
     }
 
 
@@ -910,6 +931,8 @@ def analyze_ad(image_path: str | Path,
         image_copy_coherence=float(raw.get("image_copy_coherence", 0.5)),
         image_copy_coherence_explanation=str(
             raw.get("image_copy_coherence_explanation", "")),
+        creative_type=str(raw.get("creative_type", "")),
+        creative_type_explanation=str(raw.get("creative_type_explanation", "")),
         ban_risk=raw.get("ban_risk") or {
             "level": "unknown", "flags": [],
             "explanation": "Image not inspected (heuristic mode).",
@@ -1335,6 +1358,8 @@ def analyze_ad_video(video_path,
         image_description=str(raw.get("image_description", "")),
         image_copy_coherence=_flt(raw.get("image_copy_coherence")),
         image_copy_coherence_explanation=str(raw.get("image_copy_coherence_explanation", "")),
+        creative_type=str(raw.get("creative_type", "")).strip().lower(),
+        creative_type_explanation=str(raw.get("creative_type_explanation", "")).strip(),
         ban_risk=ban_risk,
     )
 

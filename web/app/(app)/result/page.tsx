@@ -449,6 +449,83 @@ export default function ResultPage() {
           {/* HOW YOU COMPARE — forecast vs benchmark vs your account + live cited */}
           <BenchmarkPanel result={result} />
 
+          {/* CREATIVE TYPE & ADVICE — Phase B. Surfaces the detected
+              creative type + per-(type, objective) hand-authored advice. */}
+          {result.creative_advice && result.creative_advice.advice.length > 0 && (() => {
+            const ca = result.creative_advice!;
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Creative type & advice</h2>
+                <p className="text-ink-muted text-[14px] mb-3">
+                  Detected creative type and targeted suggestions for your <strong>{ca.objective}</strong> objective.
+                </p>
+                <Card className="!p-0 overflow-hidden border-2 !border-coral/30">
+                  <div className="px-6 py-4 bg-gradient-to-br from-coral-soft to-magenta-soft flex items-center gap-3 flex-wrap">
+                    <Pill tone="coral">{ca.label}</Pill>
+                    {ca.explanation && <span className="text-[12.5px] text-ink-muted">{ca.explanation}</span>}
+                  </div>
+                  <div className="px-6 py-4 bg-surface">
+                    <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em] mb-2">Targeted advice</div>
+                    <ul className="space-y-2">
+                      {ca.advice.map((line, i) => (
+                        <li key={i} className="text-[13px] text-ink flex gap-2 leading-snug">
+                          <span className="text-coral">→</span><span>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-coral/20 bg-bg-deep">
+                    <strong>Honest framing:</strong> hand-authored marketing rules, NOT model-generated. Same creative + objective will always produce the same advice — deterministic by design.
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
+
+          {/* SCRIPT CRITIQUE & REWRITE — Phase C. Only renders for
+              talking-head videos. Gemini-powered, labelled honestly. */}
+          {result.script_critique && !result.script_critique.is_skipped && result.script_critique.transcript && (() => {
+            const sc = result.script_critique!;
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Talking-head script · critic + rewrite</h2>
+                <p className="text-ink-muted text-[14px] mb-3">
+                  Gemini transcribed your script, critiqued it as a senior copywriter would for the <strong>{sc.objective}</strong> objective, and offered a tightened rewrite.
+                </p>
+                <Card className="!p-0 overflow-hidden border-2 !border-violet/30">
+                  <div className="px-6 py-4 bg-gradient-to-br from-violet-soft to-magenta-soft">
+                    <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-1">Transcript</div>
+                    <div className="text-[13px] text-ink italic leading-relaxed">&ldquo;{sc.transcript}&rdquo;</div>
+                  </div>
+                  {sc.critique.length > 0 && (
+                    <div className="px-6 py-4 bg-surface border-t border-violet/20">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-2">Critique</div>
+                      <ul className="space-y-2">
+                        {sc.critique.map((line, i) => (
+                          <li key={i} className="text-[13px] text-ink flex gap-2 leading-snug">
+                            <span className="text-violet">·</span><span>{line}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {sc.rewrite && (
+                    <div className="px-6 py-4 bg-lime-soft border-t border-violet/20">
+                      <div className="text-[11.5px] text-lime-deep font-bold uppercase tracking-[0.08em] mb-2">Rewrite</div>
+                      <div className="text-[13.5px] text-ink leading-relaxed">{sc.rewrite}</div>
+                      {sc.rewrite_explanation && (
+                        <div className="text-[11.5px] text-ink-muted mt-2 italic">{sc.rewrite_explanation}</div>
+                      )}
+                    </div>
+                  )}
+                  <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-violet/20 bg-bg-deep">
+                    <strong>Honest caveat:</strong> A craft critique, NOT a virality predictor and NOT a CTR forecast. Powered by Gemini ({sc.model}) — Blotato's Viral AI Coach is web-only and isn't exposed via their API.
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
+
           {/* REEL QUALITY — short-video creative craft scorecard (video only).
               Five sub-scores + composite + actionable suggestions. Surfaced
               as a SEPARATE panel so it cannot be misread as a virality or

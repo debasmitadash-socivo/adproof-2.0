@@ -1935,6 +1935,12 @@ def simulate(req: SimulateRequest) -> dict:
                    if result["visual"] is not None else None),
         "reel_quality": (result["reel_quality"].to_dict()
                          if result.get("reel_quality") is not None else None),
+        # Phase B+C: type-specific advice + (talking-head only) script
+        # critique with rewrite. Both gracefully None when not applicable.
+        "creative_advice": _build_creative_advice(
+            result.get("visual"), brief.objective),
+        "script_critique": (result["script_critique"].to_dict()
+                            if result.get("script_critique") is not None else None),
         "figures": figures,
         "validation": result["validation"],
         "headline_md": result["headline_md"],
@@ -2132,6 +2138,34 @@ def _calibration_provenance_note(source: str | None,
                 f"audience / interest / platform, so the forecast fell back "
                 f"to your overall account average.{nums}")
     return f"Calibration source: {source}{nums}"
+
+
+# --------------------------------------------------------------------------
+# Phase B (Pillar A retrospective fix): type-specific creative advice
+# --------------------------------------------------------------------------
+
+def _build_creative_advice(visual, objective: str | None) -> dict | None:
+    """Build the {type, label, explanation, advice[]} payload the result
+    page renders as the 'Creative type & advice' card. Returns None when
+    we have no detected type so the UI hides the card cleanly.
+    """
+    if visual is None:
+        return None
+    ct = (getattr(visual, "creative_type", "") or "").strip().lower()
+    if not ct:
+        return None
+    try:
+        from creative_advice import advice_for, type_label
+    except ImportError:                                  # `python src/...`
+        from src.creative_advice import advice_for, type_label
+    suggestions = advice_for(ct, (objective or "conversion"))
+    return {
+        "type": ct,
+        "label": type_label(ct),
+        "explanation": getattr(visual, "creative_type_explanation", "") or "",
+        "objective": (objective or "conversion"),
+        "advice": suggestions,
+    }
 
 
 def _pretty_factor_label(key: str, value: float) -> str:
