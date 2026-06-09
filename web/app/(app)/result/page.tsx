@@ -340,6 +340,20 @@ export default function ResultPage() {
             );
           })()}
 
+          {/* GRADING BASIS — explicit "we graded you on X because your
+              objective is Y" line so the user always knows what's being
+              weighed. Fixes the 'ROAS is 9 but grade is C?' confusion. */}
+          {result.grading_basis && (
+            <Card className="mb-5 !bg-violet-soft !border-violet/30 !py-3 !px-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Pill tone="violet">Graded on {result.grading_basis.metric}</Pill>
+                <span className="text-[12px] text-ink-muted">Objective: {result.grading_basis.objective}</span>
+              </div>
+              <div className="text-[13px] text-ink leading-snug">{result.grading_basis.explanation}</div>
+              <div className="text-[11.5px] text-ink-muted mt-1">{result.grading_basis.change_hint}</div>
+            </Card>
+          )}
+
           {/* CONTEXT */}
           <div className="flex flex-wrap gap-2.5 mb-5">
             <div className="bg-surface border border-border rounded-full px-4 py-1.5 text-[13px] flex items-center gap-2.5">

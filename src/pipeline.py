@@ -517,34 +517,58 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
     )
 
     _step(0.15, "Scoring the creative on the four visual dimensions...")
-    if video_path:
-        from src.visual_analysis import analyze_ad_video    # noqa
-        visual = analyze_ad_video(
-            video_path, ad_text_combined,
-            audience_hint=audience_hint,
-            brand_category=profile.product_category,
-            brand_industry=profile.industry,
-        )
-    elif image_path:
-        visual = analyze_ad(
-            image_path, ad_text_combined,
-            provider=visual_provider, audience_hint=audience_hint,
-            brand_category=profile.product_category,
-            brand_industry=profile.industry,
-        )
-        # Second pair of eyes on the ban-screen: AWS Rekognition's specialised
-        # moderation model. Opt-in (silent skip if no AWS keys). Belt + braces
-        # — a creative has to clear BOTH Gemini's read AND Rekognition.
-        try:
-            from src.safety_aws import screen_image_aws, merge_ban_risk
-            aws_risk = screen_image_aws(image_path)
-            if aws_risk and visual is not None:
-                gemini_risk = visual.ban_risk or {}
-                visual.ban_risk = merge_ban_risk(gemini_risk, aws_risk)
-        except Exception:                                              # noqa: BLE001
-            pass    # AWS check is best-effort — never break a run on it
-    else:
-        visual = None
+    # Multi-placement cache: when the wizard runs the same creative against
+    # multiple formats in one go (Reels + In-Feed Video + Facebook Reels),
+    # the vision read is identical — image content, copy, brand all the
+    # same — so reuse the first call's result. Stops the 'two void, one
+    # runnable for the same creative' inconsistency AND saves ~66% of
+    # Gemini cost on multi-placement runs.
+    try:
+        from src.vision_cache import (vision_cache_key, get_cached_vision,
+                                       set_cached_vision)
+    except ImportError:                                                # standalone
+        from vision_cache import (vision_cache_key, get_cached_vision,
+                                   set_cached_vision)
+    _vc_key = vision_cache_key(
+        creative_path, ad_text_combined, audience_hint,
+        profile.product_category, profile.industry)
+    visual = get_cached_vision(_vc_key) if _vc_key else None
+
+    if visual is None:
+        if video_path:
+            from src.visual_analysis import analyze_ad_video    # noqa
+            visual = analyze_ad_video(
+                video_path, ad_text_combined,
+                audience_hint=audience_hint,
+                brand_category=profile.product_category,
+                brand_industry=profile.industry,
+            )
+        elif image_path:
+            visual = analyze_ad(
+                image_path, ad_text_combined,
+                provider=visual_provider, audience_hint=audience_hint,
+                brand_category=profile.product_category,
+                brand_industry=profile.industry,
+            )
+            # Second pair of eyes on the ban-screen: AWS Rekognition's
+            # specialised moderation model. Opt-in (silent skip if no AWS
+            # keys). Belt + braces — a creative has to clear BOTH Gemini's
+            # read AND Rekognition.
+            try:
+                from src.safety_aws import screen_image_aws, merge_ban_risk
+                aws_risk = screen_image_aws(image_path)
+                if aws_risk and visual is not None:
+                    gemini_risk = visual.ban_risk or {}
+                    visual.ban_risk = merge_ban_risk(gemini_risk, aws_risk)
+            except Exception:                                              # noqa: BLE001
+                pass    # AWS check is best-effort — never break a run on it
+        else:
+            visual = None
+        # Cache only NON-heuristic results — a heuristic fallback is the
+        # 'vision was unavailable' state, not a stable answer worth reusing.
+        if (visual is not None and _vc_key
+                and not getattr(visual, "is_heuristic", True)):
+            set_cached_vision(_vc_key, visual)
 
     # SAFETY GATE — refuse the forecast if a creative was supplied but no real
     # vision model could inspect it. Without actually seeing the image/video

@@ -40,19 +40,89 @@ _VISUAL_STRONG = 0.65
 # ===========================================================================
 
 def _verdict(mc, sample_ctr: float | None = None,
-             bench_ctr: float | None = None) -> tuple[str, str, str]:
-    """Return (verdict_class, headline, one-liner).
+             bench_ctr: float | None = None,
+             objective: str = "conversion",
+             bench_cpm: float | None = None,
+             budget: float | None = None,
+             total_impressions: int | None = None,
+             currency: str = "GBP") -> tuple[str, str, str]:
+    """Return (verdict_class, headline, one-liner) graded against the
+    objective the user actually picked.
 
-    The base verdict is the ROAS band, but two believability guardrails apply
-    so a fantasy number can't read as a green 'Strong' win:
-      * an implausibly high ROAS (>12x) is treated as a likely overstated input
-        (conversion rate / order value), not a result;
-      * a below-benchmark click-through can't be a 'strong' creative — any high
-        return there is driven by economics, not the ad.
+    The base ROAS-magnitude verdict is the right answer ONLY for a
+    conversion brief. An awareness brief is fundamentally about CPM /
+    reach; a consideration brief about CTR / CPC. Grading either of
+    those on ROAS magnitude is the bug the owner caught on 2026-06-08
+    (Variant A · Facebook · Reels: 9.5x ROAS, 0.58% CTR vs 1.30%
+    benchmark, label said 'BREAK EVEN' grade C even though the
+    consideration objective is failing on engagement). This function
+    is now objective-aware so insights.verdict_class agrees with
+    plain_verdict.class end-to-end.
+
+    For conversion (the original logic): two believability guardrails
+    still apply so a fantasy number can't read as a green 'Strong' win.
     """
+    obj = (objective or "conversion").lower()
     roas_p50 = mc.predicted_roas["p50"]
-    roas_p10 = mc.predicted_roas["p10"]
     roi_p50 = mc.predicted_roi["p50"] * 100
+
+    if obj == "awareness":
+        # CPM-led grade. Lower CPM is better.
+        cpm = ((budget / total_impressions) * 1000
+               if budget and total_impressions else None)
+        ref = bench_cpm or 8.0
+        if cpm is None or ref is None:
+            cls = "moderate_reach"
+        elif cpm <= ref * 0.75:
+            cls = "wide_reach"
+        elif cpm <= ref * 1.10:
+            cls = "moderate_reach"
+        else:
+            cls = "narrow_reach"
+        headline = {
+            "wide_reach": "Wide reach forecast",
+            "moderate_reach": "Moderate reach forecast",
+            "narrow_reach": "Narrow reach forecast",
+        }[cls]
+        one_liner = (
+            f"Awareness brief — graded on CPM. Modelled CPM "
+            f"{currency} {cpm:.2f} vs format benchmark "
+            f"{currency} {ref:.2f}."
+            if cpm is not None else
+            f"Awareness brief — CPM benchmark {currency} {ref:.2f}."
+        )
+        return cls, headline, one_liner
+
+    if obj == "consideration":
+        # CTR-led grade. Higher CTR vs format benchmark is better.
+        if sample_ctr is None or bench_ctr is None or bench_ctr <= 0:
+            cls = "fair_engagement"
+        elif sample_ctr >= bench_ctr * 1.25:
+            cls = "strong_engagement"
+        elif sample_ctr >= bench_ctr * 0.90:
+            cls = "fair_engagement"
+        else:
+            cls = "weak_engagement"
+        headline = {
+            "strong_engagement": "Strong engagement forecast",
+            "fair_engagement": "Fair engagement forecast",
+            "weak_engagement": "Weak engagement forecast",
+        }[cls]
+        if sample_ctr is not None and bench_ctr:
+            delta = (sample_ctr - bench_ctr) / bench_ctr * 100
+            one_liner = (
+                f"Consideration brief — graded on CTR. Modelled "
+                f"{sample_ctr*100:.2f}% vs {bench_ctr*100:.2f}% benchmark "
+                f"({delta:+.0f}%). ROAS shown elsewhere is a directional "
+                f"artefact — don't grade a consideration ad on it."
+            )
+        else:
+            one_liner = "Consideration brief — graded on CTR."
+        return cls, headline, one_liner
+
+    # objective == "conversion" (or unknown -> conversion). Original logic
+    # preserved verbatim so existing conversion-brief behaviour is unchanged.
+    roas_p10 = mc.predicted_roas["p10"]
 
     if roas_p50 >= _ROAS_STRONG:
         cls = "strong"
@@ -292,14 +362,30 @@ def explain_simulation(mc,
     company name, platform, and format-specific benchmark in view -- not just
     in abstract simulator terms.
     """
-    # Pull the format benchmark CTR (if the wizard passed the format) so the
-    # verdict can tell whether the creative is actually pulling its weight.
+    # Pull the format benchmark CTR/CPM (if the wizard passed the format) so the
+    # verdict can tell whether the creative is actually pulling its weight on
+    # the OBJECTIVE the user chose (awareness -> CPM, consideration -> CTR,
+    # conversion -> ROAS). Without the objective here the verdict would
+    # silently default to ROAS-grade like the legacy code did, which is the
+    # bug Pillar A was meant to fix.
     _fmt = (context or {}).get("format")
     _bench_ctr = (_fmt.benchmarks.get("ctr", 0.012)
                   if _fmt is not None and hasattr(_fmt, "benchmarks") else None)
+    _bench_cpm = (_fmt.benchmarks.get("cpm", 8.0)
+                  if _fmt is not None and hasattr(_fmt, "benchmarks") else None)
     _sample_ctr = (sum(mc.sample_ctrs) / max(len(mc.sample_ctrs), 1)
                    if mc.sample_ctrs else None)
-    verdict_class, headline, one_liner = _verdict(mc, _sample_ctr, _bench_ctr)
+    _brief = (context or {}).get("brief")
+    _objective = (getattr(_brief, "objective", "conversion") or "conversion")
+    _budget = getattr(_brief, "budget", None)
+    _currency = getattr(_brief, "currency", "GBP") or "GBP"
+    _total_impressions = getattr(mc, "total_impressions", None)
+    verdict_class, headline, one_liner = _verdict(
+        mc, _sample_ctr, _bench_ctr,
+        objective=_objective, bench_cpm=_bench_cpm,
+        budget=_budget, total_impressions=_total_impressions,
+        currency=_currency,
+    )
 
     positives, negatives = _rank_factors(mc.aggregate_click_factors or {})
     what_works = []

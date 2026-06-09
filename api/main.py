@@ -1958,6 +1958,38 @@ def simulate(req: SimulateRequest) -> dict:
             # Single source of truth — same value the headline's risk wording uses.
             "break_even_chance_pct": break_even_probability,
         },
+        # Pillar A3: explicit grading-basis line so the user always sees
+        # WHICH metric is the grading axis and WHY (their objective). The
+        # confusion that surfaced on 2026-06-08 was 'why grade C when ROAS
+        # is 9?' — because the chosen objective was Consideration, so the
+        # grade is CTR-based, not ROAS-based, and we never said so.
+        "grading_basis": {
+            "objective": objective,
+            "metric": {
+                "awareness": "CPM",
+                "consideration": "CTR",
+                "conversion": "ROAS",
+            }.get(objective, "ROAS"),
+            "explanation": ({
+                "awareness": (
+                    f"Graded on CPM because your objective is Awareness. "
+                    f"Reach efficiency is what matters here — ROAS shown "
+                    f"elsewhere is a directional artefact, not a target."),
+                "consideration": (
+                    f"Graded on CTR because your objective is Consideration. "
+                    f"Engagement is what matters here — a high ROAS number "
+                    f"can be misleading on consideration creatives because "
+                    f"Reels / discovery formats aren't optimised for sales."),
+                "conversion": (
+                    f"Graded on ROAS because your objective is Conversion. "
+                    f"Revenue efficiency is what matters here."),
+            }.get(objective, "Graded on ROAS.")),
+            "change_hint": (
+                "To get graded on ROAS instead, pick Conversion in Step 1."
+                if objective in ("awareness", "consideration") else
+                "To get graded on engagement instead, pick Consideration "
+                "in Step 1."),
+        },
         "factor_plain": factor_plain,
         "data_sources": data_sources,
         "economics": economics,

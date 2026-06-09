@@ -394,6 +394,14 @@ export interface SimulateResponse {
   headline_md: string;
   visual_md: string;
   narrative_md: string;
+  // Pillar A3: which metric the grade is computed against + why. Shown
+  // directly under the hero so the user always sees the grading axis.
+  grading_basis?: {
+    objective: 'awareness' | 'consideration' | 'conversion';
+    metric: 'CPM' | 'CTR' | 'ROAS';
+    explanation: string;
+    change_hint: string;
+  };
   // Plain-English additions surfaced by the API for the marketer view.
   plain_verdict: {
     headline: string;
