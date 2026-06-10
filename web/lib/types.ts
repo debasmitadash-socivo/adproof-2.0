@@ -394,6 +394,38 @@ export interface SimulateResponse {
   headline_md: string;
   visual_md: string;
   narrative_md: string;
+  // Phase 1: industry × platform × region benchmark context. Drawn from
+  // Rival IQ 2025 (industry engagement) + Sprout 2026 (platform context).
+  // null when the company couldn't be classified into a known industry.
+  industry_context?: {
+    industry: string;
+    platform_id: string;
+    geo: string;
+    modelled_ctr: number;
+    format_benchmark_ctr: number;
+    industry_engagement?: {
+      value: {
+        engagement_rate: number;
+        posts_per_week: number | null;
+        industry: string;
+        platform: string;
+        data_year: number;
+      };
+      source: string;
+      cite: string;
+      notes: { metric_kind?: string; sample?: string };
+    } | null;
+    platform_2026?: {
+      value: { platform_label: string; text: string; char_count: number };
+      source: string;
+      cite: string;
+    } | null;
+    global_2026?: {
+      value: Record<string, number>;
+      source: string;
+      cite: string;
+    } | null;
+  } | null;
   // Pillar A3: which metric the grade is computed against + why. Shown
   // directly under the hero so the user always sees the grading axis.
   grading_basis?: {
@@ -479,20 +511,32 @@ export interface SimulateResponse {
     is_skipped: boolean;
     skipped_reason: string;
   } | null;
-  // Reel Quality — short-video craft rubric (only when a video was uploaded
-  // and Gemini was available). NOT a virality score; rates paid-ad craft.
+  // Reel Quality — VIE 8-dim short-video critic (only when a video was
+  // uploaded and Gemini was available). Same call also produces hook
+  // autopsy + algorithm-risk + publish verdict.
   reel_quality?: {
     scores: {
-      hook_strength: number;
-      sound_off_comprehension: number;
-      pain_benefit_clarity: number;
-      pacing_retention: number;
-      emotional_resonance: number;
+      attention: number;        // /15
+      curiosity: number;        // /15
+      emotion: number;          // /15
+      retention: number;        // /20
+      shareability: number;     // /10
+      saveability: number;      // /10
+      uniqueness: number;       // /10
+      platform_fit: number;     // /5
     };
-    composite: number;                 // 0-100 weighted composite
-    grade: string;                     // 'A' | 'B' | 'C' | 'D' | '—'
+    composite: number;          // 0-100 (simple sum of sub-scores)
+    grade: string;              // A+/A/B/C/D/F/—
     explanations: Record<string, string>;
-    suggestions: string[];
+    biggest_strength: string;
+    biggest_weakness: string;
+    drop_off_point: string;
+    hook_score: number;         // /10
+    hook_alternatives: { hook: string; reason: string }[];
+    viral_pattern: string;
+    algorithm_risk: Record<string, string>;   // 10 axes → Low/Medium/High
+    publish_verdict: string;    // 'YES' | 'NO'
+    publish_changes_required: string[];
     provider: string;
     model: string;
     is_skipped: boolean;

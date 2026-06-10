@@ -580,6 +580,56 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 # ===========================================================================
+# Phase 1: industry × platform × region benchmark context
+# ===========================================================================
+# Lightweight endpoint clients can hit on-demand (e.g. the wizard
+# pre-fetching context as the user picks a platform). The simulate flow
+# attaches the same data automatically — this endpoint is the standalone.
+
+class IndustryContextRequest(BaseModel):
+    company_description: Optional[str] = None
+    product_category: Optional[str] = None
+    industry: Optional[str] = None
+    business_model: Optional[str] = None
+    platform_id: str
+    geo: str = "UK"
+
+
+@app.post("/api/industry-context")
+def industry_context_endpoint(req: IndustryContextRequest) -> dict:
+    """Look up industry × platform context without running a forecast."""
+    try:
+        from benchmarks import (industry_platform_engagement,
+                                 platform_2026_context, global_2026_context,
+                                 BENCHMARK_SOURCES)
+        from industry_classifier import map_to_rival_iq_industry
+    except ImportError:
+        from src.benchmarks import (industry_platform_engagement,
+                                     platform_2026_context, global_2026_context,
+                                     BENCHMARK_SOURCES)
+        from src.industry_classifier import map_to_rival_iq_industry
+
+    industry_slug = map_to_rival_iq_industry(
+        product_category=req.product_category,
+        industry=req.industry,
+        business_model=req.business_model,
+        what_they_sell=req.company_description,
+    )
+    ind  = industry_platform_engagement(industry_slug or "", req.platform_id)
+    plat = platform_2026_context(req.platform_id)
+    glob = global_2026_context()
+    return {
+        "industry":              industry_slug,
+        "platform_id":           req.platform_id,
+        "geo":                   req.geo,
+        "industry_engagement":   ind.to_dict() if ind.found else None,
+        "platform_2026":         plat.to_dict() if plat.found else None,
+        "global_2026":           glob.to_dict() if glob.found else None,
+        "sources_available":     list(BENCHMARK_SOURCES.keys()),
+    }
+
+
+# ===========================================================================
 # Pillars E + F: Blotato MCP integrations
 # ===========================================================================
 # Live MCP tools list (verified) is publishing/scheduling/asset-generation
@@ -1895,6 +1945,64 @@ def simulate(req: SimulateRequest) -> dict:
           "note": "Psychology-rule weights fitted on a generated dataset, not your past performance. Upload your Meta/Google/LinkedIn CSV exports on the Data page to recalibrate against YOUR campaigns."}),
     ]
 
+    # Industry × platform context (Phase 1 of benchmark integration). When
+    # we can map the company to one of Rival IQ's 14 industries, attach
+    # the industry median engagement rate + 2026 platform context so the
+    # report can show 'industry median for Y' beside the user's number.
+    # Also adds the source as a data_sources row.
+    try:
+        from benchmarks import (industry_platform_engagement,
+                                 platform_2026_context, global_2026_context,
+                                 BENCHMARK_SOURCES)
+        from industry_classifier import map_to_rival_iq_industry
+    except ImportError:                                       # standalone
+        from src.benchmarks import (industry_platform_engagement,
+                                     platform_2026_context, global_2026_context,
+                                     BENCHMARK_SOURCES)
+        from src.industry_classifier import map_to_rival_iq_industry
+
+    _industry_slug = map_to_rival_iq_industry(
+        product_category=profile.product_category,
+        industry=profile.industry,
+        business_model=profile.business_model,
+        what_they_sell=getattr(profile, "what_they_sell", None),
+        value_proposition=profile.value_proposition,
+        company_name=profile.company_name,
+    )
+    industry_ctx = None
+    if _industry_slug:
+        ind_lookup = industry_platform_engagement(_industry_slug, req.platform_id)
+        plat_lookup = platform_2026_context(req.platform_id)
+        glob_lookup = global_2026_context()
+        if ind_lookup.found or plat_lookup.found:
+            industry_ctx = {
+                "industry":      _industry_slug,
+                "platform_id":   req.platform_id,
+                "geo":           req.geo,
+                # Engagement rate from Rival IQ — ORGANIC, not paid. UI
+                # frames it accordingly.
+                "industry_engagement": ind_lookup.to_dict() if ind_lookup.found else None,
+                "platform_2026":       plat_lookup.to_dict() if plat_lookup.found else None,
+                "global_2026":          glob_lookup.to_dict() if glob_lookup.found else None,
+                "modelled_ctr":         round(sample_ctr, 5),
+                "format_benchmark_ctr": round(fmt_bench_ctr, 5),
+            }
+            # Add a data_sources row crediting the benchmark source(s) used
+            cites = []
+            if ind_lookup.found:
+                cites.append(ind_lookup.cite)
+            if plat_lookup.found:
+                cites.append(plat_lookup.cite)
+            data_sources.append({
+                "label": "Industry context",
+                "value": (f"{_industry_slug.replace('_', ' ').title()} on "
+                          f"{(brief.format.platform_name or req.platform_id)}"),
+                "note":  ("Industry × platform context drawn from " +
+                          " ; ".join(cites) + ". Used to enrich the LLM "
+                          "critic with 2026-aware norms; not used as the "
+                          "paid-CTR anchor (organic engagement ≠ paid CTR)."),
+            })
+
     # Confidence rating: stricter when key inputs are heuristic.
     heuristic_count = sum(1 for s in (profile.source, match.source, visual_source)
                           if s in ("heuristic", "none"))
@@ -1998,6 +2106,9 @@ def simulate(req: SimulateRequest) -> dict:
         },
         "factor_plain": factor_plain,
         "data_sources": data_sources,
+        # Phase 1: Industry × platform × region context card. None when we
+        # couldn't classify the company to one of Rival IQ's 14 industries.
+        "industry_context": industry_ctx,
         "economics": economics,
         "kpis": kpis,
         "viability": viability,

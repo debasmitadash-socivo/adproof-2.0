@@ -526,74 +526,160 @@ export default function ResultPage() {
             );
           })()}
 
-          {/* REEL QUALITY — short-video creative craft scorecard (video only).
-              Five sub-scores + composite + actionable suggestions. Surfaced
-              as a SEPARATE panel so it cannot be misread as a virality or
-              CTR prediction; the footer makes that explicit. */}
+          {/* REEL QUALITY — VIE (Virality Intelligence Engine) 8-dim
+              critic for short-video paid ads. Same call also produces hook
+              autopsy, viral pattern classification, algorithm risk and a
+              hard publish-today verdict. Strict VIE calibration: composites
+              over 85 reserved for genuinely exceptional content. */}
           {result.reel_quality && !result.reel_quality.is_skipped && (() => {
             const rq = result.reel_quality!;
-            const dims: { key: keyof typeof rq.scores; label: string }[] = [
-              { key: 'hook_strength', label: 'Hook strength (first 3s)' },
-              { key: 'sound_off_comprehension', label: 'Sound-off comprehension' },
-              { key: 'pain_benefit_clarity', label: 'Pain / benefit clarity' },
-              { key: 'pacing_retention', label: 'Pacing & retention' },
-              { key: 'emotional_resonance', label: 'Emotional resonance' },
+            const DIMS: { key: keyof typeof rq.scores; label: string; max: number }[] = [
+              { key: 'attention',    label: 'Attention',    max: 15 },
+              { key: 'curiosity',    label: 'Curiosity',    max: 15 },
+              { key: 'emotion',      label: 'Emotion',      max: 15 },
+              { key: 'retention',    label: 'Retention',    max: 20 },
+              { key: 'shareability', label: 'Shareability', max: 10 },
+              { key: 'saveability',  label: 'Saveability',  max: 10 },
+              { key: 'uniqueness',   label: 'Uniqueness',   max: 10 },
+              { key: 'platform_fit', label: 'Platform fit', max: 5  },
             ];
-            const gradeTone = rq.grade === 'A' ? 'text-success'
+            const gradeTone = rq.grade.startsWith('A') ? 'text-success'
               : rq.grade === 'B' ? 'text-coral'
               : rq.grade === 'C' ? 'text-warning' : 'text-danger';
+            const publishOk = (rq.publish_verdict || '').toUpperCase() === 'YES';
             return (
               <>
-                <h2 className="display-italic text-[28px] mt-7 mb-2">Reel Quality</h2>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Reel Quality · VIE rubric</h2>
                 <p className="text-ink-muted text-[14px] mb-3">
-                  Five-axis craft scorecard for short-video paid ads — hook, muted-feed clarity, pacing, emotion.
-                  This rates the creative, not the auction or the offer.
+                  Virality Intelligence Engine — 8-dimension critic for short-video ads. Strict calibration (most content scores 55-80).
+                  Rates the creative under paid-ad constraints, NOT a virality guarantee.
                 </p>
                 <Card className="!p-0 overflow-hidden border-2 !border-violet/30">
                   <div className="px-6 py-5 bg-gradient-to-br from-violet-soft to-magenta-soft flex items-center gap-6 flex-wrap">
-                    <div className="flex-1 min-w-[200px]">
-                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.14em]">Composite</div>
+                    <div className="flex-1 min-w-[220px]">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.14em]">Composite (VIE)</div>
                       <div className="display-italic text-[64px] leading-none mt-1">
                         {rq.composite.toFixed(0)}<span className="text-[24px] font-sans not-italic align-top opacity-70">/100</span>
                       </div>
-                      <div className="text-[13px] text-ink-muted mt-1">Hook 30% · Sound-off 20% · Clarity 20% · Pacing 15% · Emotion 15%</div>
+                      <div className="text-[12.5px] text-ink-muted mt-1">Attention 15 · Curiosity 15 · Emotion 15 · Retention 20 · Share 10 · Save 10 · Unique 10 · Fit 5</div>
+                      {rq.viral_pattern && (
+                        <div className="text-[12px] text-ink mt-2"><strong>Pattern:</strong> {rq.viral_pattern}</div>
+                      )}
                     </div>
                     <div className="w-28 h-28 rounded-full bg-white/30 backdrop-blur flex flex-col items-center justify-center border-2 border-white/60">
                       <div className="text-[10.5px] uppercase tracking-[0.14em] font-bold opacity-80">Grade</div>
                       <div className={clsx('display-italic text-[60px] leading-[0.85] mt-0.5', gradeTone)}>{rq.grade}</div>
                     </div>
+                    <div className={clsx('px-4 py-3 rounded-md border-2', publishOk ? 'border-success bg-success-soft' : 'border-danger bg-danger-soft')}>
+                      <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold opacity-90">Publish today?</div>
+                      <div className={clsx('display-italic text-[34px] leading-none mt-0.5', publishOk ? 'text-success' : 'text-danger')}>{rq.publish_verdict || '—'}</div>
+                    </div>
                   </div>
+
+                  {/* 8 sub-scores */}
                   <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 bg-surface">
-                    {dims.map((d) => {
-                      const score = rq.scores[d.key];
+                    {DIMS.map((d) => {
+                      const score = rq.scores[d.key] ?? 0;
+                      const pct = (score / d.max) * 100;
                       const explain = rq.explanations?.[d.key] || '';
-                      const tone = score >= 8 ? 'bg-success' : score >= 6 ? 'bg-coral' : score >= 4 ? 'bg-warning' : 'bg-danger';
+                      const tone = pct >= 80 ? 'bg-success' : pct >= 60 ? 'bg-coral' : pct >= 40 ? 'bg-warning' : 'bg-danger';
                       return (
                         <div key={d.key}>
                           <div className="flex items-baseline gap-2 mb-1">
                             <div className="text-[12.5px] font-semibold text-ink flex-1">{d.label}</div>
-                            <div className="mono text-[14px] font-bold">{score}<span className="text-ink-muted text-[11px]">/10</span></div>
+                            <div className="mono text-[14px] font-bold">{score}<span className="text-ink-muted text-[11px]">/{d.max}</span></div>
                           </div>
                           <div className="h-1.5 rounded-full bg-bg-deep overflow-hidden">
-                            <div className={clsx('h-full', tone)} style={{ width: `${score * 10}%` }} />
+                            <div className={clsx('h-full', tone)} style={{ width: `${pct}%` }} />
                           </div>
                           {explain && <div className="text-[11.5px] text-ink-muted mt-1 leading-snug">{explain}</div>}
                         </div>
                       );
                     })}
                   </div>
-                  {rq.suggestions && rq.suggestions.length > 0 && (
+
+                  {/* Diagnosis */}
+                  {(rq.biggest_strength || rq.biggest_weakness || rq.drop_off_point) && (
+                    <div className="px-6 py-4 border-t border-violet/20 bg-bg-deep grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {rq.biggest_strength && (
+                        <div>
+                          <div className="text-[11px] text-success font-bold uppercase tracking-[0.08em] mb-1">Biggest strength</div>
+                          <div className="text-[12.5px] text-ink leading-snug">{rq.biggest_strength}</div>
+                        </div>
+                      )}
+                      {rq.biggest_weakness && (
+                        <div>
+                          <div className="text-[11px] text-danger font-bold uppercase tracking-[0.08em] mb-1">Biggest weakness</div>
+                          <div className="text-[12.5px] text-ink leading-snug">{rq.biggest_weakness}</div>
+                        </div>
+                      )}
+                      {rq.drop_off_point && (
+                        <div>
+                          <div className="text-[11px] text-warning font-bold uppercase tracking-[0.08em] mb-1">Drop-off point</div>
+                          <div className="text-[12.5px] text-ink leading-snug">{rq.drop_off_point}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Hook autopsy */}
+                  {(rq.hook_score > 0 || rq.hook_alternatives?.length > 0) && (
                     <div className="px-6 py-4 border-t border-violet/20 bg-violet-soft/40">
-                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-1.5">How to improve</div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em]">Hook autopsy</div>
+                        {rq.hook_score > 0 && (
+                          <Pill tone={rq.hook_score >= 7 ? 'success' : rq.hook_score >= 4 ? 'warning' : 'danger'}>
+                            Hook {rq.hook_score}/10
+                          </Pill>
+                        )}
+                      </div>
+                      {rq.hook_alternatives?.length > 0 && (
+                        <>
+                          <div className="text-[11.5px] text-ink-muted mb-1.5">Top alternatives the model proposes:</div>
+                          <ol className="space-y-2">
+                            {rq.hook_alternatives.slice(0, 3).map((h, i) => (
+                              <li key={i} className="text-[13px] text-ink">
+                                <strong className="text-violet">{i + 1}.</strong> &ldquo;{h.hook}&rdquo;
+                                {h.reason && <div className="text-[11.5px] text-ink-muted mt-0.5 italic">— {h.reason}</div>}
+                              </li>
+                            ))}
+                          </ol>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Algorithm risk grid */}
+                  {Object.keys(rq.algorithm_risk || {}).length > 0 && (
+                    <div className="px-6 py-4 border-t border-violet/20 bg-surface">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-2">Algorithm risk</div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                        {Object.entries(rq.algorithm_risk).map(([axis, lvl]) => (
+                          <div key={axis} className="bg-bg-deep border border-border rounded-md px-2.5 py-1.5">
+                            <div className="text-[10px] uppercase tracking-[0.06em] text-ink-muted">{axis.replace(/_/g, ' ')}</div>
+                            <div className={clsx('text-[12.5px] font-bold',
+                              lvl === 'High'   ? 'text-danger'  :
+                              lvl === 'Medium' ? 'text-warning' : 'text-success')}>{lvl}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Required changes (only when verdict NO) */}
+                  {!publishOk && rq.publish_changes_required?.length > 0 && (
+                    <div className="px-6 py-4 border-t border-violet/20 bg-danger-soft">
+                      <div className="text-[11.5px] text-danger font-bold uppercase tracking-[0.08em] mb-1.5">Minimum changes before publishing</div>
                       <ul className="space-y-1.5">
-                        {rq.suggestions.map((s, i) => (
-                          <li key={i} className="text-[13px] text-ink flex gap-2"><span className="text-violet">→</span>{s}</li>
+                        {rq.publish_changes_required.map((c, i) => (
+                          <li key={i} className="text-[13px] text-ink flex gap-2"><span className="text-danger">⚠</span>{c}</li>
                         ))}
                       </ul>
                     </div>
                   )}
+
                   <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-violet/20 bg-bg-deep">
-                    <strong>Honest caveat:</strong> Reel Quality rates the creative under paid-ad constraints (muted feeds, 3-second attention budgets). It is NOT a virality score and NOT a guarantee of CTR — a strong reel can still underperform on a weak offer; a weaker reel can still convert on a strong one. Used here as one input to the per-objective verdict above.
+                    <strong>Honest framing:</strong> VIE predicts ORGANIC short-form virality dimensions (hook, retention, emotional pull). Those dimensions correlate with paid-ad craft quality, but a high VIE score does NOT guarantee paid CTR or ROAS. Read this as a creative-craft signal, not a forecast. Powered by Gemini {rq.model && (<>(<span className="mono">{rq.model}</span>)</>)}.
                   </div>
                 </Card>
               </>
@@ -812,6 +898,94 @@ export default function ResultPage() {
                       ))}
                     </div>
                   )}
+                </Card>
+              </>
+            );
+          })()}
+
+          {/* INDUSTRY × REGION CONTEXT — Phase 1 of benchmark integration.
+              Shows the user where their numbers sit against 2025/2026 published
+              industry data with cited sources. Hidden when we couldn't classify
+              the company to an industry. Honest framing: engagement-rate data
+              is ORGANIC, used as a creative-quality signal, NOT as a paid-CTR
+              forecast anchor. */}
+          {result.industry_context && (() => {
+            const ic = result.industry_context!;
+            const ie = ic.industry_engagement;
+            const p2 = ic.platform_2026;
+            const g2 = ic.global_2026;
+            const industryLabel = ic.industry.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Industry &amp; region context</h2>
+                <p className="text-ink-muted text-[14px] mb-3">
+                  Where your numbers sit against published 2025/2026 industry data — cited.
+                </p>
+                <Card className="!p-0 overflow-hidden border-2 !border-violet/30">
+                  <div className="px-6 py-4 bg-gradient-to-br from-violet-soft to-magenta-soft flex items-center gap-3 flex-wrap">
+                    <Pill tone="violet">{industryLabel}</Pill>
+                    <span className="text-[12.5px] text-ink-muted">on {ic.platform_id.replace(/_/g, ' ')} · {ic.geo}</span>
+                  </div>
+                  {ie && (
+                    <div className="px-6 py-4 bg-surface">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-2">Industry median (organic engagement)</div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-[13px]">
+                        <div>
+                          <div className="text-ink-muted text-[11.5px] uppercase tracking-[0.06em] font-bold">Industry eng. rate</div>
+                          <div className="display-italic text-[22px] mt-1">{(ie.value.engagement_rate * 100).toFixed(3)}%</div>
+                        </div>
+                        {ie.value.posts_per_week != null && (
+                          <div>
+                            <div className="text-ink-muted text-[11.5px] uppercase tracking-[0.06em] font-bold">Industry posting cadence</div>
+                            <div className="display-italic text-[22px] mt-1">{ie.value.posts_per_week.toFixed(1)}<span className="text-ink-muted text-[14px]"> /wk</span></div>
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-ink-muted text-[11.5px] uppercase tracking-[0.06em] font-bold">Your modelled CTR</div>
+                          <div className="display-italic text-[22px] mt-1">{(ic.modelled_ctr * 100).toFixed(2)}%</div>
+                        </div>
+                      </div>
+                      <div className="text-[11.5px] text-ink-muted mt-3 leading-snug">
+                        <strong>Heads up — organic ≠ paid.</strong> {ie.notes?.metric_kind} The industry engagement number above shows whether your category historically gets attention on this platform at all; it&apos;s NOT a paid-CTR target. Your modelled paid CTR is graded against the format benchmark ({(ic.format_benchmark_ctr * 100).toFixed(2)}%).
+                      </div>
+                    </div>
+                  )}
+                  {p2 && (
+                    <div className="px-6 py-4 bg-bg-deep border-t border-violet/20">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-2">2026 platform context — {p2.value.platform_label}</div>
+                      <div className="text-[12.5px] text-ink leading-snug whitespace-pre-wrap">
+                        {p2.value.text.slice(0, 700)}{p2.value.text.length > 700 ? '…' : ''}
+                      </div>
+                    </div>
+                  )}
+                  {g2 && (
+                    <div className="px-6 py-4 bg-surface border-t border-violet/20">
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-2">2026 global baseline</div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-[12.5px]">
+                        {g2.value.active_social_users_billion != null && (
+                          <div><strong>{g2.value.active_social_users_billion}B</strong><div className="text-ink-muted text-[11px]">global social users</div></div>
+                        )}
+                        {g2.value.social_ad_spend_2026_billion_usd != null && (
+                          <div><strong>${g2.value.social_ad_spend_2026_billion_usd}B</strong><div className="text-ink-muted text-[11px]">2026 social ad spend</div></div>
+                        )}
+                        {g2.value.daily_time_minutes_uk != null && (
+                          <div><strong>{Math.floor(g2.value.daily_time_minutes_uk / 60)}h {g2.value.daily_time_minutes_uk % 60}m</strong><div className="text-ink-muted text-[11px]">UK daily time online</div></div>
+                        )}
+                        {g2.value.product_discovery_share_social_pct != null && (
+                          <div><strong>{g2.value.product_discovery_share_social_pct}%</strong><div className="text-ink-muted text-[11px]">product discovery via social</div></div>
+                        )}
+                        {g2.value.consumers_switch_brand_if_no_social_response_pct != null && (
+                          <div><strong>{g2.value.consumers_switch_brand_if_no_social_response_pct}%</strong><div className="text-ink-muted text-[11px]">switch brand if no social response</div></div>
+                        )}
+                        {g2.value.short_form_video_roi_share_pct != null && (
+                          <div><strong>{g2.value.short_form_video_roi_share_pct}%</strong><div className="text-ink-muted text-[11px]">video format ROI share (short-form)</div></div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-violet/20 bg-bg-deep">
+                    Sources: {ie && <span>{ie.cite}</span>}{ie && p2 && ' · '}{p2 && <span>{p2.cite}</span>}{p2 && g2 && ' · '}{g2 && <span>{g2.cite}</span>}.
+                  </div>
                 </Card>
               </>
             );

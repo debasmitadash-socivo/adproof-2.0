@@ -643,8 +643,50 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
             from src.reel_quality import score_reel_quality
         except ImportError:                               # `python src/...`
             from reel_quality import score_reel_quality
+        # Phase 1: build the 2026 context block injected into VIE's prompt
+        # — industry baseline + platform demographics + trend signals.
+        # Best-effort; an import or lookup failure must NEVER block the run.
+        _ctx_block = ""
         try:
-            reel_quality = score_reel_quality(video_path, ad_text_combined)
+            try:
+                from src.benchmarks import (industry_platform_engagement,
+                                             platform_2026_context,
+                                             trends_2026_for_prompt)
+                from src.industry_classifier import map_to_rival_iq_industry
+            except ImportError:
+                from benchmarks import (industry_platform_engagement,
+                                         platform_2026_context,
+                                         trends_2026_for_prompt)
+                from industry_classifier import map_to_rival_iq_industry
+            from src.reel_quality import _format_2026_context
+            ind_slug = map_to_rival_iq_industry(
+                product_category=profile.product_category,
+                industry=profile.industry,
+                business_model=profile.business_model,
+                what_they_sell=getattr(profile, "what_they_sell", None),
+                value_proposition=profile.value_proposition,
+                company_name=profile.company_name,
+            )
+            ind_lookup = (industry_platform_engagement(
+                ind_slug, brief.platform_id).to_dict()
+                if ind_slug else None)
+            plat_lookup = platform_2026_context(brief.platform_id).to_dict()
+            trends_lookup = trends_2026_for_prompt(max_trends=4).value or {}
+            _ctx_block = _format_2026_context(
+                ind_lookup if ind_lookup and ind_lookup.get("found") else None,
+                plat_lookup if plat_lookup.get("found") else None,
+                trends_lookup,
+            )
+        except Exception:                                 # noqa: BLE001
+            _ctx_block = ""
+        try:
+            reel_quality = score_reel_quality(
+                video_path, ad_text_combined,
+                platform_label=getattr(fmt, "platform_name", "") or "",
+                audience_hint=audience_hint,
+                objective=brief.objective,
+                context_block=_ctx_block,
+            )
         except Exception:                                 # noqa: BLE001
             reel_quality = None         # never fail the run on the extra pass
 
