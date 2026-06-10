@@ -101,3 +101,8 @@ Thumbs.db
 # Lock files we don't ship
 # ============================================================================
 *.lock.txt
+
+# Benchmark reference PDFs — large, licensed under their original
+# publisher terms. Extracted/structured data lives under
+# data/benchmarks/extracted/ and IS committed (we own the parse).
+data/benchmarks/reference/*.pdf

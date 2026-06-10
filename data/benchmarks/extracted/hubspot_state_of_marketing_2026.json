@@ -1,0 +1,50 @@
+{
+  "source": {
+    "publisher": "HubSpot",
+    "title": "State of Marketing 2026 Report \u2014 AI, Brand POV & Human-Led Growth",
+    "report_year": 2026,
+    "url": "https://hubspot-state-of-marketing-2026.replit.app/",
+    "sample_size": "1,500+ global marketers",
+    "extraction_method": "Press coverage aggregation (Replit app is JS-rendered; PDFs collected by owner were screenshot-only with sparse text). All numbers cross-referenced from HubSpot's own blog + secondary press summaries.",
+    "license_note": "Free annual report by HubSpot; cite when used."
+  },
+  "ai_disruption": {
+    "marketers_seeing_biggest_disruption_in_20_years_pct": 61,
+    "marketing_teams_using_ai_pct_2026": 86.4,
+    "marketing_teams_using_ai_pct_2025": 67,
+    "marketing_teams_using_ai_pct_2024": 41,
+    "marketers_say_internet_flooded_with_ai_content_pct": 56,
+    "marketers_say_consumers_can_identify_ai_content_pct": 65,
+    "note": "The competitive edge in 2026 is no longer 'who uses AI' \u2014 it's HOW well, with a defensible brand POV. AI-generated bland content is the new noise; distinctive humanity is the differentiator."
+  },
+  "budget_outlook": {
+    "expect_slight_or_significant_increase_pct": 79.2,
+    "expect_significant_increase_pct": 21.2,
+    "expect_decrease_pct": 6
+  },
+  "marketing_practices": {
+    "personalization_improves_leads_or_purchases_pct": 93,
+    "marketers_using_5plus_channels_pct": 75,
+    "meeting_or_exceeding_benchmarks_pct": 65
+  },
+  "channels": {
+    "top_channels_b2b": [
+      "Websites",
+      "Blogs",
+      "SEO"
+    ],
+    "short_form_video": {
+      "share_of_marketers_using_pct": 60,
+      "yoy_growth_in_most_valuable_channel_naming_pct": 104,
+      "note": "Short-form video named most-valuable channel by 104% more marketers vs 2024."
+    },
+    "social_media": {
+      "brand_awareness_top_priority_pct": 60,
+      "yoy_share_change_pct": 100,
+      "note": "Brand awareness is now the #1 priority for ~60% of social media marketers \u2014 more than doubled vs prior year."
+    }
+  },
+  "ai_aversion_data_points": {
+    "ai_content_repulsion_summary": "Audiences aren't rejecting AI tools \u2014 they're rejecting AI SLOP (low-quality, repetitive, uncurated). 30% of consumers (Hootsuite 2026) say they're less likely to choose a brand if they know the ads are AI-generated. HubSpot data confirms 65% of marketers say consumers can now identify AI content. Implication for AdProof: flag obviously-AI creatives, prioritise human-feeling craft signals."
+  }
+}

@@ -1,0 +1,290 @@
+{
+  "source": {
+    "publisher": "Rival IQ",
+    "title": "2025 Social Media Industry Benchmark Report",
+    "data_year": 2024,
+    "report_year": 2025,
+    "sample_size": "2,100 companies (150 from each of 14 industries)",
+    "sample_filter": "Facebook 25k-1M followers; IG/TT/X > 5k followers; active as of Jan 2025",
+    "methodology": "Median engagement rate = (likes + comments + shares + reactions) / total follower count",
+    "license_note": "Free annual report by Rival IQ; cite when used."
+  },
+  "platforms": [
+    "facebook",
+    "instagram",
+    "twitter_x",
+    "tiktok"
+  ],
+  "all_industries_baseline": {
+    "facebook": {
+      "engagement_rate_median": 0.00046,
+      "metric": "engagement_rate_per_post_by_follower"
+    },
+    "instagram": {
+      "engagement_rate_median": 0.0036,
+      "metric": "engagement_rate_per_post_by_follower"
+    },
+    "twitter_x": {
+      "engagement_rate_median": 0.00015,
+      "metric": "engagement_rate_per_tweet_by_follower"
+    },
+    "tiktok": {
+      "engagement_rate_median": 0.0173,
+      "metric": "engagement_rate_per_video_by_follower"
+    }
+  },
+  "by_industry": {
+    "higher_ed": {
+      "facebook": {
+        "engagement_rate": 0.00126,
+        "posts_per_week": 6.35
+      },
+      "instagram": {
+        "engagement_rate": 0.02101,
+        "posts_per_week": 4.07
+      },
+      "twitter_x": {
+        "engagement_rate": 0.00036,
+        "posts_per_week": 4.9
+      },
+      "tiktok": {
+        "engagement_rate": 0.0736,
+        "posts_per_week": 1.59
+      }
+    },
+    "sports_teams": {
+      "facebook": {
+        "engagement_rate": 0.0023,
+        "posts_per_week": 25.2
+      },
+      "instagram": {
+        "engagement_rate": 0.013,
+        "posts_per_week": 19.78
+      },
+      "twitter_x": {
+        "engagement_rate": 0.00073,
+        "posts_per_week": 44.25
+      },
+      "tiktok": {
+        "engagement_rate": 0.0268,
+        "posts_per_week": 3.08
+      }
+    },
+    "influencers": {
+      "facebook": {
+        "engagement_rate": 0.00095,
+        "posts_per_week": 3.52
+      },
+      "instagram": {
+        "engagement_rate": 0.00576,
+        "posts_per_week": 4.5
+      },
+      "twitter_x": {
+        "engagement_rate": 0.00021,
+        "posts_per_week": 1.54
+      },
+      "tiktok": {
+        "engagement_rate": 0.0111,
+        "posts_per_week": 1.99
+      }
+    },
+    "nonprofits": {
+      "facebook": {
+        "engagement_rate": 0.00046,
+        "posts_per_week": 5.51
+      },
+      "instagram": {
+        "engagement_rate": 0.00561,
+        "posts_per_week": 4.18
+      },
+      "twitter_x": {
+        "engagement_rate": 0.00023,
+        "posts_per_week": 5.68
+      },
+      "tiktok": {
+        "engagement_rate": 0.0304,
+        "posts_per_week": 1.42
+      }
+    },
+    "media": {
+      "facebook": {
+        "engagement_rate": 0.00019,
+        "posts_per_week": 61.9
+      },
+      "instagram": {
+        "engagement_rate": 0.00443,
+        "posts_per_week": 13.03
+      },
+      "twitter_x": {
+        "engagement_rate": 6e-05,
+        "posts_per_week": 49.9
+      },
+      "tiktok": {
+        "engagement_rate": 0.0134,
+        "posts_per_week": 6.66
+      }
+    },
+    "food_beverage": {
+      "facebook": {
+        "engagement_rate": 0.00032,
+        "posts_per_week": 1.92
+      },
+      "instagram": {
+        "engagement_rate": 0.004,
+        "posts_per_week": 2.79
+      },
+      "twitter_x": {
+        "engagement_rate": 3e-05,
+        "posts_per_week": 0.08
+      },
+      "tiktok": {
+        "engagement_rate": 0.0204,
+        "posts_per_week": 1.37
+      }
+    },
+    "alcohol": {
+      "facebook": {
+        "engagement_rate": 0.00069,
+        "posts_per_week": 2.51
+      },
+      "instagram": {
+        "engagement_rate": 0.00368,
+        "posts_per_week": 2.87
+      },
+      "twitter_x": {
+        "engagement_rate": 0.00017,
+        "posts_per_week": 0.42
+      },
+      "tiktok": {
+        "engagement_rate": 0.0176,
+        "posts_per_week": null
+      }
+    },
+    "travel": {
+      "facebook": {
+        "engagement_rate": 0.00061,
+        "posts_per_week": 3.1
+      },
+      "instagram": {
+        "engagement_rate": 0.00341,
+        "posts_per_week": 3.58
+      },
+      "twitter_x": {
+        "engagement_rate": 9e-05,
+        "posts_per_week": 0.34
+      },
+      "tiktok": {
+        "engagement_rate": 0.0273,
+        "posts_per_week": 2.11
+      }
+    },
+    "tech_software": {
+      "facebook": {
+        "engagement_rate": 0.00021,
+        "posts_per_week": 3.84
+      },
+      "instagram": {
+        "engagement_rate": 0.00327,
+        "posts_per_week": 2.82
+      },
+      "twitter_x": {
+        "engagement_rate": 0.00019,
+        "posts_per_week": 3.89
+      },
+      "tiktok": {
+        "engagement_rate": 0.0121,
+        "posts_per_week": 1.63
+      }
+    },
+    "financial_services": {
+      "facebook": {
+        "engagement_rate": 0.0004,
+        "posts_per_week": 4.32
+      },
+      "instagram": {
+        "engagement_rate": 0.00261,
+        "posts_per_week": 4.29
+      },
+      "twitter_x": {
+        "engagement_rate": 0.00025,
+        "posts_per_week": 4.27
+      },
+      "tiktok": {
+        "engagement_rate": 0.0133,
+        "posts_per_week": 1.32
+      }
+    },
+    "retail": {
+      "facebook": {
+        "engagement_rate": 0.00024,
+        "posts_per_week": 4.7
+      },
+      "instagram": {
+        "engagement_rate": 0.0016,
+        "posts_per_week": 5.56
+      },
+      "twitter_x": {
+        "engagement_rate": 5e-05,
+        "posts_per_week": 0.33
+      },
+      "tiktok": {
+        "engagement_rate": 0.0128,
+        "posts_per_week": 2.59
+      }
+    },
+    "fashion": {
+      "facebook": {
+        "engagement_rate": 0.00018,
+        "posts_per_week": 3.39
+      },
+      "instagram": {
+        "engagement_rate": 0.00147,
+        "posts_per_week": 5.23
+      },
+      "twitter_x": {
+        "engagement_rate": 1e-05,
+        "posts_per_week": 0.02
+      },
+      "tiktok": {
+        "engagement_rate": 0.0095,
+        "posts_per_week": 2.14
+      }
+    },
+    "health_beauty": {
+      "facebook": {
+        "engagement_rate": 0.00017,
+        "posts_per_week": 2.94
+      },
+      "instagram": {
+        "engagement_rate": 0.00144,
+        "posts_per_week": 6.04
+      },
+      "twitter_x": {
+        "engagement_rate": 0.0,
+        "posts_per_week": 0.0
+      },
+      "tiktok": {
+        "engagement_rate": 0.0085,
+        "posts_per_week": 3.15
+      }
+    },
+    "home_decor": {
+      "facebook": {
+        "engagement_rate": 0.00023,
+        "posts_per_week": 3.56
+      },
+      "instagram": {
+        "engagement_rate": 0.00136,
+        "posts_per_week": 4.7
+      },
+      "twitter_x": {
+        "engagement_rate": 1e-05,
+        "posts_per_week": 0.02
+      },
+      "tiktok": {
+        "engagement_rate": 0.0152,
+        "posts_per_week": 2.13
+      }
+    }
+  }
+}
