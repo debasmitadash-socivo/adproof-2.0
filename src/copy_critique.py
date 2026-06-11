@@ -149,26 +149,39 @@ def _check_text_quality(text: str, field: str,
         ))
 
     # 2. Symbol-in-word / leet-speak / character-spacing.
-    m = _SYMBOL_IN_WORD.search(text)
-    if m:
+    # Note (per owner feedback 2026-06-10): stylistic spacing like "B-U-Y"
+    # or "Lim!ted Time" is often DELIBERATE — meant to read weird but
+    # meaningful. We surface it as INFO, not warning, and acknowledge it
+    # might be intentional. Only flag if there are TWO+ instances (one is
+    # likely deliberate; multiple suggests a typo pattern).
+    matches = list(_SYMBOL_IN_WORD.finditer(text))
+    if len(matches) >= 2:
+        examples = ", ".join(f'"{m.group(0)}"' for m in matches[:3])
         out.append(CopyIssue(
-            severity="warning", field=field,
-            message=f"Symbol inside a word: \"{m.group(0)}\" — common censor-dodge trick that platforms increasingly downrank, and looks unprofessional.",
-            fix=f"Spell the word normally. If platform policy is a concern, rephrase rather than disguise.",
+            severity="info", field=field,
+            message=(f"Multiple symbols inside words: {examples}. If deliberate "
+                     "stylistic emphasis (e.g. censorship-skirting on a "
+                     "sensitive niche), fine. If accidental, fix."),
+            fix="Verify each instance is intentional. Platforms increasingly downrank censor-dodge tricks.",
         ))
 
-    # 3. Emoji clusters (3+ consecutive). Warn always; harder warning for B2B.
-    m = _EMOJI_CLUSTER.search(text)
-    if m:
+    # 3. Emoji clusters (5+ consecutive — bumped from 3). A short emoji run
+    # is fine as decoration; only call out when it's clearly excessive.
+    # Still stricter on LinkedIn where consumer emoji walls genuinely hurt.
+    if _EMOJI_CLUSTER.search(text):
+        m = _EMOJI_CLUSTER.search(text)                       # re-scan for matches
         is_b2b = platform_id.lower() in _B2B_PLATFORM_IDS
-        out.append(CopyIssue(
-            severity="warning" if is_b2b else "info",
-            field=field,
-            message=(f"Emoji cluster (3+ in a row): \"{m.group(0).strip()}\"" +
-                     (" — reads as low-effort on LinkedIn." if is_b2b else
-                      " — fine on consumer feeds but worth thinning out for a cleaner read.")),
-            fix="Cap at 2 emojis per cluster; use them to mark a beat, not as filler.",
-        ))
+        cluster_len = len((m.group(0) if m else "").replace(" ", ""))
+        threshold = 3 if is_b2b else 5
+        if cluster_len >= threshold:
+            out.append(CopyIssue(
+                severity="info",
+                field=field,
+                message=(f"Emoji cluster ({cluster_len} in a row)" +
+                         (" — reads as low-effort on LinkedIn." if is_b2b else
+                          " — fine on consumer feeds but worth thinning for a cleaner read.")),
+                fix="Cap at 2 emojis per cluster; use them to mark a beat, not as filler.",
+            ))
 
     # 4. Whitespace + leading/trailing junk.
     if "  " in text:
