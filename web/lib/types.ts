@@ -511,6 +511,52 @@ export interface SimulateResponse {
     is_skipped: boolean;
     skipped_reason: string;
   } | null;
+  // Session 2: Meta-specific paid critic (Ivan Falco's ads-skills KB).
+  // Only present when platform_id starts with 'meta_' AND Gemini was
+  // available. Focuses on offer strength + message-market-fit +
+  // creative-as-targeting (the levers VIE and the LinkedIn critic
+  // don't cover).
+  meta_critique?: {
+    scores: {
+      offer_strength: number;
+      message_market_fit: number;
+      creative_as_targeting: number;
+      hook: number;
+      cta_alignment: number;
+      format_execution: number;
+    };
+    composite: number;
+    grade: string;
+    explanations: Record<string, string>;
+    detected_concept: string;
+    recommended_concepts: { concept: string; why: string }[];
+    detected_funnel_stage: string;
+    intended_funnel_stage: string;
+    stage_mismatch_warning: string;
+    offer_no_brainer_pass: Record<string, string>;   // 6 axes Pass/Fail
+    offer_issues: string[];
+    copy_formula_gaps: string[];
+    icp_specificity_score: number;
+    icp_specificity_issues: string[];
+    placement_findings: string[];
+    hook_score: number;
+    hook_alternatives: { hook: string; reason: string }[];
+    predicted_quality_score: {
+      urgency: number;     // /3
+      budget: number;      // /3
+      fit: number;         // /3
+      total: number;       // /9
+      rationale: string;
+    };
+    deterministic_findings: string[];
+    biggest_strength: string;
+    biggest_weakness: string;
+    one_specific_fix: string;
+    provider: string;
+    model: string;
+    is_skipped: boolean;
+    skipped_reason: string;
+  } | null;
   // Session 1: LinkedIn-specific paid critic (Ivan Falco's ads-skills KB
   // + the owner's LDA 6-dim scorecard). Only present when platform_id
   // starts with 'linkedin' AND Gemini was available.

@@ -2053,6 +2053,10 @@ def simulate(req: SimulateRequest) -> dict:
         # platform isn't LinkedIn or no LLM key is configured.
         "linkedin_critique": (result["linkedin_critique"].to_dict()
                               if result.get("linkedin_critique") is not None else None),
+        # Session 2: Meta-specific paid critic (Ivan). null when platform
+        # isn't Meta or the critic was skipped.
+        "meta_critique": (result["meta_critique"].to_dict()
+                          if result.get("meta_critique") is not None else None),
         "figures": figures,
         "validation": result["validation"],
         "headline_md": result["headline_md"],

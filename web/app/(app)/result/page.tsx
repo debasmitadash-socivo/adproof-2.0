@@ -526,6 +526,227 @@ export default function ResultPage() {
             );
           })()}
 
+          {/* META CRITIQUE — Session 2. Ivan-derived 6-dim scorecard
+              tuned for Meta. Focuses on offer / message-market-fit /
+              creative-as-targeting — the levers VIE doesn't touch.
+              Renders only on Meta placements. */}
+          {result.meta_critique && !result.meta_critique.is_skipped && (() => {
+            const mc = result.meta_critique!;
+            const DIMS: { key: keyof typeof mc.scores; label: string; weight: string }[] = [
+              { key: 'offer_strength',        label: 'Offer strength',         weight: '25%' },
+              { key: 'message_market_fit',    label: 'Message-market fit',     weight: '20%' },
+              { key: 'creative_as_targeting', label: 'Creative as targeting',  weight: '15%' },
+              { key: 'hook',                  label: 'Hook',                   weight: '15%' },
+              { key: 'cta_alignment',         label: 'CTA alignment',          weight: '15%' },
+              { key: 'format_execution',      label: 'Format execution',       weight: '10%' },
+            ];
+            const gradeTone = mc.grade.startsWith('A') ? 'text-success'
+              : mc.grade === 'B' ? 'text-coral'
+              : mc.grade === 'C' ? 'text-warning' : 'text-danger';
+            const stageMismatch = mc.stage_mismatch_warning && mc.detected_funnel_stage
+              && mc.detected_funnel_stage !== mc.intended_funnel_stage;
+            const pretty = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const qs = mc.predicted_quality_score;
+            const qsTone = qs.total >= 7 ? 'text-success'
+              : qs.total >= 5 ? 'text-coral'
+              : qs.total >= 3 ? 'text-warning' : 'text-danger';
+            // No-brainer pass count for the offer box
+            const nbEntries = Object.entries(mc.offer_no_brainer_pass ?? {});
+            const nbPasses = nbEntries.filter(([, v]) => v === 'Pass').length;
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Meta critique · Ivan&apos;s framework</h2>
+                <p className="text-ink-muted text-[14px] mb-3">
+                  Paid-Meta craft critic. Weighted to the levers Ivan calls highest-impact: Offer 25% / Message-market fit 20% / Creative-as-targeting 15% / Hook 15% / CTA 15% / Format 10%.
+                </p>
+                <Card className="!p-0 overflow-hidden border-2 !border-magenta/30">
+                  <div className="px-6 py-5 bg-gradient-to-br from-magenta-soft to-coral-soft flex items-center gap-6 flex-wrap">
+                    <div className="flex-1 min-w-[220px]">
+                      <div className="text-[11.5px] text-magenta font-bold uppercase tracking-[0.14em]">Composite</div>
+                      <div className="display-italic text-[64px] leading-none mt-1">
+                        {mc.composite.toFixed(1)}<span className="text-[24px] font-sans not-italic align-top opacity-70">/10</span>
+                      </div>
+                      <div className="text-[12.5px] text-ink-muted mt-1">
+                        {pretty(mc.intended_funnel_stage)} stage{mc.detected_concept && <> · Concept: <strong>{pretty(mc.detected_concept)}</strong></>}
+                      </div>
+                    </div>
+                    <div className="w-28 h-28 rounded-full bg-white/30 backdrop-blur flex flex-col items-center justify-center border-2 border-white/60">
+                      <div className="text-[10.5px] uppercase tracking-[0.14em] font-bold opacity-80">Grade</div>
+                      <div className={clsx('display-italic text-[60px] leading-[0.85] mt-0.5', gradeTone)}>{mc.grade}</div>
+                    </div>
+                    {qs.total > 0 && (
+                      <div className="px-4 py-3 rounded-md border-2 border-violet/40 bg-white/40">
+                        <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold opacity-90 text-violet">Predicted lead quality</div>
+                        <div className={clsx('display-italic text-[32px] leading-none mt-0.5', qsTone)}>{qs.total}<span className="text-[16px] font-sans not-italic align-top opacity-70">/9</span></div>
+                        <div className="text-[10.5px] text-ink-muted mt-1">U{qs.urgency} · B{qs.budget} · F{qs.fit}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {stageMismatch && (
+                    <div className="px-6 py-3 bg-warning-soft border-t border-warning/30 text-[12.5px] text-ink leading-snug">
+                      <strong>Stage mismatch:</strong> {mc.stage_mismatch_warning} (detected: {pretty(mc.detected_funnel_stage)}; intended for your objective: {pretty(mc.intended_funnel_stage)})
+                    </div>
+                  )}
+
+                  {/* 6 sub-scores */}
+                  <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 bg-surface">
+                    {DIMS.map((d) => {
+                      const score = mc.scores[d.key] ?? 0;
+                      const explain = mc.explanations?.[d.key] || '';
+                      const tone = score >= 8 ? 'bg-success' : score >= 6 ? 'bg-coral' : score >= 4 ? 'bg-warning' : 'bg-danger';
+                      return (
+                        <div key={d.key}>
+                          <div className="flex items-baseline gap-2 mb-1">
+                            <div className="text-[12.5px] font-semibold text-ink flex-1">{d.label} <span className="text-ink-muted text-[10.5px]">({d.weight})</span></div>
+                            <div className="mono text-[14px] font-bold">{score}<span className="text-ink-muted text-[11px]">/10</span></div>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-bg-deep overflow-hidden">
+                            <div className={clsx('h-full', tone)} style={{ width: `${score * 10}%` }} />
+                          </div>
+                          {explain && <div className="text-[11.5px] text-ink-muted mt-1 leading-snug">{explain}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Diagnosis trio */}
+                  {(mc.biggest_strength || mc.biggest_weakness || mc.one_specific_fix) && (
+                    <div className="px-6 py-4 border-t border-magenta/20 bg-bg-deep grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {mc.biggest_strength && (
+                        <div>
+                          <div className="text-[11px] text-success font-bold uppercase tracking-[0.08em] mb-1">Biggest strength</div>
+                          <div className="text-[12.5px] text-ink leading-snug">{mc.biggest_strength}</div>
+                        </div>
+                      )}
+                      {mc.biggest_weakness && (
+                        <div>
+                          <div className="text-[11px] text-danger font-bold uppercase tracking-[0.08em] mb-1">Biggest weakness</div>
+                          <div className="text-[12.5px] text-ink leading-snug">{mc.biggest_weakness}</div>
+                        </div>
+                      )}
+                      {mc.one_specific_fix && (
+                        <div>
+                          <div className="text-[11px] text-violet font-bold uppercase tracking-[0.08em] mb-1">If you do ONE thing</div>
+                          <div className="text-[12.5px] text-ink leading-snug">{mc.one_specific_fix}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Offer no-brainer scorecard */}
+                  {nbEntries.length > 0 && (
+                    <div className="px-6 py-4 border-t border-magenta/20 bg-surface">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="text-[11.5px] text-magenta font-bold uppercase tracking-[0.08em]">Offer audit (no-brainer framework)</div>
+                        <Pill tone={nbPasses >= 5 ? 'success' : nbPasses >= 3 ? 'warning' : 'danger'}>{nbPasses}/{nbEntries.length} pass</Pill>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {nbEntries.map(([axis, verdict]) => (
+                          <div key={axis} className="bg-bg-deep border border-border rounded-md px-2.5 py-1.5">
+                            <div className="text-[10px] uppercase tracking-[0.06em] text-ink-muted">{axis.replace(/_/g, ' ')}</div>
+                            <div className={clsx('text-[12.5px] font-bold', verdict === 'Pass' ? 'text-success' : 'text-danger')}>{verdict}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {mc.offer_issues.length > 0 && (
+                        <ul className="mt-3 space-y-1.5">
+                          {mc.offer_issues.slice(0, 4).map((s, i) => (
+                            <li key={i} className="text-[12.5px] text-ink flex gap-2 leading-snug"><span className="text-magenta">·</span>{s}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ICP specificity + ad copy formula gaps */}
+                  {(mc.icp_specificity_issues.length > 0 || mc.copy_formula_gaps.length > 0) && (
+                    <div className="px-6 py-4 border-t border-magenta/20 bg-surface grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {mc.icp_specificity_issues.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div className="text-[11.5px] text-magenta font-bold uppercase tracking-[0.08em]">ICP specificity</div>
+                            <Pill tone={mc.icp_specificity_score >= 7 ? 'success' : mc.icp_specificity_score >= 4 ? 'warning' : 'danger'}>{mc.icp_specificity_score}/10</Pill>
+                          </div>
+                          <ul className="space-y-1">
+                            {mc.icp_specificity_issues.slice(0, 3).map((s, i) => (
+                              <li key={i} className="text-[12.5px] text-ink leading-snug">· {s}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {mc.copy_formula_gaps.length > 0 && (
+                        <div>
+                          <div className="text-[11.5px] text-magenta font-bold uppercase tracking-[0.08em] mb-1.5">Ad copy formula gaps</div>
+                          <ul className="space-y-1">
+                            {mc.copy_formula_gaps.slice(0, 4).map((s, i) => (
+                              <li key={i} className="text-[12.5px] text-ink leading-snug">· {s}</li>
+                            ))}
+                          </ul>
+                          <div className="text-[10.5px] text-ink-muted mt-1.5 italic">Formula: Direct offer → Pain → Solution → Pain explained → Solution explained → Social proof → CTA</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Hook autopsy */}
+                  {(mc.hook_score > 0 || mc.hook_alternatives.length > 0) && (
+                    <div className="px-6 py-4 border-t border-magenta/20 bg-magenta-soft/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="text-[11.5px] text-magenta font-bold uppercase tracking-[0.08em]">Hook autopsy</div>
+                        {mc.hook_score > 0 && (
+                          <Pill tone={mc.hook_score >= 7 ? 'success' : mc.hook_score >= 4 ? 'warning' : 'danger'}>
+                            Hook {mc.hook_score}/10
+                          </Pill>
+                        )}
+                      </div>
+                      {mc.hook_alternatives.length > 0 && (
+                        <ol className="space-y-2">
+                          {mc.hook_alternatives.slice(0, 3).map((h, i) => (
+                            <li key={i} className="text-[13px] text-ink">
+                              <strong className="text-magenta">{i + 1}.</strong> &ldquo;{h.hook}&rdquo;
+                              {h.reason && <div className="text-[11.5px] text-ink-muted mt-0.5 italic">— {h.reason}</div>}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Recommended concepts */}
+                  {mc.recommended_concepts.length > 0 && (
+                    <div className="px-6 py-4 border-t border-magenta/20 bg-surface">
+                      <div className="text-[11.5px] text-magenta font-bold uppercase tracking-[0.08em] mb-2">Recommended concepts (Ivan&apos;s 8)</div>
+                      <ul className="space-y-1.5">
+                        {mc.recommended_concepts.slice(0, 3).map((r, i) => (
+                          <li key={i} className="text-[13px] text-ink">
+                            <strong>{pretty(r.concept)}</strong>{r.why && <> — <span className="text-ink-muted">{r.why}</span></>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Deterministic + placement findings */}
+                  {(mc.deterministic_findings.length > 0 || mc.placement_findings.length > 0) && (
+                    <div className="px-6 py-4 border-t border-magenta/20 bg-warning-soft/50">
+                      <div className="text-[11.5px] text-warning font-bold uppercase tracking-[0.08em] mb-1.5">Pre-flight findings</div>
+                      <ul className="space-y-1.5">
+                        {[...mc.deterministic_findings, ...mc.placement_findings].slice(0, 5).map((f, i) => (
+                          <li key={i} className="text-[12.5px] text-ink flex gap-2 leading-snug"><span className="text-warning">⚠</span>{f}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-magenta/20 bg-bg-deep leading-snug">
+                    <strong>Honest framing.</strong> Scores craft quality for paid Meta — NOT CTR or ROAS. Even a perfect ad fails if the offer is wrong for the audience, the landing page doesn&apos;t match, or budget is too thin. Knowledge base adapted from <a href="https://github.com/ivangfalco/ads-skills" target="_blank" rel="noreferrer" className="underline">Ivan Falco&apos;s ads-skills</a>, licensed for AdProof&apos;s use. Powered by Gemini {mc.model && <>(<span className="mono">{mc.model}</span>)</>}.
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
+
           {/* LINKEDIN CRITIQUE — Session 1. LDA 6-dim scorecard +
               Ivan Falco's creative-strategy + copy-audit framework.
               Renders only on LinkedIn placements. Honest framing:

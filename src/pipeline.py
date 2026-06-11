@@ -732,6 +732,34 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
         except Exception:                                  # noqa: BLE001
             linkedin_critique = None      # never fail the run on the critic
 
+    # Session 2: Meta-specific critic (Ivan). Runs only on Meta placements.
+    # Focuses on offer strength + message-market fit + creative-as-targeting
+    # — the levers VIE and the LinkedIn critic don't touch.
+    meta_critique = None
+    try:
+        from src.meta_critic import critique_meta, is_meta_platform
+    except ImportError:
+        from meta_critic import critique_meta, is_meta_platform
+    if is_meta_platform(brief.platform_id):
+        try:
+            meta_critique = critique_meta(
+                headline=assets.headline,
+                primary_text=assets.primary_text,
+                description=assets.description,
+                cta=assets.cta,
+                link=assets.link,
+                objective=brief.objective,
+                platform_id=brief.platform_id,
+                audience_hint=audience_hint,
+                industry=profile.industry or profile.product_category or "",
+                geo=getattr(brief, "geo", "UK") or "UK",
+                avg_order_value=getattr(brief, "avg_order_value", None),
+                image_path=image_path,
+                video_path=video_path,
+            )
+        except Exception:                                  # noqa: BLE001
+            meta_critique = None
+
     # Vision (esp. the video path, which buffers the clip + the genai client)
     # can leave tens of MB resident; release it BEFORE the memory-heavy Monte
     # Carlo so the two peaks don't stack and OOM a small instance.
@@ -871,4 +899,5 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
         "reel_quality": reel_quality,
         "script_critique": script_critique,
         "linkedin_critique": linkedin_critique,
+        "meta_critique": meta_critique,
     }
