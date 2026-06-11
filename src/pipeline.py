@@ -706,6 +706,32 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
             except Exception:                             # noqa: BLE001
                 script_critique = None    # never fail the run on the critic
 
+    # Session 1: LinkedIn-specific critic (Ivan + LDA). Runs only when the
+    # placement is LinkedIn. Cheap text-only Gemini call, ~£0.003.
+    linkedin_critique = None
+    try:
+        from src.linkedin_critic import critique_linkedin, is_linkedin_platform
+    except ImportError:                                   # `python src/...`
+        from linkedin_critic import critique_linkedin, is_linkedin_platform
+    if is_linkedin_platform(brief.platform_id):
+        try:
+            linkedin_critique = critique_linkedin(
+                headline=assets.headline,
+                primary_text=assets.primary_text,
+                description=assets.description,
+                cta=assets.cta,
+                link=assets.link,
+                objective=brief.objective,
+                platform_id=brief.platform_id,
+                audience_hint=audience_hint,
+                industry=profile.industry or profile.product_category or "",
+                geo=getattr(brief, "geo", "UK") or "UK",
+                image_path=image_path,
+                video_path=video_path,
+            )
+        except Exception:                                  # noqa: BLE001
+            linkedin_critique = None      # never fail the run on the critic
+
     # Vision (esp. the video path, which buffers the clip + the genai client)
     # can leave tens of MB resident; release it BEFORE the memory-heavy Monte
     # Carlo so the two peaks don't stack and OOM a small instance.
@@ -844,4 +870,5 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
         "assets": assets, "validation": validation,
         "reel_quality": reel_quality,
         "script_critique": script_critique,
+        "linkedin_critique": linkedin_critique,
     }

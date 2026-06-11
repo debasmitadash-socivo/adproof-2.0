@@ -526,6 +526,194 @@ export default function ResultPage() {
             );
           })()}
 
+          {/* LINKEDIN CRITIQUE — Session 1. LDA 6-dim scorecard +
+              Ivan Falco's creative-strategy + copy-audit framework.
+              Renders only on LinkedIn placements. Honest framing:
+              this scores craft quality for paid LinkedIn use, NOT
+              CTR. Required attribution footer at the bottom. */}
+          {result.linkedin_critique && !result.linkedin_critique.is_skipped && (() => {
+            const lc = result.linkedin_critique!;
+            const DIMS: { key: keyof typeof lc.scores; label: string; weight: string }[] = [
+              { key: 'hook',             label: 'Hook',              weight: '30%' },
+              { key: 'body',             label: 'Body',              weight: '20%' },
+              { key: 'credibility',      label: 'Credibility',       weight: '15%' },
+              { key: 'audience_fit',     label: 'Audience fit',      weight: '15%' },
+              { key: 'cta',              label: 'CTA',               weight: '10%' },
+              { key: 'format_execution', label: 'Format execution',  weight: '10%' },
+            ];
+            const gradeTone = lc.grade.startsWith('A') ? 'text-success'
+              : lc.grade === 'B' ? 'text-coral'
+              : lc.grade === 'C' ? 'text-warning' : 'text-danger';
+            const stageMismatch = lc.stage_mismatch_warning && lc.detected_awareness_stage
+              && lc.detected_awareness_stage !== lc.intended_awareness_stage;
+            const allCopyIssues = [
+              ...lc.factual_accuracy_issues.map(s => ({ kind: 'Factual',     s })),
+              ...lc.tone_violations.map(s        => ({ kind: 'Tone',        s })),
+              ...lc.structure_issues.map(s       => ({ kind: 'Structure',   s })),
+              ...lc.text_density_issues.map(s    => ({ kind: 'Text density', s })),
+              ...lc.audience_fit_issues.map(s    => ({ kind: 'Audience fit', s })),
+            ];
+            const prettyAngle = (a: string) => a.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">LinkedIn critique · LDA + Ivan</h2>
+                <p className="text-ink-muted text-[14px] mb-3">
+                  Paid-LinkedIn craft critic. Scores 6 dimensions weighted by Hook 30% / Body 20% / Credibility 15% / Audience Fit 15% / CTA 10% / Format 10%, plus Ivan's awareness-stage + creative-angle audit.
+                </p>
+                <Card className="!p-0 overflow-hidden border-2 !border-coral/30">
+                  <div className="px-6 py-5 bg-gradient-to-br from-coral-soft to-magenta-soft flex items-center gap-6 flex-wrap">
+                    <div className="flex-1 min-w-[220px]">
+                      <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.14em]">LDA composite</div>
+                      <div className="display-italic text-[64px] leading-none mt-1">
+                        {lc.composite.toFixed(1)}<span className="text-[24px] font-sans not-italic align-top opacity-70">/10</span>
+                      </div>
+                      <div className="text-[12.5px] text-ink-muted mt-1">
+                        {lc.funnel_stage} · {prettyAngle(lc.detected_awareness_stage || lc.intended_awareness_stage)}{lc.detected_angle && <> · Angle: <strong>{prettyAngle(lc.detected_angle)}</strong></>}
+                      </div>
+                    </div>
+                    <div className="w-28 h-28 rounded-full bg-white/30 backdrop-blur flex flex-col items-center justify-center border-2 border-white/60">
+                      <div className="text-[10.5px] uppercase tracking-[0.14em] font-bold opacity-80">Grade</div>
+                      <div className={clsx('display-italic text-[60px] leading-[0.85] mt-0.5', gradeTone)}>{lc.grade}</div>
+                    </div>
+                  </div>
+
+                  {stageMismatch && (
+                    <div className="px-6 py-3 bg-warning-soft border-t border-warning/30 text-[12.5px] text-ink leading-snug">
+                      <strong>Stage mismatch:</strong> {lc.stage_mismatch_warning} (detected: {prettyAngle(lc.detected_awareness_stage)}; intended for your {lc.intended_awareness_stage.replace(/_/g, '-')} objective: {prettyAngle(lc.intended_awareness_stage)})
+                    </div>
+                  )}
+
+                  {/* 6 sub-scores */}
+                  <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 bg-surface">
+                    {DIMS.map((d) => {
+                      const score = lc.scores[d.key] ?? 0;
+                      const explain = lc.explanations?.[d.key] || '';
+                      const tone = score >= 8 ? 'bg-success' : score >= 6 ? 'bg-coral' : score >= 4 ? 'bg-warning' : 'bg-danger';
+                      return (
+                        <div key={d.key}>
+                          <div className="flex items-baseline gap-2 mb-1">
+                            <div className="text-[12.5px] font-semibold text-ink flex-1">{d.label} <span className="text-ink-muted text-[10.5px]">({d.weight})</span></div>
+                            <div className="mono text-[14px] font-bold">{score}<span className="text-ink-muted text-[11px]">/10</span></div>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-bg-deep overflow-hidden">
+                            <div className={clsx('h-full', tone)} style={{ width: `${score * 10}%` }} />
+                          </div>
+                          {explain && <div className="text-[11.5px] text-ink-muted mt-1 leading-snug">{explain}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Diagnosis trio */}
+                  {(lc.biggest_strength || lc.biggest_weakness || lc.one_specific_fix) && (
+                    <div className="px-6 py-4 border-t border-coral/20 bg-bg-deep grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {lc.biggest_strength && (
+                        <div>
+                          <div className="text-[11px] text-success font-bold uppercase tracking-[0.08em] mb-1">Biggest strength</div>
+                          <div className="text-[12.5px] text-ink leading-snug">{lc.biggest_strength}</div>
+                        </div>
+                      )}
+                      {lc.biggest_weakness && (
+                        <div>
+                          <div className="text-[11px] text-danger font-bold uppercase tracking-[0.08em] mb-1">Biggest weakness</div>
+                          <div className="text-[12.5px] text-ink leading-snug">{lc.biggest_weakness}</div>
+                        </div>
+                      )}
+                      {lc.one_specific_fix && (
+                        <div>
+                          <div className="text-[11px] text-violet font-bold uppercase tracking-[0.08em] mb-1">If you do ONE thing</div>
+                          <div className="text-[12.5px] text-ink leading-snug">{lc.one_specific_fix}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Hook autopsy */}
+                  {(lc.hook_score > 0 || lc.hook_alternatives.length > 0) && (
+                    <div className="px-6 py-4 border-t border-coral/20 bg-coral-soft/40">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em]">Hook autopsy</div>
+                        {lc.hook_score > 0 && (
+                          <Pill tone={lc.hook_score >= 7 ? 'success' : lc.hook_score >= 4 ? 'warning' : 'danger'}>
+                            Hook {lc.hook_score}/10
+                          </Pill>
+                        )}
+                      </div>
+                      {lc.hook_alternatives.length > 0 && (
+                        <ol className="space-y-2">
+                          {lc.hook_alternatives.slice(0, 3).map((h, i) => (
+                            <li key={i} className="text-[13px] text-ink">
+                              <strong className="text-coral">{i + 1}.</strong> &ldquo;{h.hook}&rdquo;
+                              {h.reason && <div className="text-[11.5px] text-ink-muted mt-0.5 italic">— {h.reason}</div>}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Recommended angles (Ivan's 12 categories) */}
+                  {lc.recommended_angles.length > 0 && (
+                    <div className="px-6 py-4 border-t border-coral/20 bg-surface">
+                      <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em] mb-2">Recommended angles</div>
+                      <ul className="space-y-2">
+                        {lc.recommended_angles.slice(0, 3).map((r, i) => (
+                          <li key={i} className="text-[13px] text-ink">
+                            <strong>{prettyAngle(r.angle)}</strong>{r.why && <> — <span className="text-ink-muted">{r.why}</span></>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* 5-layer copy audit findings */}
+                  {allCopyIssues.length > 0 && (
+                    <div className="px-6 py-4 border-t border-coral/20 bg-surface">
+                      <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em] mb-2">5-layer copy audit (Ivan's framework)</div>
+                      <ul className="space-y-1.5">
+                        {allCopyIssues.slice(0, 6).map((iss, i) => (
+                          <li key={i} className="text-[13px] text-ink flex gap-2 leading-snug">
+                            <span className="mono text-[10.5px] text-violet uppercase tracking-[0.06em] mt-0.5">{iss.kind}</span>
+                            <span>{iss.s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* TLA eligibility note */}
+                  {(lc.tla_eligible || lc.tla_notes) && (
+                    <div className={clsx('px-6 py-3 border-t border-coral/20',
+                      lc.tla_eligible ? 'bg-lime-soft' : 'bg-bg-deep')}>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <Pill tone={lc.tla_eligible ? 'success' : 'warning'}>
+                          {lc.tla_eligible ? 'TLA-promotable' : 'Not TLA-shaped'}
+                        </Pill>
+                      </div>
+                      <div className="text-[12px] text-ink leading-snug">{lc.tla_notes}</div>
+                    </div>
+                  )}
+
+                  {/* Deterministic audit-checklist findings */}
+                  {lc.deterministic_findings.length > 0 && (
+                    <div className="px-6 py-4 border-t border-coral/20 bg-warning-soft/50">
+                      <div className="text-[11.5px] text-warning font-bold uppercase tracking-[0.08em] mb-1.5">Audit checklist (deterministic)</div>
+                      <ul className="space-y-1.5">
+                        {lc.deterministic_findings.map((f, i) => (
+                          <li key={i} className="text-[12.5px] text-ink flex gap-2 leading-snug"><span className="text-warning">⚠</span>{f}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-coral/20 bg-bg-deep leading-snug">
+                    <strong>Honest framing.</strong> Scores craft quality for paid LinkedIn — NOT CTR or ROAS. Even a perfect 10/10 ad can fail on paid LinkedIn if targeting is wrong, the landing page doesn&apos;t match, or the offer is weak — none of which this critic can see. Use as a copy + creative-direction signal, not a forecast. Knowledge base adapted from <a href="https://github.com/ivangfalco/ads-skills" target="_blank" rel="noreferrer" className="underline">Ivan Falco&apos;s ads-skills</a>, licensed for AdProof&apos;s use. Scoring framework: LinkedIn Devil&apos;s Advocate. Powered by Gemini {lc.model && <>(<span className="mono">{lc.model}</span>)</>}.
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
+
           {/* REEL QUALITY — VIE (Virality Intelligence Engine) 8-dim
               critic for short-video paid ads. Same call also produces hook
               autopsy, viral pattern classification, algorithm risk and a

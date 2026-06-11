@@ -511,6 +511,45 @@ export interface SimulateResponse {
     is_skipped: boolean;
     skipped_reason: string;
   } | null;
+  // Session 1: LinkedIn-specific paid critic (Ivan Falco's ads-skills KB
+  // + the owner's LDA 6-dim scorecard). Only present when platform_id
+  // starts with 'linkedin' AND Gemini was available.
+  linkedin_critique?: {
+    scores: {
+      hook: number;             // /10
+      body: number;             // /10
+      credibility: number;      // /10
+      audience_fit: number;     // /10
+      cta: number;              // /10
+      format_execution: number; // /10
+    };
+    composite: number;          // 0-10 weighted (Hook 30%, Body 20%, etc.)
+    grade: string;              // A+/A/B/C/D/F/—
+    explanations: Record<string, string>;
+    detected_awareness_stage: string;
+    intended_awareness_stage: string;
+    stage_mismatch_warning: string;
+    funnel_stage: string;
+    detected_angle: string;
+    recommended_angles: { angle: string; why: string }[];
+    factual_accuracy_issues: string[];
+    tone_violations: string[];
+    structure_issues: string[];
+    text_density_issues: string[];
+    audience_fit_issues: string[];
+    hook_score: number;
+    hook_alternatives: { hook: string; reason: string }[];
+    tla_eligible: boolean;
+    tla_notes: string;
+    deterministic_findings: string[];
+    biggest_strength: string;
+    biggest_weakness: string;
+    one_specific_fix: string;
+    provider: string;
+    model: string;
+    is_skipped: boolean;
+    skipped_reason: string;
+  } | null;
   // Reel Quality — VIE 8-dim short-video critic (only when a video was
   // uploaded and Gemini was available). Same call also produces hook
   // autopsy + algorithm-risk + publish verdict.
