@@ -1005,7 +1005,28 @@ export default function NewAnalysisPage() {
                 </div>
               )}
               <div><strong>Audience:</strong> {audienceMethod === 'saved' ? (w.audienceSegment ?? '—') : audienceMethod === 'words' ? (w.audienceDescription ? w.audienceDescription.slice(0, 60) + '…' : '—') : 'filters'}</div>
-              <div><strong>Creative:</strong> {w.imagePath ? '✓ uploaded' : '— not uploaded'}</div>
+              {(() => {
+                // Summary used to only check imagePath — missed videos AND missed
+                // extra variants. Now counts every variant that has either an
+                // image OR video so the user can see X/N at a glance.
+                const totalVariants = 1 + w.extraVariants.length;
+                const variantHas = (v: { imagePath?: string | null; videoPath?: string | null }) =>
+                  !!(v.imagePath || v.videoPath);
+                let uploadedCount = (w.imagePath || w.videoPath) ? 1 : 0;
+                uploadedCount += w.extraVariants.filter(variantHas).length;
+                const allUploaded = uploadedCount === totalVariants;
+                const partial = uploadedCount > 0 && !allUploaded;
+                return (
+                  <div>
+                    <strong>Creative:</strong>{' '}
+                    {allUploaded
+                      ? <span className="text-success">✓ uploaded ({uploadedCount}/{totalVariants})</span>
+                      : partial
+                        ? <span className="text-warning">partial — {uploadedCount}/{totalVariants} uploaded</span>
+                        : <span className="text-danger">— not uploaded (0/{totalVariants})</span>}
+                  </div>
+                );
+              })()}
               <div><strong>Market:</strong> {geo}</div>
               <div><strong>Budget:</strong> {currency} {w.budget.toLocaleString()} / {w.days} days</div>
               <div><strong>Order value:</strong> {aov ? `${currency} ${Number(aov).toLocaleString()}` : <span className="text-warning">not set</span>} · {convRate}% conv</div>
@@ -1138,6 +1159,14 @@ function PlatformFilters({ platformId }: { platformId: string }) {
   const clearFilters = useApp((s) => s.clearFilters);
   const setManyFilters = useApp((s) => s.setManyFilters);
   const profile = useApp((s) => s.companyProfile);
+  const savedAudiences = useApp((s) => s.savedAudiences);
+  const addAudience = useApp((s) => s.addAudience);
+  const currentCompanyId = useApp((s) => s.currentCompanyId);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+  // Tracks the chip-signature of the last tailor so a follow-up tailor with
+  // a different mix can offer 'save as new' without dupes. Reserved for the
+  // next slice; read-out happens in the auto-save check below.
+  const [, setLastTailorSig] = useState<string | null>(null);
 
   const cards = filtersForPlatform(platformId);
   const selectedIds = Object.keys(filterSelections);
@@ -1174,10 +1203,48 @@ function PlatformFilters({ platformId }: { platformId: string }) {
       r.selected_chip_ids.filter((id) => !id.startsWith('gender:')).forEach((id) => next.add(id));
       r.custom_interests.forEach((t) => next.add(`custom:${t}`));
       if (r.gender) next.add(`gender:${r.gender}`);
-      setManyFilters([...next]);
+      const chipList = [...next];
+      setManyFilters(chipList);
       setRationale(r.rationale || null);
       setShowAll(false);                     // collapse to the relevant groups
       if (r.source !== 'llm') setTailorErr('AI was unavailable — pick chips manually, or try again.');
+
+      // Fix #4: auto-save the tailored set as a SavedAudience the first time
+      // we tailor (owner ask: don't make users repeat this step). The chip
+      // selection is serialised into the description field so it survives
+      // existing audiences-table schema with no migration needed. Skipped
+      // when an identical chipset is already saved.
+      const sig = chipList.slice().sort().join('|');
+      setLastTailorSig(sig);
+      const existingSigs = new Set(savedAudiences.map((a) => {
+        try {
+          const parsed = JSON.parse(a.description || '{}');
+          return Array.isArray(parsed?.chips) ? parsed.chips.slice().sort().join('|') : '';
+        } catch { return ''; }
+      }));
+      if (!existingSigs.has(sig)) {
+        const name = savedAudiences.length === 0
+          ? `Auto-tailored for ${profile?.company_name || 'your brand'}`
+          : `Tailored ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+        addAudience({
+          id: crypto.randomUUID?.() ?? `aud_${Date.now()}`,
+          companyId: currentCompanyId ?? undefined,
+          name,
+          description: JSON.stringify({
+            chips: chipList,
+            rationale: r.rationale || '',
+            tailored_at: new Date().toISOString(),
+            platform_id: platformId,
+          }),
+          segment: 'all',                    // chip-based audience; segment falls back
+          createdAt: Date.now(),
+          usedInCount: 0,
+        });
+        setSaveToast(savedAudiences.length === 0
+          ? `✓ Saved as your first audience: "${name}"`
+          : `✓ Saved as new audience: "${name}"`);
+        setTimeout(() => setSaveToast(null), 5000);
+      }
     } catch (e) {
       setTailorErr((e as Error).message);
     } finally { setTailoring(false); }
@@ -1213,6 +1280,7 @@ function PlatformFilters({ platformId }: { platformId: string }) {
           )}
         </div>
         {rationale && <div className="text-[12.5px] text-ink mt-2 pt-2 border-t border-coral/20"><strong>Why:</strong> {rationale}</div>}
+        {saveToast && <div className="text-[12.5px] text-success mt-2 bg-lime-soft border border-lime-deep/30 rounded-md px-2.5 py-1.5">{saveToast}</div>}
         {tailorErr && <div className="text-[12.5px] text-danger mt-2">{tailorErr}</div>}
       </Card>
 

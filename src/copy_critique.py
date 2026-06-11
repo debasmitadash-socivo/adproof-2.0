@@ -65,6 +65,168 @@ def _has_concrete_numbers(text: str) -> bool:
     ))
 
 
+# ---------------------------------------------------------------------------
+# Text-quality detectors (added 2026-06-10 per owner feedback — VIE wasn't
+# catching obvious typos, weird symbols mid-word, or AI smells).
+# ---------------------------------------------------------------------------
+
+# AI / corporate-speak phrases that flatten copy. Tuned to the owner's
+# personal banned-phrases list (per linkedin-devils-advocate skill) so the
+# same critic works for LinkedIn drafts too.
+_AI_PHRASES = (
+    "game-changer", "game changer", "in today's landscape", "in today's world",
+    "let's dive in", "at the end of the day", "seamless", "leverage",
+    "unlock", "elevate", "synergy", "circle back", "bandwidth", "low-hanging fruit",
+    "boil the ocean", "move the needle", "needs to be addressed", "going forward",
+    "robust", "best-in-class", "world-class", "cutting-edge", "next-level",
+)
+
+# Likely typos / common misspellings + missing-apostrophe shortcuts.
+_TYPO_PATTERNS = (
+    (r"\b[Yy]our\s+welcome\b",      "'Your welcome' → 'You're welcome'"),
+    (r"\b[Ii]ts\s+a\b",              "'Its a' → 'It's a'"),
+    (r"\b[Ii]m\s",                   "'Im ' missing apostrophe — should be 'I'm '"),
+    (r"\b[Yy]oure\s",                "'Youre ' missing apostrophe — should be 'You're '"),
+    (r"\b[Dd]ont\s",                 "'Dont' missing apostrophe — 'Don't'"),
+    (r"\b[Cc]ant\s",                 "'Cant' missing apostrophe — 'Can't'"),
+    (r"\b[Ww]ont\s",                 "'Wont' missing apostrophe — 'Won't'"),
+    (r"\b[Tt]heir\s+is\b",           "'Their is' → 'There is'"),
+    (r"\bteh\b",                     "'teh' is the classic 'the' typo"),
+    (r"\brecieve\b",                 "'recieve' is misspelt — 'receive'"),
+    (r"\boccured\b",                 "'occured' → 'occurred'"),
+    (r"\bdefinately\b",              "'definately' → 'definitely'"),
+    (r"\bseperate\b",                "'seperate' → 'separate'"),
+    (r"\b(?:loo+|sooo+|reeeally|amaaaazing)\b",
+                                      "Stretched-out word reads as informal/text-message style"),
+    (r"\b(\w)\1{2,}(\w)*",            "Letter repeated 3+ times in a word — often a typo or chat-speak"),
+)
+
+# Symbol-in-word / leet-speak tricks brands use to try to dodge filters or
+# add emphasis. These hurt readability AND get clamped by ad-platform policy.
+_SYMBOL_IN_WORD = re.compile(
+    r"\b[A-Za-z]+[@$0]+[A-Za-z]+\b"            # B@y, m0ney, c@sh
+    r"|\b[A-Za-z](?:[._\-*]+[A-Za-z]){2,}\b",  # B.U.Y, B-U-Y, B_U_Y
+)
+
+# Emoji clusters (3+ in a row) — heavy in B2C but reads as low-effort spam
+# in B2B contexts.
+_EMOJI_CLUSTER = re.compile(
+    r"(?:[\U0001F300-\U0001FAFF\U0001F600-\U0001F64F☀-➿]\s*){3,}")
+
+
+def _check_text_quality(text: str, field: str,
+                          *, allow_emojis: bool = True,
+                          platform_id: str = "") -> List[CopyIssue]:
+    """Deterministic quality scan for typos / symbols / repeats / AI smells.
+
+    Honest about confidence: these are pattern checks, NOT a full grammar
+    engine. False positives are possible (e.g. 'Mississippi' triggers the
+    'letter repeated 3+ times' rule). The fix line always explains the
+    suspected issue so the user can dismiss it if it's a false positive.
+    """
+    out: List[CopyIssue] = []
+    if not text:
+        return out
+
+    # 1. Runaway punctuation (!!! / ??? / multiple periods that aren't an ellipsis).
+    if re.search(r"!{2,}", text):
+        out.append(CopyIssue(
+            severity="warning", field=field,
+            message="Multiple exclamation marks in a row (!!) — reads as spammy on most platforms and gets clamped by Meta's policy filters.",
+            fix="Use ONE exclamation maximum, and only where the sentence genuinely earns it.",
+        ))
+    if re.search(r"\?{2,}", text):
+        out.append(CopyIssue(
+            severity="info", field=field,
+            message="Multiple question marks in a row (??) — reads as agitated, not curious.",
+            fix="One question mark. The reader gets it.",
+        ))
+    if re.search(r"\.{4,}", text):
+        out.append(CopyIssue(
+            severity="info", field=field,
+            message="More than three dots in a row — an ellipsis is exactly three (…).",
+            fix="Use exactly three dots, or the unicode … character.",
+        ))
+
+    # 2. Symbol-in-word / leet-speak / character-spacing.
+    m = _SYMBOL_IN_WORD.search(text)
+    if m:
+        out.append(CopyIssue(
+            severity="warning", field=field,
+            message=f"Symbol inside a word: \"{m.group(0)}\" — common censor-dodge trick that platforms increasingly downrank, and looks unprofessional.",
+            fix=f"Spell the word normally. If platform policy is a concern, rephrase rather than disguise.",
+        ))
+
+    # 3. Emoji clusters (3+ consecutive). Warn always; harder warning for B2B.
+    m = _EMOJI_CLUSTER.search(text)
+    if m:
+        is_b2b = platform_id.lower() in _B2B_PLATFORM_IDS
+        out.append(CopyIssue(
+            severity="warning" if is_b2b else "info",
+            field=field,
+            message=(f"Emoji cluster (3+ in a row): \"{m.group(0).strip()}\"" +
+                     (" — reads as low-effort on LinkedIn." if is_b2b else
+                      " — fine on consumer feeds but worth thinning out for a cleaner read.")),
+            fix="Cap at 2 emojis per cluster; use them to mark a beat, not as filler.",
+        ))
+
+    # 4. Whitespace + leading/trailing junk.
+    if "  " in text:
+        out.append(CopyIssue(
+            severity="info", field=field,
+            message="Double space inside the text — usually a copy-paste artefact.",
+            fix="Collapse to single spaces.",
+        ))
+    if text != text.strip():
+        out.append(CopyIssue(
+            severity="info", field=field,
+            message="Leading or trailing whitespace — gets preserved on some platforms and breaks line-wrap.",
+            fix="Trim the start/end.",
+        ))
+
+    # 5. Typo & missing-apostrophe patterns.
+    lower = text.lower()
+    seen_typos = set()
+    for pattern, fix_text in _TYPO_PATTERNS:
+        m = re.search(pattern, text)
+        if m and m.group(0).lower() not in seen_typos:
+            seen_typos.add(m.group(0).lower())
+            out.append(CopyIssue(
+                severity="warning", field=field,
+                message=f"Possible typo: \"{m.group(0)}\". {fix_text}.",
+                fix=f"Verify the spelling; this pattern usually catches a real mistake but occasionally false-positives on proper nouns.",
+            ))
+            if len(seen_typos) >= 3:           # Don't drown the user
+                break
+
+    # 6. AI / corporate-speak phrases.
+    ai_hits = [phrase for phrase in _AI_PHRASES if phrase in lower]
+    if ai_hits:
+        quoted = ", ".join('"' + p + '"' for p in ai_hits[:3])
+        more = "…" if len(ai_hits) > 3 else ""
+        out.append(CopyIssue(
+            severity="info", field=field,
+            message=(f"AI / corporate-speak phrases detected: {quoted}{more}. "
+                     f"These flatten copy and reduce trust (Hootsuite 2026: "
+                     f"30% of consumers are less likely to buy if ads feel "
+                     f"AI-generated)."),
+            fix="Rewrite in plain English. Specific, concrete language beats corporate phrases.",
+            lift_pct=6,
+        ))
+
+    # 7. Em-dash detection (per owner's UK-spelling/no-em-dashes preference
+    # for LinkedIn-style drafts). Soft warning — only flags if there's more
+    # than one em-dash, since the occasional em-dash is fine in long-form.
+    em_dashes = text.count("—") + text.count("–")
+    if em_dashes >= 2:
+        out.append(CopyIssue(
+            severity="info", field=field,
+            message=f"{em_dashes} em / en dashes in the copy — heavy em-dash usage reads as AI-generated to many readers (it's a common LLM tell).",
+            fix="Replace with a comma, full stop, or line break. Em-dashes are fine occasionally but not as a default punctuation.",
+        ))
+    return out
+
+
 def critique_copy(
     headline: str,
     primary_text: str,
@@ -232,6 +394,16 @@ def critique_copy(
             message="Primary text repeats the headline verbatim.",
             fix="Use the body to add the supporting benefit or proof — don't re-state the headline.",
         ))
+
+    # --- Text-quality scans (typos / symbols / AI-smells / punctuation /
+    # em-dashes). Runs per field so each issue is attributed to the right
+    # input slot in the UI.
+    platform_id = getattr(fmt, "platform_id", "") or ""
+    for field_name, text in (("headline",     headline),
+                              ("primary_text", primary_text),
+                              ("description",  description)):
+        issues.extend(_check_text_quality(text, field_name,
+                                           platform_id=platform_id))
 
     # Order most important first.
     SEV_ORDER = {"error": 0, "warning": 1, "info": 2}

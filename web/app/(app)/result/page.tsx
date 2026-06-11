@@ -543,21 +543,38 @@ export default function ResultPage() {
               { key: 'uniqueness',   label: 'Uniqueness',   max: 10 },
               { key: 'platform_fit', label: 'Platform fit', max: 5  },
             ];
+            // Paid-ad framing: VIE's grade reflects ORGANIC virality potential.
+            // For paid ads the bar is much lower — paid distribution doesn't
+            // depend on organic stopping power, so a "fails-organic" creative
+            // can still convert paid. We re-interpret VIE's verdict here so
+            // users don't get scared off perfectly serviceable paid creative.
+            //   organic_strong = composite >= 70 (would do well organic + paid)
+            //   paid_ready     = composite >= 30 (likely fine for paid)
+            //   paid_concern   = composite < 30  (weak even for paid)
+            const organicStrong = rq.composite >= 70;
+            const paidReady    = rq.composite >= 30;
+            const paidLabel = organicStrong ? 'Strong'
+              : paidReady ? 'Paid-ready'
+              : 'Weak even for paid';
+            const paidTone = organicStrong ? 'text-success'
+              : paidReady ? 'text-coral'
+              : 'text-danger';
+            const paidBorder = organicStrong ? 'border-success bg-success-soft'
+              : paidReady ? 'border-coral bg-coral-soft'
+              : 'border-danger bg-danger-soft';
             const gradeTone = rq.grade.startsWith('A') ? 'text-success'
               : rq.grade === 'B' ? 'text-coral'
               : rq.grade === 'C' ? 'text-warning' : 'text-danger';
-            const publishOk = (rq.publish_verdict || '').toUpperCase() === 'YES';
             return (
               <>
                 <h2 className="display-italic text-[28px] mt-7 mb-2">Reel Quality · VIE rubric</h2>
                 <p className="text-ink-muted text-[14px] mb-3">
-                  Virality Intelligence Engine — 8-dimension critic for short-video ads. Strict calibration (most content scores 55-80).
-                  Rates the creative under paid-ad constraints, NOT a virality guarantee.
+                  Virality Intelligence Engine — 8-dimension organic-craft critic. We translate it for paid-ad context below: a low VIE score doesn&apos;t fail your ad, it just tells you the creative wouldn&apos;t carry itself organically.
                 </p>
                 <Card className="!p-0 overflow-hidden border-2 !border-violet/30">
                   <div className="px-6 py-5 bg-gradient-to-br from-violet-soft to-magenta-soft flex items-center gap-6 flex-wrap">
                     <div className="flex-1 min-w-[220px]">
-                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.14em]">Composite (VIE)</div>
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.14em]">Organic craft (VIE)</div>
                       <div className="display-italic text-[64px] leading-none mt-1">
                         {rq.composite.toFixed(0)}<span className="text-[24px] font-sans not-italic align-top opacity-70">/100</span>
                       </div>
@@ -570,9 +587,16 @@ export default function ResultPage() {
                       <div className="text-[10.5px] uppercase tracking-[0.14em] font-bold opacity-80">Grade</div>
                       <div className={clsx('display-italic text-[60px] leading-[0.85] mt-0.5', gradeTone)}>{rq.grade}</div>
                     </div>
-                    <div className={clsx('px-4 py-3 rounded-md border-2', publishOk ? 'border-success bg-success-soft' : 'border-danger bg-danger-soft')}>
-                      <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold opacity-90">Publish today?</div>
-                      <div className={clsx('display-italic text-[34px] leading-none mt-0.5', publishOk ? 'text-success' : 'text-danger')}>{rq.publish_verdict || '—'}</div>
+                    <div className={clsx('px-4 py-3 rounded-md border-2', paidBorder)}>
+                      <div className="text-[10.5px] uppercase tracking-[0.12em] font-bold opacity-90">For paid ads</div>
+                      <div className={clsx('display-italic text-[28px] leading-none mt-0.5', paidTone)}>{paidLabel}</div>
+                      <div className="text-[11px] text-ink-muted mt-1 max-w-[180px] leading-snug">
+                        {organicStrong
+                          ? 'Carries itself organically and paid — strongest position.'
+                          : paidReady
+                            ? "Wouldn't do well organic but paid distribution can carry it. Fix the biggest weakness for lift."
+                            : 'Even paid placement struggles with creative this weak — fix the biggest weakness before shipping.'}
+                      </div>
                     </div>
                   </div>
 
@@ -666,20 +690,25 @@ export default function ResultPage() {
                     </div>
                   )}
 
-                  {/* Required changes (only when verdict NO) */}
-                  {!publishOk && rq.publish_changes_required?.length > 0 && (
-                    <div className="px-6 py-4 border-t border-violet/20 bg-danger-soft">
-                      <div className="text-[11.5px] text-danger font-bold uppercase tracking-[0.08em] mb-1.5">Minimum changes before publishing</div>
+                  {/* Suggested lifts — framed as 'how to strengthen the creative'
+                      rather than 'minimum required before publishing'. For paid
+                      ads, the changes are recommendations not blockers. */}
+                  {rq.publish_changes_required?.length > 0 && (
+                    <div className={clsx('px-6 py-4 border-t border-violet/20',
+                      organicStrong ? 'bg-violet-soft/30' : paidReady ? 'bg-coral-soft' : 'bg-danger-soft')}>
+                      <div className="text-[11.5px] text-violet font-bold uppercase tracking-[0.08em] mb-1.5">
+                        {organicStrong ? 'To push from strong to elite' : paidReady ? 'To lift the creative further' : 'Fix these before shipping'}
+                      </div>
                       <ul className="space-y-1.5">
                         {rq.publish_changes_required.map((c, i) => (
-                          <li key={i} className="text-[13px] text-ink flex gap-2"><span className="text-danger">⚠</span>{c}</li>
+                          <li key={i} className="text-[13px] text-ink flex gap-2"><span className="text-violet">→</span>{c}</li>
                         ))}
                       </ul>
                     </div>
                   )}
 
                   <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-violet/20 bg-bg-deep">
-                    <strong>Honest framing:</strong> VIE predicts ORGANIC short-form virality dimensions (hook, retention, emotional pull). Those dimensions correlate with paid-ad craft quality, but a high VIE score does NOT guarantee paid CTR or ROAS. Read this as a creative-craft signal, not a forecast. Powered by Gemini {rq.model && (<>(<span className="mono">{rq.model}</span>)</>)}.
+                    <strong>Honest framing — organic ≠ paid.</strong> The VIE composite measures whether the creative would carry itself in an ORGANIC feed (where the algorithm needs hook strength, retention and emotion to surface you). For PAID ads, distribution is bought — the creative bar is lower. A 30/100 organic-craft score can still convert paid because targeting + budget do the work the organic algorithm normally demands. We use the same VIE numbers but reframe the verdict: <em>strong / paid-ready / weak even for paid</em>, never <em>publish: no</em>. Same creative scores differently per platform (e.g. higher on Instagram than LinkedIn) — that's by design and worth heeding. Powered by Gemini {rq.model && (<>(<span className="mono">{rq.model}</span>)</>)}.
                   </div>
                 </Card>
               </>
