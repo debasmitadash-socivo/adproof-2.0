@@ -1623,6 +1623,65 @@ export default function ResultPage() {
           <PolicyCheckSection result={result} />
 
 
+          {/* READABILITY & PERSUASION — directional linguistic read (pure-Python,
+              approximate Flesch-Kincaid + persuasion-marker scan). Moat Step 1. */}
+          {result.linguistics && !result.linguistics.is_empty && (() => {
+            const lg = result.linguistics!;
+            const gradeTone = lg.grade_level <= 8 ? 'text-success' : lg.grade_level <= 12 ? 'text-coral' : 'text-warning';
+            const catLabel: Record<string, string> = { urgency: 'Urgency', social_proof: 'Social proof', value: 'Value', curiosity: 'Curiosity', emotion: 'Emotion', exclusivity: 'Exclusivity' };
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Readability &amp; persuasion</h2>
+                <p className="text-ink-muted text-[14px] mb-3">A directional read of how easily your copy lands and which persuasion levers it pulls.</p>
+                <Card className="!p-0 overflow-hidden">
+                  <div className="px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface">
+                    <div>
+                      <div className="text-[10.5px] text-ink-muted uppercase tracking-[0.06em] mb-0.5">Reading grade</div>
+                      <div className={clsx('mono text-[26px] font-bold leading-none', gradeTone)}>{lg.grade_level.toFixed(0)}{lg.grade_level >= 18 && '+'}</div>
+                      <div className="text-[11px] text-ink-muted mt-1 capitalize">{lg.readability_label}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10.5px] text-ink-muted uppercase tracking-[0.06em] mb-0.5">Reading time</div>
+                      <div className="mono text-[26px] font-bold text-ink leading-none">{lg.reading_time_seconds}<span className="text-[14px] font-sans"> s</span></div>
+                      <div className="text-[11px] text-ink-muted mt-1">{lg.word_count} words</div>
+                    </div>
+                    <div>
+                      <div className="text-[10.5px] text-ink-muted uppercase tracking-[0.06em] mb-0.5">Density</div>
+                      <div className="mono text-[26px] font-bold text-ink leading-none">{lg.avg_words_per_sentence.toFixed(0)}</div>
+                      <div className="text-[11px] text-ink-muted mt-1">words / sentence</div>
+                    </div>
+                    <div>
+                      <div className="text-[10.5px] text-ink-muted uppercase tracking-[0.06em] mb-0.5">Persuasion hooks</div>
+                      <div className="mono text-[26px] font-bold text-ink leading-none">{lg.persuasion_count}</div>
+                      <div className="text-[11px] text-ink-muted mt-1">markers</div>
+                    </div>
+                  </div>
+                  {Object.keys(lg.persuasion_markers).length > 0 && (
+                    <div className="px-6 py-4 border-t border-border bg-bg-deep flex flex-wrap gap-2">
+                      {Object.entries(lg.persuasion_markers).map(([cat, words]) => (
+                        <span key={cat} className="text-[11.5px] bg-surface border border-border rounded-full px-2.5 py-1">
+                          <strong className="text-coral">{catLabel[cat] || cat}:</strong> {words.join(', ')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {lg.insights.length > 0 && (
+                    <div className="px-6 py-4 border-t border-border bg-surface">
+                      <ul className="space-y-1.5">
+                        {lg.insights.map((s, i) => (
+                          <li key={i} className="text-[13px] text-ink flex gap-2 leading-snug"><span className="text-coral">→</span>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-border bg-bg-deep leading-snug">
+                    <strong>Directional.</strong> Reading grade is an approximate vowel-heuristic estimate (Flesch-Kincaid), not a measured grade — use it to compare drafts, not as an absolute. Persuasion markers are a keyword scan.
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
+
           {/* COPY CRITIQUE — specific, actionable fixes */}
           {result.copy_critique && result.copy_critique.length > 0 && (
             <>

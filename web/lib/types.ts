@@ -453,6 +453,22 @@ export interface SimulateResponse {
   data_sources: { label: string; value: string; note: string }[];
   confidence: { level: 'medium' | 'low_medium' | 'low'; blurb: string; heuristic_count: number };
   copy_critique?: CopyCritique[];
+  // Directional linguistic read (readability / density / persuasion markers).
+  // Pure-Python, approximate — labelled directional in the UI, not a measured grade.
+  linguistics?: {
+    word_count: number;
+    sentence_count: number;
+    avg_words_per_sentence: number;
+    avg_syllables_per_word: number;
+    flesch_reading_ease: number;
+    grade_level: number;
+    readability_label: string;
+    reading_time_seconds: number;
+    persuasion_markers: Record<string, string[]>;
+    persuasion_count: number;
+    insights: string[];
+    is_empty: boolean;
+  } | null;
   // Viability gate — fatal/severe creative problems void the forecast.
   viability?: {
     runnable: boolean;

@@ -38,6 +38,7 @@ from audience_match import match_audience  # noqa: E402
 from brief import CampaignBrief, CreativeAssets  # noqa: E402
 from company_profile import parse_company  # noqa: E402
 from copy_critique import critique_copy  # noqa: E402
+from linguistics import analyze_copy  # noqa: E402
 from llm import have_any_key, text_complete, extract_json  # noqa: E402
 from outcomes import calibrate_rows, ingest_and_calibrate  # noqa: E402
 from pipeline import VisionUnavailableError, run_wizard_simulation  # noqa: E402
@@ -2026,6 +2027,17 @@ def simulate(req: SimulateRequest) -> dict:
         fmt=brief.format, profile=profile,
     )]
 
+    # Directional linguistic read (readability / density / persuasion markers).
+    # Defensive: never let this optional layer fail the forecast.
+    try:
+        ling = analyze_copy(
+            headline=req.headline, primary_text=req.primary_text,
+            description=req.description,
+        )
+        linguistics = ling.to_dict() if not ling.is_empty else None
+    except Exception:                                     # noqa: BLE001
+        linguistics = None
+
     return {
         "company": profile.to_dict(),
         "match": match.to_dict(),
@@ -2037,6 +2049,7 @@ def simulate(req: SimulateRequest) -> dict:
             "benchmarks": brief.format.benchmarks,
         },
         "copy_critique": copy_issues,
+        "linguistics": linguistics,
         "mc": _strip_unserialisable(mc_dict),
         "insights": result["insights"],
         "visual": (result["visual"].to_dict()
