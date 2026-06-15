@@ -1637,7 +1637,10 @@ export default function ResultPage() {
                   return (
                     <Card key={i} className={`!p-4 ${accent}`}>
                       <div className="flex items-start gap-3">
-                        <Pill tone={tone as any}>{c.field.replace('_', ' ')}</Pill>
+                        <div className="flex flex-col items-start gap-1">
+                          <Pill tone={tone as any}>{c.field.replace('_', ' ')}</Pill>
+                          {c.source === 'ivan' && <span className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-violet">Ivan</span>}
+                        </div>
                         <div className="flex-1">
                           <div className="text-[14px] font-semibold text-ink">{c.message}</div>
                           <div className="text-[13.5px] text-ink mt-1.5"><strong className="text-coral">Fix:</strong> {c.fix}</div>
@@ -1650,6 +1653,11 @@ export default function ResultPage() {
                   );
                 })}
               </div>
+              {result.copy_critique.some((c) => c.source === 'ivan') && (
+                <p className="text-[11.5px] text-ink-muted mt-3 leading-snug">
+                  Rules tagged <span className="text-violet font-semibold">Ivan</span> are adapted from <a href="https://github.com/ivangfalco/ads-skills" target="_blank" rel="noreferrer" className="underline">Ivan Falco&apos;s ads-skills</a>, licensed for AdProof&apos;s use.
+                </p>
+              )}
             </>
           )}
 

@@ -766,4 +766,5 @@ export interface CopyCritique {
   message: string;
   fix: string;
   lift_pct?: number;
+  source?: string;   // "ivan" for Ivan-Falco-derived rules; absent = built-in
 }

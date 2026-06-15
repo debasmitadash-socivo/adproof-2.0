@@ -28,6 +28,7 @@ class CopyIssue:
     message: str
     fix: str
     lift_pct: Optional[int] = None  # approx CTR lift if fixed (directional)
+    source: Optional[str] = None    # "ivan" for Ivan-Falco-derived rules; None = built-in
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -240,6 +241,86 @@ def _check_text_quality(text: str, field: str,
     return out
 
 
+# ---------------------------------------------------------------------------
+# Ivan Falco ad-copywriting.md detectors (Session 3). ADDITIVE — these run
+# alongside the existing owner-calibrated checks, never replacing them. Each
+# emits source="ivan" so the UI can attribute. Knowledge base adapted from
+# Ivan Falco's ads-skills, licensed for AdProof's use.
+# ---------------------------------------------------------------------------
+
+# Mistake #5 — vague outcome language: promises a result without saying what
+# changes or by how much. Multi-word clichés kept DISTINCT from _AI_PHRASES /
+# _GENERIC_PHRASES so we never double-flag the same words.
+_VAGUE_OUTCOME = (
+    "make smarter decisions", "drive results", "drive real results",
+    "deliver results", "achieve your goals", "reach your goals",
+    "take it to the next level", "boost your bottom line", "supercharge your",
+    "transform your business", "transform the way you work", "get more done",
+    "work smarter", "increase productivity", "improve efficiency",
+    "maximize your roi", "maximise your roi", "grow your business",
+    "take your business to the next level",
+)
+
+# Mistake #4 — generic pain question: a category question anyone in the space
+# could ask. We ONLY flag these generic openers, never all questions (Ivan:
+# a specific lived-moment question can outperform a claim).
+_GENERIC_PAIN_Q = re.compile(
+    r"^\s*(?:struggling with|tired of|sick of|fed up with|looking for|"
+    r"do you struggle|are you struggling|are you ready to)\b.*\?",
+    re.IGNORECASE,
+)
+
+
+def _check_ivan_rules(headline: str, primary_text: str,
+                       description: str) -> List[CopyIssue]:
+    """Ivan-Falco-derived copy detectors. ADDITIVE, every issue source='ivan'.
+
+    Two high-precision checks from ad-copywriting.md. The fuzzier
+    feature-vs-benefit headline check is deliberately omitted — it
+    false-positives on Ivan's own contrast/feeling formulas.
+    """
+    out: List[CopyIssue] = []
+    full = " ".join(t for t in (headline, primary_text, description) if t)
+    if not full:
+        return out
+    low = full.lower()
+
+    # Vague outcome language — only when nothing in the copy quantifies it
+    # (a number anywhere usually means the claim IS specific).
+    if not _has_concrete_numbers(full):
+        hits = [p for p in _VAGUE_OUTCOME if p in low]
+        if hits:
+            quoted = ", ".join(f'"{h}"' for h in hits[:3])
+            out.append(CopyIssue(
+                severity="info", field="copy", source="ivan",
+                message=(f"Vague outcome language: {quoted}. It promises a result "
+                         "without saying what changes or by how much — readers tune it out."),
+                fix=("Replace with a specific, quantified outcome in the customer's own "
+                     "words. Ivan: \"We found seven figures in optimization\" beats "
+                     "\"make smarter decisions\". Pull a real number — time saved, % lift, days cut."),
+                lift_pct=8,
+            ))
+
+    # Generic pain question — check the headline and the first sentence of body.
+    first_sentence = ""
+    if primary_text:
+        first_sentence = re.split(r"(?<=[.!?])\s", primary_text.strip(), maxsplit=1)[0]
+    for field_name, text in (("headline", headline), ("primary_text", first_sentence)):
+        if text and _GENERIC_PAIN_Q.match(text.strip()):
+            out.append(CopyIssue(
+                severity="info", field=field_name, source="ivan",
+                message=("Generic pain question — a category question anyone in your "
+                         "space could ask, so the reader scrolls past instead of feeling seen."),
+                fix=("Swap it for a specific moment the buyer has actually lived. Ivan: "
+                     "\"Struggling with reporting?\" → \"Your board asked for a forecast. "
+                     "How long did it take?\""),
+                lift_pct=6,
+            ))
+            break          # one is enough — don't drown the user
+
+    return out
+
+
 def critique_copy(
     headline: str,
     primary_text: str,
@@ -417,6 +498,9 @@ def critique_copy(
                               ("description",  description)):
         issues.extend(_check_text_quality(text, field_name,
                                            platform_id=platform_id))
+
+    # Ivan Falco ad-copywriting detectors (additive, source="ivan").
+    issues.extend(_check_ivan_rules(headline, primary_text, description))
 
     # Order most important first.
     SEV_ORDER = {"error": 0, "warning": 1, "info": 2}
