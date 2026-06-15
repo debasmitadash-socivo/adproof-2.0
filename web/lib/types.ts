@@ -576,6 +576,29 @@ export interface SimulateResponse {
     intended_awareness_stage: string;
     stage_mismatch_warning: string;
     funnel_stage: string;
+    // Ivan's paid-LinkedIn benchmark band for this funnel stage (B2B SaaS,
+    // USD). Reference ranges, NOT a CTR prediction. BenchmarkLookup.to_dict()
+    // shape; `value` is null / the object missing on older cached critiques.
+    paid_benchmark?: {
+      value: {
+        objective: string;
+        funnel_stage: string;
+        ctrtlp_band: { label: string; low_pct: number; high_pct: number; note: string };
+        ctrtlp_overall_avg_pct: number;
+        ctrtlp_good_threshold_pct: number;
+        cpm_usd: { low: number; high: number; spotlight: number };
+        cpc_usd: { standard_low: number; standard_high: number; tla_low: number };
+        cost_per_lead_usd: { low: number; high: number; note: string };
+        roas_pct: number;
+        format_ranking: { rank: number; format: string; best_for: string; efficiency: string }[];
+        scope: string;
+        currency: string;
+      } | null;
+      source: string;
+      cite: string;
+      found: boolean;
+      notes: Record<string, string>;
+    };
     detected_angle: string;
     recommended_angles: { angle: string; why: string }[];
     factual_accuracy_issues: string[];

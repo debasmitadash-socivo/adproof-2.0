@@ -33,6 +33,7 @@ __all__ = [
     "global_2026_context",
     "trends_2026_for_prompt",
     "hubspot_2026_for_prompt",
+    "linkedin_paid_benchmark",
     "BENCHMARK_SOURCES",
 ]
 
@@ -58,13 +59,15 @@ _RIVAL_IQ  = _load("rival_iq_2025_industry_engagement.json")
 _SPROUT    = _load("sprout_social_index_2026_platform_stats.json")
 _HOOTSUITE = _load("hootsuite_social_trends_2026.json")
 _HUBSPOT   = _load("hubspot_state_of_marketing_2026.json")
+_IVAN_LI   = _load("ivan_linkedin_paid_benchmarks_2026.json")
 
 
 BENCHMARK_SOURCES = {
-    "rival_iq":  _RIVAL_IQ.get("source", {}),
-    "sprout":    _SPROUT.get("source", {}),
-    "hootsuite": _HOOTSUITE.get("source", {}),
-    "hubspot":   _HUBSPOT.get("source", {}),
+    "rival_iq":      _RIVAL_IQ.get("source", {}),
+    "sprout":        _SPROUT.get("source", {}),
+    "hootsuite":     _HOOTSUITE.get("source", {}),
+    "hubspot":       _HUBSPOT.get("source", {}),
+    "ivan_linkedin": _IVAN_LI.get("source", {}),
 }
 
 
@@ -248,4 +251,52 @@ def hubspot_2026_for_prompt() -> BenchmarkLookup:
         },
         source="hubspot",
         cite=_cite("hubspot"),
+    )
+
+
+# Campaign objective -> LinkedIn funnel stage. Mirrors
+# linkedin_critic.OBJECTIVE_TO_STAGE so the benchmark band the user sees
+# matches the stage the critic graded against.
+_OBJECTIVE_TO_FUNNEL = {
+    "awareness":     "TOF",
+    "consideration": "MOF",
+    "conversion":    "BOF",
+}
+
+
+def linkedin_paid_benchmark(objective: str = "consideration") -> BenchmarkLookup:
+    """LinkedIn PAID benchmark band for the funnel stage implied by the
+    campaign objective (awareness->TOF, consideration->MOF, conversion->BOF).
+
+    Fills a gap nothing else in AdProof covers: Rival IQ is ORGANIC
+    engagement only, so we have no paid-LinkedIn numbers anywhere else.
+    These are Ivan Falco's ads-skills ranges — B2B SaaS, USD. The caller
+    MUST label them as such and frame them as reference ranges for the
+    stage, NOT a prediction of this specific ad's CTR. ``notes`` carries
+    the honest caveats (CTRTLP != engagement rate, scope, currency, ROAS
+    lag) so the UI / prompt can surface them.
+    """
+    if not _IVAN_LI:
+        return BenchmarkLookup(value=None, found=False)
+    funnel = _OBJECTIVE_TO_FUNNEL.get((objective or "").lower(), "MOF")
+    stage_band = (_IVAN_LI.get("ctrtlp_by_stage") or {}).get(funnel) or {}
+    src = _IVAN_LI.get("source") or {}
+    return BenchmarkLookup(
+        value={
+            "objective":                 objective,
+            "funnel_stage":              funnel,
+            "ctrtlp_band":               stage_band,
+            "ctrtlp_overall_avg_pct":    _IVAN_LI.get("ctrtlp_overall_avg_pct"),
+            "ctrtlp_good_threshold_pct": _IVAN_LI.get("ctrtlp_good_threshold_pct"),
+            "cpm_usd":                   _IVAN_LI.get("cpm_usd"),
+            "cpc_usd":                   _IVAN_LI.get("cpc_usd"),
+            "cost_per_lead_usd":         _IVAN_LI.get("cost_per_lead_usd"),
+            "roas_pct":                  _IVAN_LI.get("roas_pct"),
+            "format_ranking":            _IVAN_LI.get("format_ranking") or [],
+            "scope":                     src.get("scope", "B2B SaaS"),
+            "currency":                  src.get("currency", "USD"),
+        },
+        source="ivan_linkedin",
+        cite=_cite("ivan_linkedin"),
+        notes=_IVAN_LI.get("honest_notes") or {},
     )

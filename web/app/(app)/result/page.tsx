@@ -825,6 +825,45 @@ export default function ResultPage() {
                     })}
                   </div>
 
+                  {/* LinkedIn paid benchmark — Ivan's B2B-SaaS reference ranges
+                      for this funnel stage. Reference context, NOT a forecast.
+                      Fills the gap Rival IQ can't (Rival IQ is organic only). */}
+                  {lc.paid_benchmark?.value?.ctrtlp_band && (() => {
+                    const pb = lc.paid_benchmark!.value!;
+                    const band = pb.ctrtlp_band;
+                    const cpm = pb.cpm_usd;
+                    const cpc = pb.cpc_usd;
+                    const notes = lc.paid_benchmark!.notes || {};
+                    return (
+                      <div className="px-6 py-4 border-t border-coral/20 bg-surface">
+                        <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+                          <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em]">LinkedIn paid benchmark · {pb.funnel_stage}</div>
+                          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-ink-muted bg-bg-deep rounded px-1.5 py-0.5">{pb.scope} · {pb.currency}</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <div className="text-[10.5px] text-ink-muted uppercase tracking-[0.06em] mb-0.5">CTR to landing page</div>
+                            <div className="mono text-[16px] font-bold text-ink leading-none">{band.low_pct.toFixed(2)}%–{band.high_pct.toFixed(2)}%</div>
+                            <div className="text-[11px] text-ink-muted leading-snug mt-1">{band.label}. Platform avg {pb.ctrtlp_overall_avg_pct}%; above {pb.ctrtlp_good_threshold_pct}% is genuinely good.</div>
+                          </div>
+                          <div>
+                            <div className="text-[10.5px] text-ink-muted uppercase tracking-[0.06em] mb-0.5">CPM</div>
+                            <div className="mono text-[16px] font-bold text-ink leading-none">${cpm.low}–${cpm.high}</div>
+                            <div className="text-[11px] text-ink-muted leading-snug mt-1">Spotlight ads ~${cpm.spotlight}.</div>
+                          </div>
+                          <div>
+                            <div className="text-[10.5px] text-ink-muted uppercase tracking-[0.06em] mb-0.5">CPC</div>
+                            <div className="mono text-[16px] font-bold text-ink leading-none">${cpc.standard_low}–${cpc.standard_high}+</div>
+                            <div className="text-[11px] text-ink-muted leading-snug mt-1">Thought Leader Ads as low as ${cpc.tla_low}.</div>
+                          </div>
+                        </div>
+                        <div className="text-[11px] text-ink-muted leading-snug mt-3 pt-2.5 border-t border-coral/20">
+                          <strong>Reference for the {pb.funnel_stage} stage — not a forecast of this ad.</strong> {notes.metric_kind} {notes.currency_caveat}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Diagnosis trio */}
                   {(lc.biggest_strength || lc.biggest_weakness || lc.one_specific_fix) && (
                     <div className="px-6 py-4 border-t border-coral/20 bg-bg-deep grid grid-cols-1 md:grid-cols-3 gap-4">

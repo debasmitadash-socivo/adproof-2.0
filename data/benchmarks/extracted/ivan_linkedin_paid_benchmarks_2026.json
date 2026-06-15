@@ -1,0 +1,56 @@
+{
+  "source": {
+    "publisher": "Ivan Falco",
+    "title": "ads-skills: B2B SaaS LinkedIn Ads Benchmarks",
+    "url": "https://github.com/ivangfalco/ads-skills",
+    "data_year": 2026,
+    "scope": "B2B SaaS",
+    "currency": "USD",
+    "sample_size": "200+ B2B SaaS accounts, cross-source",
+    "methodology": "Aggregated paid-LinkedIn performance ranges across 200+ B2B SaaS accounts. CTRTLP = click-through to landing page (off-platform), NOT the on-platform 'CTR' LinkedIn reports for Engagement campaigns (which is engagement rate).",
+    "license_note": "Knowledge base adapted from Ivan Falco's ads-skills, licensed for AdProof's use."
+  },
+  "ctrtlp_by_stage": {
+    "TOF": {
+      "label": "Cold (TOF)",
+      "low_pct": 0.30,
+      "high_pct": 0.55,
+      "note": "Anything above 0.44% is above platform average. For Engagement campaigns compare engagement rate, not post CTR."
+    },
+    "MOF": {
+      "label": "Warm / Retargeting (MOF)",
+      "low_pct": 0.55,
+      "high_pct": 0.80,
+      "note": "Higher because the audience already knows you."
+    },
+    "BOF": {
+      "label": "Engaged / Converted (BOF)",
+      "low_pct": 0.80,
+      "high_pct": 1.30,
+      "note": "Highest intent, highest CTR to landing page."
+    }
+  },
+  "ctrtlp_overall_avg_pct": 0.45,
+  "ctrtlp_good_threshold_pct": 1.0,
+  "cpm_usd": { "low": 33, "high": 65, "spotlight": 5.23 },
+  "cpc_usd": { "standard_low": 8, "standard_high": 22, "tla_low": 4.14 },
+  "cost_per_conversion_usd": { "low": 15, "high": 50, "note": "On-platform conversion. Varies heavily by industry and offer." },
+  "cost_per_lead_usd": { "low": 50, "high": 200, "note": "Lead Gen Form (native). Website form submission runs $200-$500 (higher friction)." },
+  "form_fill_rate_target_pct": 8.0,
+  "roas_pct": 113,
+  "format_ranking": [
+    { "rank": 1, "format": "Thought Leader Ads (TLA)", "best_for": "TOF engagement + BOF conversion", "efficiency": "Highest - lowest CPC, highest CTR" },
+    { "rank": 2, "format": "Video TLAs (VTLA)", "best_for": "TOF awareness + retargeting pool", "efficiency": "High - strong conversion rates" },
+    { "rank": 3, "format": "Video Ads (10-30s)", "best_for": "TOF awareness", "efficiency": "Good for retargeting pool building" },
+    { "rank": 4, "format": "Document Ads", "best_for": "MOF nurture", "efficiency": "High engagement, good for retargeting" },
+    { "rank": 5, "format": "Single Image", "best_for": "All stages", "efficiency": "Versatile, moderate performance" },
+    { "rank": 6, "format": "Carousel", "best_for": "MOF/BOF", "efficiency": "Good for feature showcases" }
+  ],
+  "honest_notes": {
+    "metric_kind": "CTRTLP = click-through to your landing page. It is NOT the 'CTR' LinkedIn shows for Engagement-objective campaigns (that figure is engagement rate: reactions, comments, post clicks).",
+    "scope_caveat": "B2B SaaS only. Do not apply these numbers to e-commerce / DTC LinkedIn ads.",
+    "currency_caveat": "Benchmarks are USD. AdProof prices in GBP - treat as directional ranges, not FX-converted targets.",
+    "roas_caveat": "ROAS ~113% is a lagging metric; LinkedIn Ads impact often shows 3-6 months after engagement. Pipeline attribution is more meaningful than last-click ROAS.",
+    "not_a_forecast": "These are reference ranges for the funnel stage, not a prediction of THIS ad's performance. Paid LinkedIn succeeds or fails on targeting, bidding, landing page and offer."
+  }
+}

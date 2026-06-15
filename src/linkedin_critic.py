@@ -49,6 +49,11 @@ except ImportError:                                    # standalone
                                  _VISION_EXHAUSTED, _get_key,
                                  _is_quota_error, _ph_ok, _ph_quota)
 
+try:
+    from src.benchmarks import linkedin_paid_benchmark
+except ImportError:                                    # standalone
+    from benchmarks import linkedin_paid_benchmark
+
 __all__ = [
     "LinkedInCritique",
     "critique_linkedin",
@@ -122,6 +127,9 @@ class LinkedInCritique:
     intended_awareness_stage: str = "" # derived from brief.objective
     stage_mismatch_warning: str = ""   # populated when detected != intended
     funnel_stage: str = ""             # TOF / MOF / BOF
+    # Ivan's paid-LinkedIn benchmark band for this funnel stage (B2B SaaS,
+    # USD). Reference ranges, NOT a CTR prediction. Shape: BenchmarkLookup.to_dict().
+    paid_benchmark: dict = field(default_factory=dict)
     # Creative angle classification + alternatives
     detected_angle: str = ""           # one of CREATIVE_ANGLES
     recommended_angles: list = field(default_factory=list)  # top 2-3 alternatives
@@ -258,7 +266,8 @@ def _user_prompt(*, headline: str, primary_text: str, description: str,
                   industry: str, geo: str,
                   deterministic_findings: list[str],
                   tla_eligible: bool, tla_notes: str,
-                  has_image: bool, has_video: bool) -> str:
+                  has_image: bool, has_video: bool,
+                  paid_benchmark: dict | None = None) -> str:
     stage_info = OBJECTIVE_TO_STAGE.get(objective.lower(),
                                           ("solution_aware", "MOF"))
     intended_stage, funnel_stage = stage_info
@@ -269,6 +278,30 @@ def _user_prompt(*, headline: str, primary_text: str, description: str,
     if deterministic_findings:
         det_block = "\n\nDETERMINISTIC AUDIT FINDINGS (already detected):\n" + \
                     "\n".join(f"- {f}" for f in deterministic_findings)
+
+    # Paid-LinkedIn benchmark context — grounds the read in real B2B-SaaS
+    # ranges for THIS funnel stage. Framed hard as reference, never a CTR
+    # prediction (the critic must not output a forecast — that's the
+    # forecast engine's job, and these are USD/B2B-SaaS ranges anyway).
+    bench_block = ""
+    if paid_benchmark and paid_benchmark.get("ctrtlp_band"):
+        b = paid_benchmark.get("ctrtlp_band") or {}
+        cpm = paid_benchmark.get("cpm_usd") or {}
+        cpc = paid_benchmark.get("cpc_usd") or {}
+        bench_block = (
+            f"\n\nPAID-LINKEDIN BENCHMARK CONTEXT (B2B SaaS, USD — Ivan Falco's "
+            f"ads-skills). REFERENCE ranges for the {funnel_stage} stage to "
+            f"calibrate how ambitious this creative needs to be. This is NOT a "
+            f"prediction of this ad's performance — do NOT output a CTR/CPM forecast:\n"
+            f"- CTRTLP (click-through to landing page) for {funnel_stage}: "
+            f"{b.get('low_pct')}%–{b.get('high_pct')}% "
+            f"(overall LinkedIn avg {paid_benchmark.get('ctrtlp_overall_avg_pct')}%, "
+            f"above {paid_benchmark.get('ctrtlp_good_threshold_pct')}% is genuinely good)\n"
+            f"- CPM ${cpm.get('low')}–${cpm.get('high')}; CPC "
+            f"${cpc.get('standard_low')}–${cpc.get('standard_high')}+ "
+            f"(Thought Leader Ads as low as ${cpc.get('tla_low')})\n"
+            f"Use only to judge whether the creative's ambition fits the stage."
+        )
     return (
         f"Critique this LinkedIn paid ad. Format: {media_desc}.\n\n"
         f"Headline: \"{headline.strip()}\"\n"
@@ -281,7 +314,7 @@ def _user_prompt(*, headline: str, primary_text: str, description: str,
         f"Target audience hint: {audience_hint[:300]}\n"
         f"Industry context: {industry}, geo: {geo}\n"
         f"TLA eligibility (pre-computed): {tla_eligible} — {tla_notes}"
-        f"{det_block}\n\n"
+        f"{det_block}{bench_block}\n\n"
         "--- TASK ---\n\n"
         "Score on LDA's 6 dimensions (each 0-10), classify the creative's "
         "awareness stage + angle, audit the copy against Ivan's 5-layer "
@@ -420,6 +453,18 @@ def critique_linkedin(*, headline: str = "",
         headline=headline, primary_text=primary_text,
         has_video=bool(video_path))
 
+    # Paid-LinkedIn benchmark band for this objective's funnel stage.
+    # Defensive: a benchmark lookup failure must never kill the critic.
+    pb_value: dict | None = None
+    pb_dict: dict = {}
+    try:
+        pb = linkedin_paid_benchmark(objective)
+        if pb.found:
+            pb_value = pb.value
+            pb_dict = pb.to_dict()
+    except Exception:                                     # noqa: BLE001
+        pass
+
     # Pick a provider — prefer Gemini (cheapest), then Claude, then OpenAI.
     # No video Part: we just need the LLM to read copy + (optionally) view
     # an attached image. Skipping the multimodal arm keeps cost predictable
@@ -431,6 +476,7 @@ def critique_linkedin(*, headline: str = "",
         deterministic_findings=det,
         tla_eligible=tla_ok, tla_notes=tla_notes,
         has_image=bool(image_path), has_video=bool(video_path),
+        paid_benchmark=pb_value,
     )
 
     raw: dict = {}
@@ -539,6 +585,7 @@ def critique_linkedin(*, headline: str = "",
         intended_awareness_stage=intended_stage,
         stage_mismatch_warning=str(raw.get("stage_mismatch_warning", "")).strip(),
         funnel_stage=funnel_stage,
+        paid_benchmark=pb_dict,
         detected_angle=detected_angle,
         recommended_angles=recommended_angles,
         factual_accuracy_issues=_strlist("factual_accuracy_issues"),
