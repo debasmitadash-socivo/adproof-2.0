@@ -878,8 +878,36 @@ export default function NewAnalysisPage() {
                   if ('link' in patch) w.setCreativeField('link', patch.link);
                 }
               };
+              // Reuse the text from a past AdProof analysis (those store the copy
+              // you entered). Imports carry ad names, not body copy, so the
+              // reliable text source is your previous campaigns.
+              const pastWithCopy = w.savedCampaigns.filter(
+                (c) => c.originalRequests?.[0]?.headline || c.originalRequests?.[0]?.primary_text);
+              const loadCampaign = (id: string) => {
+                const req = w.savedCampaigns.find((x) => x.id === id)?.originalRequests?.[0];
+                if (req) set({ headline: req.headline || '', primaryText: req.primary_text || '',
+                               cta: req.cta || '', link: req.link || '' });
+              };
               return (
                 <div className="space-y-3">
+                  {pastWithCopy.length > 0 && (
+                    <div>
+                      <label className="label">Reuse copy from a previous analysis</label>
+                      <select
+                        className="input text-[13px]"
+                        value=""
+                        onChange={(e) => { if (e.target.value) loadCampaign(e.target.value); }}
+                      >
+                        <option value="">Start fresh — or pull text from a past campaign…</option>
+                        {pastWithCopy.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {(c.name || 'Untitled').slice(0, 40)} · {new Date(c.createdAt).toLocaleDateString()}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="text-[11.5px] text-ink-muted mt-1">Pulls the text (headline, body, CTA, URL) into this variant — edit freely after.</div>
+                    </div>
+                  )}
                   <div><label className="label">Headline</label><input className="input" value={cur.headline} onChange={(e) => set({ headline: e.target.value })} placeholder="Your headline" /></div>
                   <div><label className="label">Primary text / caption</label><textarea className="input" rows={3} value={cur.primaryText} onChange={(e) => set({ primaryText: e.target.value })} placeholder="What you'd say in the body of the post / ad" /></div>
                   <div className="grid grid-cols-2 gap-3">
