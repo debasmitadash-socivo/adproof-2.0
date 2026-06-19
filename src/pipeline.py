@@ -706,7 +706,7 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
             except Exception:                             # noqa: BLE001
                 script_critique = None    # never fail the run on the critic
 
-    # Session 1: LinkedIn-specific critic (Ivan + LDA). Runs only when the
+    # Session 1: LinkedIn-specific critic (Socivo + LDA). Runs only when the
     # placement is LinkedIn. Cheap text-only Gemini call, ~£0.003.
     linkedin_critique = None
     try:
@@ -732,7 +732,7 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
         except Exception:                                  # noqa: BLE001
             linkedin_critique = None      # never fail the run on the critic
 
-    # Session 2: Meta-specific critic (Ivan). Runs only on Meta placements.
+    # Session 2: Meta-specific critic (Socivo). Runs only on Meta placements.
     # Focuses on offer strength + message-market fit + creative-as-targeting
     # — the levers VIE and the LinkedIn critic don't touch.
     meta_critique = None

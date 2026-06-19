@@ -527,7 +527,7 @@ export interface SimulateResponse {
     is_skipped: boolean;
     skipped_reason: string;
   } | null;
-  // Session 2: Meta-specific paid critic (Ivan Falco's ads-skills KB).
+  // Session 2: Meta-specific paid critic (Socivo's KB).
   // Only present when platform_id starts with 'meta_' AND Gemini was
   // available. Focuses on offer strength + message-market-fit +
   // creative-as-targeting (the levers VIE and the LinkedIn critic
@@ -573,7 +573,7 @@ export interface SimulateResponse {
     is_skipped: boolean;
     skipped_reason: string;
   } | null;
-  // Session 1: LinkedIn-specific paid critic (Ivan Falco's ads-skills KB
+  // Session 1: LinkedIn-specific paid critic (Socivo's KB
   // + the owner's LDA 6-dim scorecard). Only present when platform_id
   // starts with 'linkedin' AND Gemini was available.
   linkedin_critique?: {
@@ -592,7 +592,7 @@ export interface SimulateResponse {
     intended_awareness_stage: string;
     stage_mismatch_warning: string;
     funnel_stage: string;
-    // Ivan's paid-LinkedIn benchmark band for this funnel stage (B2B SaaS,
+    // Socivo's paid-LinkedIn benchmark band for this funnel stage (B2B SaaS,
     // USD). Reference ranges, NOT a CTR prediction. BenchmarkLookup.to_dict()
     // shape; `value` is null / the object missing on older cached critiques.
     paid_benchmark?: {
@@ -782,5 +782,5 @@ export interface CopyCritique {
   message: string;
   fix: string;
   lift_pct?: number;
-  source?: string;   // "ivan" for Ivan-Falco-derived rules; absent = built-in
+  source?: string;   // "socivo" for Socivo rules; absent = built-in
 }

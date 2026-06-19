@@ -526,7 +526,7 @@ export default function ResultPage() {
             );
           })()}
 
-          {/* META CRITIQUE — Session 2. Ivan-derived 6-dim scorecard
+          {/* META CRITIQUE — Session 2. Socivo 6-dim scorecard
               tuned for Meta. Focuses on offer / message-market-fit /
               creative-as-targeting — the levers VIE doesn't touch.
               Renders only on Meta placements. */}
@@ -555,9 +555,9 @@ export default function ResultPage() {
             const nbPasses = nbEntries.filter(([, v]) => v === 'Pass').length;
             return (
               <>
-                <h2 className="display-italic text-[28px] mt-7 mb-2">Meta critique · Ivan&apos;s framework</h2>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Meta critique · Socivo&apos;s framework</h2>
                 <p className="text-ink-muted text-[14px] mb-3">
-                  Paid-Meta craft critic. Weighted to the levers Ivan calls highest-impact: Offer 25% / Message-market fit 20% / Creative-as-targeting 15% / Hook 15% / CTA 15% / Format 10%.
+                  Paid-Meta craft critic. Weighted to the levers Socivo rates highest-impact: Offer 25% / Message-market fit 20% / Creative-as-targeting 15% / Hook 15% / CTA 15% / Format 10%.
                 </p>
                 <Card className="!p-0 overflow-hidden border-2 !border-magenta/30">
                   <div className="px-6 py-5 bg-gradient-to-br from-magenta-soft to-coral-soft flex items-center gap-6 flex-wrap">
@@ -716,7 +716,7 @@ export default function ResultPage() {
                   {/* Recommended concepts */}
                   {mc.recommended_concepts.length > 0 && (
                     <div className="px-6 py-4 border-t border-magenta/20 bg-surface">
-                      <div className="text-[11.5px] text-magenta font-bold uppercase tracking-[0.08em] mb-2">Recommended concepts (Ivan&apos;s 8)</div>
+                      <div className="text-[11.5px] text-magenta font-bold uppercase tracking-[0.08em] mb-2">Recommended concepts (Socivo&apos;s 8)</div>
                       <ul className="space-y-1.5">
                         {mc.recommended_concepts.slice(0, 3).map((r, i) => (
                           <li key={i} className="text-[13px] text-ink">
@@ -740,7 +740,7 @@ export default function ResultPage() {
                   )}
 
                   <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-magenta/20 bg-bg-deep leading-snug">
-                    <strong>Honest framing.</strong> Scores craft quality for paid Meta — NOT CTR or ROAS. Even a perfect ad fails if the offer is wrong for the audience, the landing page doesn&apos;t match, or budget is too thin. Knowledge base adapted from <a href="https://github.com/ivangfalco/ads-skills" target="_blank" rel="noreferrer" className="underline">Ivan Falco&apos;s ads-skills</a>, licensed for AdProof&apos;s use. Powered by Gemini {mc.model && <>(<span className="mono">{mc.model}</span>)</>}.
+                    <strong>Honest framing.</strong> Scores craft quality for paid Meta — NOT CTR or ROAS. Even a perfect ad fails if the offer is wrong for the audience, the landing page doesn&apos;t match, or budget is too thin. Powered by Gemini {mc.model && <>(<span className="mono">{mc.model}</span>)</>}.
                   </div>
                 </Card>
               </>
@@ -748,7 +748,7 @@ export default function ResultPage() {
           })()}
 
           {/* LINKEDIN CRITIQUE — Session 1. LDA 6-dim scorecard +
-              Ivan Falco's creative-strategy + copy-audit framework.
+              Socivo's creative-strategy + copy-audit framework.
               Renders only on LinkedIn placements. Honest framing:
               this scores craft quality for paid LinkedIn use, NOT
               CTR. Required attribution footer at the bottom. */}
@@ -777,9 +777,9 @@ export default function ResultPage() {
             const prettyAngle = (a: string) => a.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             return (
               <>
-                <h2 className="display-italic text-[28px] mt-7 mb-2">LinkedIn critique · LDA + Ivan</h2>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">LinkedIn critique · Socivo</h2>
                 <p className="text-ink-muted text-[14px] mb-3">
-                  Paid-LinkedIn craft critic. Scores 6 dimensions weighted by Hook 30% / Body 20% / Credibility 15% / Audience Fit 15% / CTA 10% / Format 10%, plus Ivan's awareness-stage + creative-angle audit.
+                  Paid-LinkedIn craft critic. Scores 6 dimensions weighted by Hook 30% / Body 20% / Credibility 15% / Audience Fit 15% / CTA 10% / Format 10%, plus Socivo's awareness-stage + creative-angle audit.
                 </p>
                 <Card className="!p-0 overflow-hidden border-2 !border-coral/30">
                   <div className="px-6 py-5 bg-gradient-to-br from-coral-soft to-magenta-soft flex items-center gap-6 flex-wrap">
@@ -825,7 +825,7 @@ export default function ResultPage() {
                     })}
                   </div>
 
-                  {/* LinkedIn paid benchmark — Ivan's B2B-SaaS reference ranges
+                  {/* LinkedIn paid benchmark — Socivo's B2B-SaaS reference ranges
                       for this funnel stage. Reference context, NOT a forecast.
                       Fills the gap Rival IQ can't (Rival IQ is organic only). */}
                   {lc.paid_benchmark?.value?.ctrtlp_band && (() => {
@@ -912,7 +912,7 @@ export default function ResultPage() {
                     </div>
                   )}
 
-                  {/* Recommended angles (Ivan's 12 categories) */}
+                  {/* Recommended angles (Socivo's 12 categories) */}
                   {lc.recommended_angles.length > 0 && (
                     <div className="px-6 py-4 border-t border-coral/20 bg-surface">
                       <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em] mb-2">Recommended angles</div>
@@ -929,7 +929,7 @@ export default function ResultPage() {
                   {/* 5-layer copy audit findings */}
                   {allCopyIssues.length > 0 && (
                     <div className="px-6 py-4 border-t border-coral/20 bg-surface">
-                      <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em] mb-2">5-layer copy audit (Ivan's framework)</div>
+                      <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em] mb-2">5-layer copy audit (Socivo's framework)</div>
                       <ul className="space-y-1.5">
                         {allCopyIssues.slice(0, 6).map((iss, i) => (
                           <li key={i} className="text-[13px] text-ink flex gap-2 leading-snug">
@@ -967,7 +967,7 @@ export default function ResultPage() {
                   )}
 
                   <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-coral/20 bg-bg-deep leading-snug">
-                    <strong>Honest framing.</strong> Scores craft quality for paid LinkedIn — NOT CTR or ROAS. Even a perfect 10/10 ad can fail on paid LinkedIn if targeting is wrong, the landing page doesn&apos;t match, or the offer is weak — none of which this critic can see. Use as a copy + creative-direction signal, not a forecast. Knowledge base adapted from <a href="https://github.com/ivangfalco/ads-skills" target="_blank" rel="noreferrer" className="underline">Ivan Falco&apos;s ads-skills</a>, licensed for AdProof&apos;s use. Scoring framework: LinkedIn Devil&apos;s Advocate. Powered by Gemini {lc.model && <>(<span className="mono">{lc.model}</span>)</>}.
+                    <strong>Honest framing.</strong> Scores craft quality for paid LinkedIn — NOT CTR or ROAS. Even a perfect 10/10 ad can fail on paid LinkedIn if targeting is wrong, the landing page doesn&apos;t match, or the offer is weak — none of which this critic can see. Use as a copy + creative-direction signal, not a forecast. Scoring framework: LinkedIn Devil&apos;s Advocate. Powered by Gemini {lc.model && <>(<span className="mono">{lc.model}</span>)</>}.
                   </div>
                 </Card>
               </>
@@ -1698,7 +1698,7 @@ export default function ResultPage() {
                       <div className="flex items-start gap-3">
                         <div className="flex flex-col items-start gap-1">
                           <Pill tone={tone as any}>{c.field.replace('_', ' ')}</Pill>
-                          {c.source === 'ivan' && <span className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-violet">Ivan</span>}
+                          {c.source === 'socivo' && <span className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-violet">Socivo</span>}
                         </div>
                         <div className="flex-1">
                           <div className="text-[14px] font-semibold text-ink">{c.message}</div>
@@ -1712,9 +1712,9 @@ export default function ResultPage() {
                   );
                 })}
               </div>
-              {result.copy_critique.some((c) => c.source === 'ivan') && (
+              {result.copy_critique.some((c) => c.source === 'socivo') && (
                 <p className="text-[11.5px] text-ink-muted mt-3 leading-snug">
-                  Rules tagged <span className="text-violet font-semibold">Ivan</span> are adapted from <a href="https://github.com/ivangfalco/ads-skills" target="_blank" rel="noreferrer" className="underline">Ivan Falco&apos;s ads-skills</a>, licensed for AdProof&apos;s use.
+                  Rules tagged <span className="text-violet font-semibold">Socivo</span> are Socivo&apos;s own copy methodology.
                 </p>
               )}
             </>

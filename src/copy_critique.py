@@ -28,7 +28,7 @@ class CopyIssue:
     message: str
     fix: str
     lift_pct: Optional[int] = None  # approx CTR lift if fixed (directional)
-    source: Optional[str] = None    # "ivan" for Ivan-Falco-derived rules; None = built-in
+    source: Optional[str] = None    # "socivo" for Socivo rules; None = built-in
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -242,10 +242,10 @@ def _check_text_quality(text: str, field: str,
 
 
 # ---------------------------------------------------------------------------
-# Ivan Falco ad-copywriting.md detectors (Session 3). ADDITIVE — these run
+# Socivo ad-copywriting.md detectors (Session 3). ADDITIVE — these run
 # alongside the existing owner-calibrated checks, never replacing them. Each
-# emits source="ivan" so the UI can attribute. Knowledge base adapted from
-# Ivan Falco's ads-skills, licensed for AdProof's use.
+# emits source="socivo" so the UI can attribute. Knowledge base adapted from
+# Socivo's, licensed for AdProof's use.
 # ---------------------------------------------------------------------------
 
 # Mistake #5 — vague outcome language: promises a result without saying what
@@ -262,7 +262,7 @@ _VAGUE_OUTCOME = (
 )
 
 # Mistake #4 — generic pain question: a category question anyone in the space
-# could ask. We ONLY flag these generic openers, never all questions (Ivan:
+# could ask. We ONLY flag these generic openers, never all questions (Socivo:
 # a specific lived-moment question can outperform a claim).
 _GENERIC_PAIN_Q = re.compile(
     r"^\s*(?:struggling with|tired of|sick of|fed up with|looking for|"
@@ -271,13 +271,13 @@ _GENERIC_PAIN_Q = re.compile(
 )
 
 
-def _check_ivan_rules(headline: str, primary_text: str,
+def _check_socivo_rules(headline: str, primary_text: str,
                        description: str) -> List[CopyIssue]:
-    """Ivan-Falco-derived copy detectors. ADDITIVE, every issue source='ivan'.
+    """Socivo copy detectors. ADDITIVE, every issue source='socivo'.
 
     Two high-precision checks from ad-copywriting.md. The fuzzier
     feature-vs-benefit headline check is deliberately omitted — it
-    false-positives on Ivan's own contrast/feeling formulas.
+    false-positives on Socivo's own contrast/feeling formulas.
     """
     out: List[CopyIssue] = []
     full = " ".join(t for t in (headline, primary_text, description) if t)
@@ -292,11 +292,11 @@ def _check_ivan_rules(headline: str, primary_text: str,
         if hits:
             quoted = ", ".join(f'"{h}"' for h in hits[:3])
             out.append(CopyIssue(
-                severity="info", field="copy", source="ivan",
+                severity="info", field="copy", source="socivo",
                 message=(f"Vague outcome language: {quoted}. It promises a result "
                          "without saying what changes or by how much — readers tune it out."),
                 fix=("Replace with a specific, quantified outcome in the customer's own "
-                     "words. Ivan: \"We found seven figures in optimization\" beats "
+                     "words. Socivo: \"We found seven figures in optimization\" beats "
                      "\"make smarter decisions\". Pull a real number — time saved, % lift, days cut."),
                 lift_pct=8,
             ))
@@ -308,10 +308,10 @@ def _check_ivan_rules(headline: str, primary_text: str,
     for field_name, text in (("headline", headline), ("primary_text", first_sentence)):
         if text and _GENERIC_PAIN_Q.match(text.strip()):
             out.append(CopyIssue(
-                severity="info", field=field_name, source="ivan",
+                severity="info", field=field_name, source="socivo",
                 message=("Generic pain question — a category question anyone in your "
                          "space could ask, so the reader scrolls past instead of feeling seen."),
-                fix=("Swap it for a specific moment the buyer has actually lived. Ivan: "
+                fix=("Swap it for a specific moment the buyer has actually lived. Socivo: "
                      "\"Struggling with reporting?\" → \"Your board asked for a forecast. "
                      "How long did it take?\""),
                 lift_pct=6,
@@ -499,8 +499,8 @@ def critique_copy(
         issues.extend(_check_text_quality(text, field_name,
                                            platform_id=platform_id))
 
-    # Ivan Falco ad-copywriting detectors (additive, source="ivan").
-    issues.extend(_check_ivan_rules(headline, primary_text, description))
+    # Socivo ad-copywriting detectors (additive, source="socivo").
+    issues.extend(_check_socivo_rules(headline, primary_text, description))
 
     # Order most important first.
     SEV_ORDER = {"error": 0, "warning": 1, "info": 2}

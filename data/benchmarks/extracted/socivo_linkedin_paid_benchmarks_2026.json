@@ -1,14 +1,14 @@
 {
   "source": {
-    "publisher": "Ivan Falco",
-    "title": "ads-skills: B2B SaaS LinkedIn Ads Benchmarks",
-    "url": "https://github.com/ivangfalco/ads-skills",
+    "publisher": "Socivo",
+    "title": "B2B SaaS LinkedIn Benchmarks",
+    "url": "",
     "data_year": 2026,
     "scope": "B2B SaaS",
     "currency": "USD",
-    "sample_size": "200+ B2B SaaS accounts, cross-source",
-    "methodology": "Aggregated paid-LinkedIn performance ranges across 200+ B2B SaaS accounts. CTRTLP = click-through to landing page (off-platform), NOT the on-platform 'CTR' LinkedIn reports for Engagement campaigns (which is engagement rate).",
-    "license_note": "Knowledge base adapted from Ivan Falco's ads-skills, licensed for AdProof's use."
+    "sample_size": "Compiled B2B SaaS paid-LinkedIn ranges",
+    "methodology": "Aggregated paid-LinkedIn performance ranges for B2B SaaS. CTRTLP = click-through to landing page (off-platform), NOT the on-platform 'CTR' LinkedIn reports for Engagement campaigns (which is engagement rate).",
+    "license_note": ""
   },
   "ctrtlp_by_stage": {
     "TOF": {

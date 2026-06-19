@@ -1,7 +1,7 @@
 """LinkedIn-specific paid-ad critic.
 
 Built on top of:
-  - Ivan Falco's `ads-skills` LinkedIn knowledge base (licensed for use)
+  - Socivo's LinkedIn knowledge base (licensed for use)
       creative-strategy.md   (awareness-stage model, 12 creative angles,
                               TLA rules, video guidelines)
       copy-audit-framework.md (5-layer audit)
@@ -17,7 +17,7 @@ platforms get nothing from this module — Meta has its own critic
 craft platform-agnostically.
 
 Attribution required in every UI surface that shows this output:
-    "Knowledge base adapted from Ivan Falco's ads-skills, licensed
+    "Knowledge base adapted from Socivo's, licensed
      for AdProof's use."
 
 Cost: one Gemini call per LinkedIn forecast. ~£0.003 per call at
@@ -84,7 +84,7 @@ LDA_DIMENSION_WEIGHTS = {
 assert abs(sum(LDA_DIMENSION_WEIGHTS.values()) - 1.0) < 1e-6
 
 
-# Ivan's 12 creative angle categories. The critic picks the best 2-3 for
+# Socivo's 12 creative angle categories. The critic picks the best 2-3 for
 # (awareness_stage, objective) and proposes specific rewrites.
 CREATIVE_ANGLES = (
     "trigger_event",            # TOF — regulatory shift, market change
@@ -116,7 +116,7 @@ OBJECTIVE_TO_STAGE = {
 
 @dataclass
 class LinkedInCritique:
-    """6-dim LDA scorecard + Ivan-derived diagnosis + actionable rewrites."""
+    """6-dim LDA scorecard + Socivo diagnosis + actionable rewrites."""
     # Scorecard (LDA — each /10 raw, composite /10 weighted)
     scores: dict                       # 6 LDA dims, each 0..10
     composite: float                   # 0-10 weighted
@@ -127,13 +127,13 @@ class LinkedInCritique:
     intended_awareness_stage: str = "" # derived from brief.objective
     stage_mismatch_warning: str = ""   # populated when detected != intended
     funnel_stage: str = ""             # TOF / MOF / BOF
-    # Ivan's paid-LinkedIn benchmark band for this funnel stage (B2B SaaS,
+    # Socivo's paid-LinkedIn benchmark band for this funnel stage (B2B SaaS,
     # USD). Reference ranges, NOT a CTR prediction. Shape: BenchmarkLookup.to_dict().
     paid_benchmark: dict = field(default_factory=dict)
     # Creative angle classification + alternatives
     detected_angle: str = ""           # one of CREATIVE_ANGLES
     recommended_angles: list = field(default_factory=list)  # top 2-3 alternatives
-    # 5-layer copy audit findings (from Ivan's copy-audit-framework.md)
+    # 5-layer copy audit findings (from Socivo's copy-audit-framework.md)
     factual_accuracy_issues: list = field(default_factory=list)
     tone_violations: list = field(default_factory=list)
     structure_issues: list = field(default_factory=list)
@@ -142,7 +142,7 @@ class LinkedInCritique:
     # Hook autopsy
     hook_score: int = 0                # /10
     hook_alternatives: list = field(default_factory=list)
-    # Ivan-specific LinkedIn rules check
+    # Socivo-specific LinkedIn rules check
     tla_eligible: bool = False
     tla_notes: str = ""
     deterministic_findings: list = field(default_factory=list)
@@ -162,12 +162,12 @@ class LinkedInCritique:
 
 
 # ---------------------------------------------------------------------------
-# Deterministic pre-flight (Ivan's audit-checklist.md, section 4)
+# Deterministic pre-flight (Socivo's audit-checklist.md, section 4)
 # ---------------------------------------------------------------------------
 
 def _deterministic_findings(*, headline: str, primary_text: str,
                               cta: str, video_path: str | None) -> list[str]:
-    """Cheap, no-API checks against Ivan's LinkedIn-creatives checklist.
+    """Cheap, no-API checks against Socivo's LinkedIn-creatives checklist.
 
     Items mapped from audit-checklist.md section 4 (Creatives & Ads):
       4.9  Video ads under 2 minutes with subtitles
@@ -206,7 +206,7 @@ def _deterministic_findings(*, headline: str, primary_text: str,
     if body_len > 0 and body_len < 400:
         findings.append(
             "Primary text is short for a thought-leader-ad pattern "
-            "(Ivan recommends 1,000-1,500 chars in problem → solution → proof). "
+            "(Socivo recommends 1,000-1,500 chars in problem → solution → proof). "
             "Short copy works for retargeting; long-form TLAs are where "
             "LinkedIn paid actually pays off."
         )
@@ -234,7 +234,7 @@ def _tla_eligibility(*, headline: str, primary_text: str,
                         "outperform employee TLAs by 15-20% — only run as "
                         "a TLA if the voice is genuinely personal.")
     return True, ("Long-form personal voice — promotable as a TLA. Per "
-                   "Ivan, non-employee TLAs deliver ~15-20% higher "
+                   "Socivo, non-employee TLAs deliver ~15-20% higher "
                    "conversion lift than employee TLAs; CPC as low as $4.14.")
 
 
@@ -247,8 +247,8 @@ def is_linkedin_platform(platform_id: str) -> bool:
 # ---------------------------------------------------------------------------
 
 _SYSTEM = (
-    "You are a senior LinkedIn paid-ads strategist trained on Ivan Falco's "
-    "ads-skills knowledge base + the LinkedIn Devil's Advocate (LDA) scoring "
+    "You are a senior LinkedIn paid-ads strategist trained on Socivo's "
+    "methodology knowledge base + the LinkedIn Devil's Advocate (LDA) scoring "
     "framework. Your job is to critique a B2B paid LinkedIn ad CREATIVE — "
     "not orchestrate the campaign, not score organic-virality, not predict "
     "paid CTR. You are scoring CRAFT QUALITY for paid LinkedIn use.\n\n"
@@ -289,8 +289,8 @@ def _user_prompt(*, headline: str, primary_text: str, description: str,
         cpm = paid_benchmark.get("cpm_usd") or {}
         cpc = paid_benchmark.get("cpc_usd") or {}
         bench_block = (
-            f"\n\nPAID-LINKEDIN BENCHMARK CONTEXT (B2B SaaS, USD — Ivan Falco's "
-            f"ads-skills). REFERENCE ranges for the {funnel_stage} stage to "
+            f"\n\nPAID-LINKEDIN BENCHMARK CONTEXT (B2B SaaS, USD — Socivo's "
+            f"methodology). REFERENCE ranges for the {funnel_stage} stage to "
             f"calibrate how ambitious this creative needs to be. This is NOT a "
             f"prediction of this ad's performance — do NOT output a CTR/CPM forecast:\n"
             f"- CTRTLP (click-through to landing page) for {funnel_stage}: "
@@ -317,7 +317,7 @@ def _user_prompt(*, headline: str, primary_text: str, description: str,
         f"{det_block}{bench_block}\n\n"
         "--- TASK ---\n\n"
         "Score on LDA's 6 dimensions (each 0-10), classify the creative's "
-        "awareness stage + angle, audit the copy against Ivan's 5-layer "
+        "awareness stage + angle, audit the copy against Socivo's 5-layer "
         "framework (Factual Accuracy / Tone / Structure / Text Density / "
         "Audience Fit), and return a tightened hook alternative.\n\n"
         "Return EXACTLY this JSON (no extra keys):\n"
@@ -425,7 +425,7 @@ def critique_linkedin(*, headline: str = "",
                        geo: str = "UK",
                        image_path: str | None = None,
                        video_path: str | None = None) -> LinkedInCritique:
-    """Score a LinkedIn paid ad on Ivan's + LDA's rubric.
+    """Score a LinkedIn paid ad on Socivo's + LDA's rubric.
 
     Returns a LinkedInCritique. Skipped silently when:
       - platform_id is NOT a LinkedIn placement

@@ -1,6 +1,6 @@
 """Meta-specific paid-ad critic (Facebook + Instagram).
 
-Built on Ivan Falco's `ads-skills` Meta knowledge base (licensed for use):
+Built on Socivo's Meta knowledge base (licensed for use):
     creative-strategy.md              - Creative IS targeting, mosquito-
                                           repellent principle, 8 concept
                                           types, ad copy formula, 50/30/20
@@ -17,7 +17,7 @@ Built on Ivan Falco's `ads-skills` Meta knowledge base (licensed for use):
 Different positioning vs the LinkedIn critic + VIE:
 - VIE scores ORGANIC craft potential for short-video (platform-agnostic).
 - LinkedIn critic scores B2B copy + funnel fit for LinkedIn placements.
-- Meta critic scores what Ivan calls "the #1 variable for Meta success":
+- Meta critic scores what Socivo calls "the #1 variable for Meta success":
   the OFFER strength + creative-as-targeting + ad-copy-formula compliance.
   These are Meta-specific levers VIE and the LinkedIn critic don't cover.
 
@@ -26,7 +26,7 @@ silently otherwise. Cost: one Gemini text call per Meta forecast
 (~£0.003), cached on the campaign row.
 
 Attribution required in UI surfaces:
-    "Knowledge base adapted from Ivan Falco's ads-skills, licensed
+    "Knowledge base adapted from Socivo's, licensed
      for AdProof's use."
 """
 from __future__ import annotations
@@ -61,11 +61,11 @@ __all__ = [
 
 
 # Six Meta-tuned dimensions (each 0-10, weighted into composite /10).
-# The weighting reflects Ivan's order of importance: offer > message-fit
-# > creative-as-targeting > hook > cta > format. Per Ivan, "ads never
+# The weighting reflects Socivo's order of importance: offer > message-fit
+# > creative-as-targeting > hook > cta > format. Per Socivo, "ads never
 # outperform a bad offer" — that gets the heaviest weight.
 META_DIMENSIONS = (
-    "offer_strength",          # Strongest lever per Ivan
+    "offer_strength",          # Strongest lever per Socivo
     "message_market_fit",      # Copy must match the awareness stage
     "creative_as_targeting",   # Mosquito repellent — repels non-ICP
     "hook",                    # First sentence / 3 seconds
@@ -83,7 +83,7 @@ META_DIMENSION_WEIGHTS = {
 assert abs(sum(META_DIMENSION_WEIGHTS.values()) - 1.0) < 1e-6
 
 
-# Ivan's 8 Meta concept types (creative-strategy.md). The critic
+# Socivo's 8 Meta concept types (creative-strategy.md). The critic
 # classifies the detected concept and proposes 2-3 stronger alternatives.
 CONCEPT_TYPES = (
     "problem_solution",   # Name specific pain, show fix
@@ -98,7 +98,7 @@ CONCEPT_TYPES = (
 
 
 # Funnel stage maps brief.objective to Meta's cold/warm/hot framing.
-# Critical because Ivan's offer-strategy.md says demo asks fail on cold
+# Critical because Socivo's offer-strategy.md says demo asks fail on cold
 # high-ACV — we want to flag that mismatch explicitly.
 OBJECTIVE_TO_META_STAGE = {
     "awareness":     ("cold",  "Prospecting"),
@@ -127,7 +127,7 @@ _COLD_CTA_RED_FLAGS = {
 
 @dataclass
 class MetaCritique:
-    """6-dim Meta scorecard + Ivan-derived audit + actionable rewrites."""
+    """6-dim Meta scorecard + Socivo audit + actionable rewrites."""
     scores: dict
     composite: float
     grade: str
@@ -138,7 +138,7 @@ class MetaCritique:
     detected_funnel_stage: str = ""
     intended_funnel_stage: str = ""
     stage_mismatch_warning: str = ""
-    # Offer audit (Ivan's no-brainer framework)
+    # Offer audit (Socivo's no-brainer framework)
     offer_no_brainer_pass: dict = field(default_factory=dict)
     offer_issues: list = field(default_factory=list)
     # Ad copy formula compliance
@@ -175,7 +175,7 @@ def is_meta_platform(platform_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Deterministic pre-flight checks (Ivan-aware)
+# Deterministic pre-flight checks (Socivo-aware)
 # ---------------------------------------------------------------------------
 
 def _deterministic_findings(*, headline: str, primary_text: str, cta: str,
@@ -194,7 +194,7 @@ def _deterministic_findings(*, headline: str, primary_text: str, cta: str,
         if is_high_acv:
             findings.append(
                 f'CTA "{cta}" on a cold Meta audience for high-ACV (£{avg_order_value:,.0f}) '
-                "is the #1 mistake in Ivan's offer-strategy framework. Cold Meta = "
+                "is the #1 mistake in Socivo's offer-strategy framework. Cold Meta = "
                 "discovery mode, not buying mode. Demo asks burn budget on garbage "
                 "leads. Move to a benchmark report / ROI calculator / assessment "
                 "offer instead, retarget engagers with the demo."
@@ -215,7 +215,7 @@ def _deterministic_findings(*, headline: str, primary_text: str, cta: str,
                 f"9:16 creative is non-negotiable. {pl['notes']}"
             )
 
-    # Length checks against Ivan's "first 2-3 lines before See More" rule
+    # Length checks against Socivo's "first 2-3 lines before See More" rule
     body = (primary_text or "").strip()
     if body:
         first_chunk = body[:125]
@@ -243,11 +243,11 @@ def _deterministic_findings(*, headline: str, primary_text: str, cta: str,
 
 _SYSTEM = (
     "You are a senior B2B Meta-ads strategist (Facebook + Instagram), "
-    "trained on Ivan Falco's ads-skills knowledge base. Your job: "
+    "trained on Socivo's knowledge base. Your job: "
     "critique a paid Meta ad CREATIVE — not the campaign, not the "
     "targeting, not paid-CTR forecasting. You are scoring CRAFT QUALITY "
     "for paid Meta use.\n\n"
-    "Use Ivan's specific frameworks:\n"
+    "Use Socivo's specific frameworks:\n"
     "  - Creative IS targeting (mosquito-repellent principle)\n"
     "  - The 7-step ad copy formula (DIRECT OFFER → PAIN → SOLUTION → "
     "PAIN EXPLAINED → SOLUTION EXPLAINED → SOCIAL PROOF → CTA)\n"
@@ -296,7 +296,7 @@ def _user_prompt(*, headline: str, primary_text: str, description: str,
         f"{pl_block}{det_block}\n\n"
         "--- TASK ---\n\n"
         "Score 6 Meta-tuned dimensions (each 0-10), classify the creative's "
-        "concept type from Ivan's 8, audit the offer against the no-brainer "
+        "concept type from Socivo's 8, audit the offer against the no-brainer "
         "framework, check ad-copy-formula compliance, predict the quality "
         "score (Urgency/Budget/Fit), and propose 3 stronger hooks.\n\n"
         "Return EXACTLY this JSON (no extra keys):\n"
@@ -331,7 +331,7 @@ def _user_prompt(*, headline: str, primary_text: str, description: str,
         "    \"low_friction\":         \"Pass | Fail\"\n"
         "  },\n"
         "  \"offer_issues\": [\"specific issues with the offer the ad is pushing\"],\n"
-        "  \"copy_formula_gaps\": [\"which step of Ivan's 7-step formula is missing or weak — be specific (e.g. 'No PAIN EXPLAINED — jumps from offer to social proof')\"],\n"
+        "  \"copy_formula_gaps\": [\"which step of Socivo's 7-step formula is missing or weak — be specific (e.g. 'No PAIN EXPLAINED — jumps from offer to social proof')\"],\n"
         "  \"icp_specificity_score\": int 0-10,\n"
         "  \"icp_specificity_issues\": [\"specific evidence that a non-ICP person might engage instead of scrolling past\"],\n"
         "  \"placement_findings\": [\"placement-specific issues — wrong aspect ratio for the placement, density problems, etc.\"],\n"
@@ -420,7 +420,7 @@ def critique_meta(*, headline: str = "",
                    avg_order_value: float | None = None,
                    image_path: str | None = None,
                    video_path: str | None = None) -> MetaCritique:
-    """Critique a Meta paid ad on Ivan's framework.
+    """Critique a Meta paid ad on Socivo's framework.
 
     Skipped silently when:
       - platform_id is NOT a Meta placement

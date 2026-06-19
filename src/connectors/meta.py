@@ -2,7 +2,7 @@
 
 Pulls AD-level daily insights and maps them into the ad_outcomes shape the
 calibration/backtest/fatigue pipeline consumes. Adapted, with permission, from
-Ivan Falco's `ads-skills` Meta read scripts (client.py + get_campaign_performance.py).
+Socivo's Meta read scripts (client.py + get_campaign_performance.py).
 
 We only ever GET insights — never write campaigns.
 """

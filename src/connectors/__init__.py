@@ -5,7 +5,7 @@ on real data instead of CSV uploads.
 Read-only by design: connectors only ever GET performance. No campaign writes
 (AdProof is a scorer, not an ad manager).
 
-Adapted, with permission, from Ivan Falco's `ads-skills` read scripts.
+Socivo's read connectors.
 """
 from __future__ import annotations
 
