@@ -878,30 +878,40 @@ export default function NewAnalysisPage() {
                   if ('link' in patch) w.setCreativeField('link', patch.link);
                 }
               };
-              // Reuse the text from a past AdProof analysis (those store the copy
-              // you entered). Imports carry ad names, not body copy, so the
-              // reliable text source is your previous campaigns.
-              const pastWithCopy = w.savedCampaigns.filter(
-                (c) => c.originalRequests?.[0]?.headline || c.originalRequests?.[0]?.primary_text);
-              const loadCampaign = (id: string) => {
-                const req = w.savedCampaigns.find((x) => x.id === id)?.originalRequests?.[0];
+              // Reuse text from a past AdProof analysis. A campaign can hold
+              // several copy variants (A/B/C/D) — list EVERY variant so you can
+              // pull any one's text, not just Variant A. (Imports carry ad names,
+              // not body copy, so previous analyses are the reliable text source.)
+              const pastOptions = w.savedCampaigns.flatMap((c) => {
+                const reqs = c.originalRequests || [];
+                const multi = reqs.filter((r) => r.headline || r.primary_text).length > 1;
+                return reqs
+                  .map((req, i) => ({
+                    key: `${c.id}::${i}`, req, name: c.name, createdAt: c.createdAt,
+                    vlabel: multi ? ` · Variant ${String.fromCharCode(65 + i)}` : '',
+                  }))
+                  .filter((o) => o.req.headline || o.req.primary_text);
+              });
+              const loadOption = (key: string) => {
+                const [id, idx] = key.split('::');
+                const req = w.savedCampaigns.find((x) => x.id === id)?.originalRequests?.[Number(idx)];
                 if (req) set({ headline: req.headline || '', primaryText: req.primary_text || '',
                                cta: req.cta || '', link: req.link || '' });
               };
               return (
                 <div className="space-y-3">
-                  {pastWithCopy.length > 0 && (
+                  {pastOptions.length > 0 && (
                     <div>
                       <label className="label">Reuse copy from a previous analysis</label>
                       <select
                         className="input text-[13px]"
                         value=""
-                        onChange={(e) => { if (e.target.value) loadCampaign(e.target.value); }}
+                        onChange={(e) => { if (e.target.value) loadOption(e.target.value); }}
                       >
                         <option value="">Start fresh — or pull text from a past campaign…</option>
-                        {pastWithCopy.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {(c.name || 'Untitled').slice(0, 40)} · {new Date(c.createdAt).toLocaleDateString()}
+                        {pastOptions.map((o) => (
+                          <option key={o.key} value={o.key}>
+                            {(o.name || 'Untitled').slice(0, 34)}{o.vlabel} · {new Date(o.createdAt).toLocaleDateString()}
                           </option>
                         ))}
                       </select>
