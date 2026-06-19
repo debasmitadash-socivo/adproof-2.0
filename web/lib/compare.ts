@@ -10,6 +10,8 @@ export interface VariantMetrics {
   roas: number;
   roiPct: number;
   ctrPct: number;
+  reach: number | null;
+  cpm: number | null;
   // 0–1 creative drivers (higher = better)
   emotional: number | null;
   clarity: number | null;
@@ -47,6 +49,8 @@ export function variantMetrics(v: SavedVariantResult): VariantMetrics {
     roas: v.roasP50,
     roiPct: v.roiP50 * 100,
     ctrPct: v.ctrPct,
+    reach: num(r.kpis?.reach?.value ?? r.plain_verdict?.reach_value ?? r.mc?.total_impressions),
+    cpm: num(r.kpis?.cpm?.value),
     emotional: num(vis['emotional_arousal']),
     clarity: num(vis['visual_clarity']),
     attention: num(vis['attention_capture']),
@@ -69,6 +73,8 @@ export interface CompareAnalysis {
   bestReasons: string[];
   worstReasons: string[];
   allVoid: boolean;
+  objective: string;     // awareness | consideration | conversion
+  rankLabel: string;     // reach | CTR | ROAS — the metric variants are ranked by
 }
 
 const DRIVER_KEYS: (keyof VariantMetrics)[] = [
@@ -103,8 +109,14 @@ function topDeltas(m: VariantMetrics, avg: Record<string, number>, sign: 1 | -1,
 
 export function analyzeVariants(variants: SavedVariantResult[]): CompareAnalysis {
   const metrics = variants.map(variantMetrics);
+  // Rank by the objective's real metric — never ROAS on a non-conversion
+  // campaign (ROAS only means something for a conversion objective).
+  const objective = String(variants[0]?.result?.kpis?.objective ?? 'conversion');
+  const rankLabel = objective === 'awareness' ? 'reach' : objective === 'consideration' ? 'CTR' : 'ROAS';
+  const rankKey = (m: VariantMetrics) =>
+    objective === 'awareness' ? (m.reach ?? 0) : objective === 'consideration' ? m.ctrPct : m.roas;
   const eligible = metrics.filter((m) => m.runnable && m.forecastValid);
-  const ranked = [...eligible].sort((a, b) => b.roas - a.roas);
+  const ranked = [...eligible].sort((a, b) => rankKey(b) - rankKey(a));
   const allVoid = eligible.length === 0;
 
   const best = ranked[0] ?? null;
@@ -142,5 +154,5 @@ export function analyzeVariants(variants: SavedVariantResult[]): CompareAnalysis
     }
   }
 
-  return { metrics, ranked, best, worst, bestReasons, worstReasons, allVoid };
+  return { metrics, ranked, best, worst, bestReasons, worstReasons, allVoid, objective, rankLabel };
 }

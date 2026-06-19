@@ -63,7 +63,16 @@ export default function ComparePage() {
     );
   }
 
-  const { metrics, best, worst, bestReasons, worstReasons, allVoid } = analyzeVariants(variants);
+  const { metrics, best, worst, bestReasons, worstReasons, allVoid, objective, rankLabel } = analyzeVariants(variants);
+  // Non-conversion campaigns don't have meaningful ROAS/ROI/break-even — drop
+  // those rows so the matrix matches the objective (ranking is by reach/CTR/ROAS).
+  const rows = objective === 'conversion'
+    ? ROWS
+    : ROWS.filter((r) => !['roas', 'roiPct', 'economicsVerdict'].includes(r.key as string));
+  const headlineMetric = (m: VariantMetrics) =>
+    rankLabel === 'ROAS' ? `${m.roas.toFixed(2)}× ROAS`
+    : rankLabel === 'CTR' ? `${m.ctrPct.toFixed(2)}% CTR`
+    : `${Math.round(m.reach ?? 0).toLocaleString()} reach`;
 
   return (
     <>
@@ -113,7 +122,7 @@ export default function ComparePage() {
             <>
               <div className="display-italic text-[26px] leading-tight mb-1">
                 Variant {best.label}
-                <span className="text-[15px] font-sans not-italic text-ink-muted ml-2">{best.roas.toFixed(2)}× ROAS</span>
+                <span className="text-[15px] font-sans not-italic text-ink-muted ml-2">{headlineMetric(best)}</span>
               </div>
               <div className="text-[13px] text-ink-muted mb-2 truncate">{best.headline || 'No headline'}</div>
               <ul className="space-y-1.5">
@@ -137,7 +146,7 @@ export default function ComparePage() {
               <div className="display-italic text-[26px] leading-tight mb-1">
                 Variant {worst.label}
                 <span className="text-[15px] font-sans not-italic text-ink-muted ml-2">
-                  {worst.runnable === false ? 'N/A' : `${worst.roas.toFixed(2)}× ROAS`}
+                  {worst.runnable === false ? 'N/A' : headlineMetric(worst)}
                 </span>
               </div>
               <div className="text-[13px] text-ink-muted mb-2 truncate">{worst.headline || 'No headline'}</div>
@@ -178,7 +187,7 @@ export default function ComparePage() {
               </tr>
             </thead>
             <tbody>
-              {ROWS.map((row) => {
+              {rows.map((row) => {
                 const bestVal = bestValueForRow(metrics, row.key, row.kind);
                 return (
                   <tr key={row.label} className="border-b border-border-soft last:border-b-0">
@@ -212,7 +221,7 @@ export default function ComparePage() {
       </Card>
 
       <div className="text-[12px] text-ink-faint mt-3">
-        ★ = best in row. Ranking by ROAS excludes any variant that won&apos;t run or whose forecast is void.
+        ★ = best in row. Ranking by {rankLabel} excludes any variant that won&apos;t run or whose forecast is void.
       </div>
     </>
   );

@@ -126,13 +126,36 @@ export default function ResultPage() {
         <Link href="/new"><Button size="sm">Run another version</Button></Link>
       </div>
 
-      {/* MULTI-VARIANT LEADERBOARD — only shows when the campaign has >1 variant */}
-      {hasVariants && campaign?.variants && (
+      {/* MULTI-VARIANT LEADERBOARD — objective-aware. Ranks + headlines by the
+          metric that matches the objective (reach / CTR / ROAS); ROAS/ROI only
+          appear for a conversion objective — never on awareness/consideration. */}
+      {hasVariants && campaign?.variants && (() => {
+        const obj = result.kpis?.objective ?? 'conversion';
+        const cur = result.kpis?.currency ?? result.economics?.currency ?? 'GBP';
+        const vm = (v: any) => {
+          const r = v.result;
+          return {
+            ctr: v.ctrPct as number,
+            cpc: (r.kpis?.cpc?.p50 ?? (r.mc.budget / Math.max(r.mc.predicted_clicks?.p50 ?? 0, 1))) as number,
+            cpm: (r.kpis?.cpm?.value ?? 0) as number,
+            reach: (r.kpis?.reach?.value ?? r.plain_verdict?.reach_value ?? r.mc.total_impressions ?? 0) as number,
+            roas: v.roasP50 as number, roi: v.roiP50 as number,
+          };
+        };
+        const rankVal = (v: any) => obj === 'awareness' ? vm(v).reach : obj === 'consideration' ? vm(v).ctr : v.roasP50;
+        const sortedBy = obj === 'awareness' ? 'reach' : obj === 'consideration' ? 'CTR' : 'ROAS';
+        const mean = (f: (v: any) => number) => campaign.variants!.reduce((s, v) => s + f(v), 0) / campaign.variants!.length;
+        const toneMap: Record<string, 'success' | 'coral' | 'warning' | 'danger'> = {
+          strong: 'success', positive: 'coral', break_even: 'warning', underperforming: 'danger', void: 'danger',
+          wide_reach: 'success', moderate_reach: 'coral', narrow_reach: 'warning',
+          strong_engagement: 'success', fair_engagement: 'coral', weak_engagement: 'warning',
+        };
+        return (
         <Card className="mb-6 !p-0 overflow-hidden">
           <div className="px-6 py-4 bg-gradient-to-r from-coral-soft to-magenta-soft border-b border-coral/30 flex items-center gap-3">
             <div className="flex-1">
               <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.1em]">Variant leaderboard</div>
-              <div className="text-[14px] mt-0.5">{campaign.variants.length} variants tested against the same audience &amp; budget — sorted by ROAS.</div>
+              <div className="text-[14px] mt-0.5">{campaign.variants.length} variants tested against the same audience &amp; budget — sorted by {sortedBy}.</div>
             </div>
             <Link href="/compare"><Button size="sm">Compare all → why each wins</Button></Link>
           </div>
@@ -143,8 +166,9 @@ export default function ResultPage() {
                   <th className="text-left px-5 py-2.5">#</th>
                   <th className="text-left px-3 py-2.5">Variant</th>
                   <th className="text-left px-3 py-2.5">Headline</th>
-                  <th className="text-right px-3 py-2.5">ROAS</th>
-                  <th className="text-right px-3 py-2.5">ROI</th>
+                  {obj === 'conversion' && <><th className="text-right px-3 py-2.5">ROAS</th><th className="text-right px-3 py-2.5">ROI</th></>}
+                  {obj === 'awareness' && <><th className="text-right px-3 py-2.5">Reach</th><th className="text-right px-3 py-2.5">CPM</th></>}
+                  {obj === 'consideration' && <th className="text-right px-3 py-2.5">CPC</th>}
                   <th className="text-right px-3 py-2.5">CTR</th>
                   <th className="text-left px-3 py-2.5">Verdict</th>
                   <th className="px-3 py-2.5"></th>
@@ -153,11 +177,12 @@ export default function ResultPage() {
               <tbody>
                 {[...campaign.variants]
                   .map((v, originalIdx) => ({ v, originalIdx }))
-                  .sort((a, b) => b.v.roasP50 - a.v.roasP50)
+                  .sort((a, b) => rankVal(b.v) - rankVal(a.v))
                   .map(({ v, originalIdx }, rank) => {
                     const winner = rank === 0;
                     const active = originalIdx === activeVariantIdx;
-                    const tone = ({ strong: 'success', positive: 'coral', break_even: 'warning', underperforming: 'danger', void: 'danger' } as Record<string, 'success' | 'coral' | 'warning' | 'danger'>)[v.verdictClass] ?? 'warning';
+                    const m = vm(v);
+                    const tone = toneMap[v.verdictClass] ?? 'warning';
                     return (
                       <tr key={v.label}
                           onClick={() => setActiveVariantIdx(originalIdx)}
@@ -179,10 +204,17 @@ export default function ResultPage() {
                           </div>
                         </td>
                         <td className="px-3 py-3 text-[13px] text-ink max-w-[260px] truncate">{v.headline || <em className="text-ink-muted">No headline</em>}</td>
-                        <td className="px-3 py-3 text-right font-mono text-[13.5px]"><strong>{v.roasP50.toFixed(2)}×</strong></td>
-                        <td className="px-3 py-3 text-right font-mono text-[13px]">{(v.roiP50 * 100 >= 0 ? '+' : '') + Math.round(v.roiP50 * 100)}%</td>
-                        <td className="px-3 py-3 text-right font-mono text-[13px]">{v.ctrPct.toFixed(2)}%</td>
-                        <td className="px-3 py-3"><Pill tone={tone} dot>{(v.verdictClass ?? 'n/a').replace('_', ' ')}</Pill></td>
+                        {obj === 'conversion' && <>
+                          <td className="px-3 py-3 text-right font-mono text-[13.5px]"><strong>{m.roas.toFixed(2)}×</strong></td>
+                          <td className="px-3 py-3 text-right font-mono text-[13px]">{(m.roi * 100 >= 0 ? '+' : '') + Math.round(m.roi * 100)}%</td>
+                        </>}
+                        {obj === 'awareness' && <>
+                          <td className="px-3 py-3 text-right font-mono text-[13.5px]"><strong>{Math.round(m.reach).toLocaleString()}</strong></td>
+                          <td className="px-3 py-3 text-right font-mono text-[13px]">{cur} {m.cpm.toFixed(2)}</td>
+                        </>}
+                        {obj === 'consideration' && <td className="px-3 py-3 text-right font-mono text-[13px]">{cur} {m.cpc.toFixed(2)}</td>}
+                        <td className="px-3 py-3 text-right font-mono text-[13px]">{m.ctr.toFixed(2)}%</td>
+                        <td className="px-3 py-3"><Pill tone={tone} dot>{(v.verdictClass ?? 'n/a').replace(/_/g, ' ')}</Pill></td>
                         <td className="px-3 py-3 text-right text-[12px] text-coral font-semibold">{active ? '— viewing' : 'view details →'}</td>
                       </tr>
                     );
@@ -191,10 +223,17 @@ export default function ResultPage() {
             </table>
           </div>
           <div className="px-5 py-3 bg-bg-deep text-[12.5px] text-ink-muted border-t border-border">
-            Aggregate (mean across variants): <strong className="text-ink mono">{campaign.roasP50.toFixed(2)}× ROAS</strong> · <strong className="text-ink mono">{Math.round(campaign.roiP50 * 100) >= 0 ? '+' : ''}{Math.round(campaign.roiP50 * 100)}% ROI</strong>. The dashboard takes the <em>most pessimistic</em> verdict as the campaign-level verdict so you don't read one strong variant as a green light for the whole campaign.
+            Aggregate (mean across variants):{' '}
+            {obj === 'conversion'
+              ? <><strong className="text-ink mono">{mean((v) => v.roasP50).toFixed(2)}× ROAS</strong> · <strong className="text-ink mono">{Math.round(mean((v) => v.roiP50) * 100) >= 0 ? '+' : ''}{Math.round(mean((v) => v.roiP50) * 100)}% ROI</strong></>
+              : obj === 'awareness'
+              ? <><strong className="text-ink mono">{cur} {mean((v) => vm(v).cpm).toFixed(2)} CPM</strong> · <strong className="text-ink mono">~{Math.round(mean((v) => vm(v).reach)).toLocaleString()} reached</strong></>
+              : <><strong className="text-ink mono">{mean((v) => v.ctrPct).toFixed(2)}% CTR</strong> · <strong className="text-ink mono">{cur} {mean((v) => vm(v).cpc).toFixed(2)} CPC</strong></>}
+            . The dashboard takes the <em>most pessimistic</em> verdict as the campaign-level verdict so you don&apos;t read one strong variant as a green light for the whole campaign.
           </div>
         </Card>
-      )}
+        );
+      })()}
 
       {/* Credibility hero — our predicted-vs-actual track record on this
           account, so the forecast below is read against a real accuracy number. */}
@@ -388,17 +427,32 @@ export default function ResultPage() {
             const num = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 1 : 0 });
             const money = (n: number) => `${cur} ${n.toLocaleString(undefined, { maximumFractionDigits: n < 100 ? 2 : 0 })}`;
             const pctv = (x: number) => `${(x * 100).toFixed(2)}%`;
+            // Objective-aware: ROAS / ROI / Revenue / Conversions only make sense
+            // for a conversion campaign. Awareness leads with reach + CPM;
+            // consideration with clicks / CTR / CPC. Matches the hero + leaderboard.
+            const obj = result.kpis?.objective ?? 'conversion';
+            const isConv = obj === 'conversion';
+            const reachVal = result.kpis?.reach?.value ?? result.plain_verdict?.reach_value ?? imps;
+            const cpmVal = result.kpis?.cpm?.value ?? (imps > 0 ? (bud / imps) * 1000 : 0);
             const cards: { label: string; value: string; meaning: string; range?: string; tone?: 'good' | 'bad' }[] = [
               { label: 'Impressions', value: num(imps), meaning: 'times your ad is shown' },
+              ...(obj === 'awareness' ? [
+                { label: 'Reach', value: num(reachVal), meaning: 'unique people reached' },
+                { label: 'CPM', value: money(cpmVal), meaning: 'cost per 1,000 impressions' },
+              ] : []),
               { label: 'Link clicks', value: num(cl.p50), meaning: 'people who click through', range: `${num(cl.p10)}–${num(cl.p90)} likely` },
-              { label: 'Click rate (CTR)', value: pctv(ctr50), meaning: `vs ${pctv(benchCtr)} benchmark`, tone: ctr50 >= benchCtr ? 'good' : 'bad' },
-              { label: 'Conversions', value: num(cv.p50), meaning: 'customers / leads', range: `${num(cv.p10)}–${num(cv.p90)} likely` },
-              { label: 'Conversion rate', value: pctv(cvr50), meaning: 'clicks → customers' },
+              { label: 'Click rate (CTR)', value: pctv(ctr50), meaning: `vs ${pctv(benchCtr)} benchmark`, tone: ctr50 >= benchCtr ? 'good' as const : 'bad' as const },
+              ...(isConv ? [
+                { label: 'Conversions', value: num(cv.p50), meaning: 'customers / leads', range: `${num(cv.p10)}–${num(cv.p90)} likely` },
+                { label: 'Conversion rate', value: pctv(cvr50), meaning: 'clicks → customers' },
+              ] : []),
               { label: 'Cost per click', value: money(bud / Math.max(cl.p50, 1)), meaning: 'what each click costs', range: `${money(bud / Math.max(cl.p90, 1))}–${money(bud / Math.max(cl.p10, 1))}` },
-              { label: 'Cost per result', value: money(bud / Math.max(cv.p50, 0.001)), meaning: 'cost per customer / lead' },
-              { label: 'Revenue', value: money(rv.p50), meaning: 'money back', range: `${money(rv.p10)}–${money(rv.p90)} likely` },
-              { label: 'ROAS', value: `${mc.predicted_roas.p50.toFixed(2)}×`, meaning: `back per ${cur} 1 spent`, range: `${mc.predicted_roas.p10.toFixed(2)}–${mc.predicted_roas.p90.toFixed(2)}×` },
-              { label: 'ROI', value: `${mc.predicted_roi.p50 >= 0 ? '+' : ''}${Math.round(mc.predicted_roi.p50 * 100)}%`, meaning: 'profit margin on spend', tone: mc.predicted_roi.p50 >= 0 ? 'good' : 'bad' },
+              ...(isConv ? [
+                { label: 'Cost per result', value: money(bud / Math.max(cv.p50, 0.001)), meaning: 'cost per customer / lead' },
+                { label: 'Revenue', value: money(rv.p50), meaning: 'money back', range: `${money(rv.p10)}–${money(rv.p90)} likely` },
+                { label: 'ROAS', value: `${mc.predicted_roas.p50.toFixed(2)}×`, meaning: `back per ${cur} 1 spent`, range: `${mc.predicted_roas.p10.toFixed(2)}–${mc.predicted_roas.p90.toFixed(2)}×` },
+                { label: 'ROI', value: `${mc.predicted_roi.p50 >= 0 ? '+' : ''}${Math.round(mc.predicted_roi.p50 * 100)}%`, meaning: 'profit margin on spend', tone: (mc.predicted_roi.p50 >= 0 ? 'good' : 'bad') as 'good' | 'bad' },
+              ] : []),
               ...(freq ? [{ label: 'Frequency', value: `${freq.toFixed(1)}×`, meaning: 'times each person sees it' }] : []),
             ];
             return (
@@ -1244,7 +1298,7 @@ export default function ResultPage() {
 
           {/* CHANNEL ECONOMICS — the honest break-even math on the user's real
               numbers. Shown alongside the ROAS estimate, not instead of it. */}
-          {result.economics && (() => {
+          {result.economics && (result.kpis?.objective ?? 'conversion') === 'conversion' && (() => {
             const e = result.economics!;
             const cur = e.currency || 'GBP';
             const tone = e.verdict === 'comfortable' ? 'success'
@@ -1834,7 +1888,11 @@ export default function ResultPage() {
                 key={c.id} variant="secondary" size="sm" className="w-full justify-start mb-1.5"
                 onClick={() => { setResult(c.result); router.refresh(); }}
               >
-                📊 {c.name} — {c.roasP50.toFixed(2)}×
+                📊 {c.name} — {(c.result?.kpis?.objective ?? 'conversion') === 'awareness'
+                  ? `${(c.result?.kpis?.cpm?.value ?? 0).toFixed(2)} CPM`
+                  : (c.result?.kpis?.objective === 'consideration')
+                  ? `${c.ctrPct.toFixed(2)}% CTR`
+                  : `${c.roasP50.toFixed(2)}×`}
               </Button>
             ))
           )}
