@@ -1,0 +1,3 @@
+# Per-run snapshots are bulky + machine-local. The durable references
+# (baseline.json, ledger.jsonl) ARE tracked so the trajectory lives in git.
+runs/

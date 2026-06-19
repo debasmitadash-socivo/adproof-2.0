@@ -1,0 +1,134 @@
+{
+  "_meta": {
+    "purpose": "Golden regression scenarios for the AdProof forecast engine.",
+    "honest_framing": "These test STABILITY + SANITY of the deterministic core (seeded Monte Carlo) plus the copy_critique + linguistics layers. They do NOT measure real-world ACCURACY — that needs real campaign outcomes to score against (the backtest, unlockable once real data flows). See run_eval.py header.",
+    "mode": "LLM-free + deterministic: critics disabled via env flags, heuristic profile/audience parse, fixed seed.",
+    "currency": "GBP"
+  },
+  "scenarios": [
+    {
+      "id": "li_awareness",
+      "expect": "runnable",
+      "assert": { "kpi_lead_in": ["cpm", "reach", "impressions"] },
+      "request": {
+        "company_description": "A B2B SaaS that automates financial reporting for finance teams.",
+        "audience_description": "finance leaders at mid-market companies",
+        "objective": "awareness", "platform_id": "linkedin", "format_id": "linkedin_message",
+        "budget": 1000, "days": 14, "currency": "GBP", "geo": "UK",
+        "interests": ["b2b software", "finance"], "n_runs": 300,
+        "headline": "Reporting that runs itself",
+        "primary_text": "Close the books in days, not weeks. Finance teams cut 6 hours of manual reporting every week.",
+        "cta": "Learn more", "link": "https://example.com"
+      }
+    },
+    {
+      "id": "li_consideration",
+      "expect": "runnable",
+      "assert": { "kpi_lead_in": ["ctr"] },
+      "request": {
+        "company_description": "A B2B SaaS that automates financial reporting for finance teams.",
+        "audience_description": "finance leaders at mid-market companies",
+        "objective": "consideration", "platform_id": "linkedin", "format_id": "linkedin_message",
+        "budget": 1000, "days": 14, "currency": "GBP", "geo": "UK",
+        "interests": ["b2b software", "finance"], "n_runs": 300,
+        "headline": "Close the books 3x faster",
+        "primary_text": "Finance teams cut 6 hours of manual reporting every week. See how 8,000 teams made the switch.",
+        "cta": "See how", "link": "https://example.com"
+      }
+    },
+    {
+      "id": "li_conversion",
+      "expect": "runnable",
+      "assert": { "kpi_lead_in": ["roas"] },
+      "request": {
+        "company_description": "A B2B SaaS that automates financial reporting for finance teams.",
+        "audience_description": "finance leaders at mid-market companies",
+        "objective": "conversion", "platform_id": "linkedin", "format_id": "linkedin_message",
+        "budget": 1000, "days": 14, "currency": "GBP", "geo": "UK",
+        "interests": ["b2b software", "finance"], "n_runs": 300,
+        "avg_order_value": 1200, "product_price": 1200, "target_conversion_rate": 0.03,
+        "headline": "Start your 14-day trial",
+        "primary_text": "Close the books 3x faster. £1,200/yr, 14-day free trial, cancel anytime.",
+        "cta": "Start free trial", "link": "https://example.com"
+      }
+    },
+    {
+      "id": "li_consideration_bigbudget",
+      "expect": "runnable",
+      "assert": { "kpi_lead_in": ["ctr"] },
+      "request": {
+        "company_description": "A B2B SaaS that automates financial reporting for finance teams.",
+        "audience_description": "finance leaders at mid-market companies",
+        "objective": "consideration", "platform_id": "linkedin", "format_id": "linkedin_message",
+        "budget": 5000, "days": 14, "currency": "GBP", "geo": "UK",
+        "interests": ["b2b software", "finance"], "n_runs": 300,
+        "headline": "Close the books 3x faster",
+        "primary_text": "Finance teams cut 6 hours of manual reporting every week. See how 8,000 teams made the switch.",
+        "cta": "See how", "link": "https://example.com"
+      }
+    },
+    {
+      "id": "li_copy_triggers",
+      "expect": "runnable",
+      "assert": { "copy_ivan_min": 2, "linguistics_present": true },
+      "request": {
+        "company_description": "A B2B SaaS that automates financial reporting for finance teams.",
+        "objective": "consideration", "platform_id": "linkedin", "format_id": "linkedin_message",
+        "budget": 1000, "days": 14, "currency": "GBP", "geo": "UK",
+        "interests": ["b2b software"], "n_runs": 300,
+        "headline": "Struggling with reporting?",
+        "primary_text": "We help you make smarter decisions and transform your business every single day.",
+        "cta": "Learn more", "link": "https://example.com"
+      }
+    },
+    {
+      "id": "li_copy_clean",
+      "expect": "runnable",
+      "assert": { "copy_ivan_max": 0, "linguistics_present": true },
+      "request": {
+        "company_description": "A B2B SaaS that automates financial reporting for finance teams.",
+        "objective": "consideration", "platform_id": "linkedin", "format_id": "linkedin_message",
+        "budget": 1000, "days": 14, "currency": "GBP", "geo": "UK",
+        "interests": ["b2b software"], "n_runs": 300,
+        "headline": "From 8 hours to 15 minutes",
+        "primary_text": "We cut weekly reporting from 8 hours to 15 minutes for 8,000 finance teams. Close the books by day 3.",
+        "cta": "Book a demo", "link": "https://example.com"
+      }
+    },
+    {
+      "id": "blocked_image_no_creative",
+      "expect": "blocked",
+      "assert": {},
+      "request": {
+        "company_description": "A B2B SaaS that automates financial reporting for finance teams.",
+        "objective": "consideration", "platform_id": "linkedin", "format_id": "linkedin_sponsored_image",
+        "budget": 1000, "days": 14, "currency": "GBP", "geo": "UK",
+        "interests": ["b2b software"], "n_runs": 300,
+        "headline": "Close the books 3x faster",
+        "primary_text": "Finance teams cut 6 hours of manual reporting every week.",
+        "cta": "See how", "link": "https://example.com"
+      }
+    },
+    {
+      "id": "li_minimal",
+      "expect": "runnable",
+      "assert": {},
+      "request": {
+        "company_description": "A small bakery selling sourdough bread.",
+        "objective": "consideration", "platform_id": "linkedin", "format_id": "linkedin_message",
+        "budget": 300, "days": 7, "currency": "GBP", "geo": "UK",
+        "interests": ["food"], "n_runs": 300,
+        "headline": "Fresh sourdough", "primary_text": "Baked daily.",
+        "cta": "Order", "link": "https://example.com"
+      }
+    }
+  ],
+  "cross_scenario_invariants": [
+    {
+      "name": "budget_monotonic_impressions",
+      "detail": "More budget (same brief) must not reduce impressions.",
+      "metric": "impressions", "greater_eq": "li_consideration_bigbudget", "than": "li_consideration"
+    }
+  ],
+  "determinism_check": "li_consideration"
+}

@@ -1,0 +1,581 @@
+{
+  "ts": "2026-06-19T12-14-14Z",
+  "git": "7388ecd",
+  "fingerprints": {
+    "li_awareness": {
+      "runnable": true,
+      "forecast_valid": true,
+      "verdict_class": "narrow_reach",
+      "kpi_lead": "cpm",
+      "ctr_p50": 0.00832,
+      "cpm": 15.0,
+      "clicks_p50": 517.0,
+      "clicks_p10": 421.8,
+      "clicks_p90": 710.2,
+      "conv_p50": 8.9,
+      "roas_p10": 14.716,
+      "roas_p50": 17.744,
+      "roas_p90": 24.011,
+      "impressions": 66667,
+      "audience_size": 1000,
+      "clears_break_even": true,
+      "confidence_level": "low",
+      "copy_issue_count": 2,
+      "copy_ivan_count": 0,
+      "ling_grade": 4.8,
+      "ling_persuasion": 0
+    },
+    "li_consideration": {
+      "runnable": true,
+      "forecast_valid": true,
+      "verdict_class": "weak_engagement",
+      "kpi_lead": "ctr",
+      "ctr_p50": 0.00832,
+      "cpm": 15.0,
+      "clicks_p50": 517.0,
+      "clicks_p10": 421.8,
+      "clicks_p90": 710.2,
+      "conv_p50": 8.9,
+      "roas_p10": 14.716,
+      "roas_p50": 17.744,
+      "roas_p90": 24.011,
+      "impressions": 66667,
+      "audience_size": 1000,
+      "clears_break_even": true,
+      "confidence_level": "low",
+      "copy_issue_count": 2,
+      "copy_ivan_count": 0,
+      "ling_grade": 2.7,
+      "ling_persuasion": 0
+    },
+    "li_conversion": {
+      "runnable": true,
+      "forecast_valid": true,
+      "verdict_class": "break_even",
+      "kpi_lead": "roas",
+      "ctr_p50": 0.01103,
+      "cpm": 15.0,
+      "clicks_p50": 727.9,
+      "clicks_p10": 598.6,
+      "clicks_p90": 866.7,
+      "conv_p50": 17.6,
+      "roas_p10": 17.271,
+      "roas_p50": 21.108,
+      "roas_p90": 24.957,
+      "impressions": 66667,
+      "audience_size": 1000,
+      "clears_break_even": true,
+      "confidence_level": "low",
+      "copy_issue_count": 2,
+      "copy_ivan_count": 0,
+      "ling_grade": 0.0,
+      "ling_persuasion": 1
+    },
+    "li_consideration_bigbudget": {
+      "runnable": true,
+      "forecast_valid": true,
+      "verdict_class": "weak_engagement",
+      "kpi_lead": "ctr",
+      "ctr_p50": 0.00832,
+      "cpm": 15.0,
+      "clicks_p50": 2585.0,
+      "clicks_p10": 2108.8,
+      "clicks_p90": 3551.0,
+      "conv_p50": 44.4,
+      "roas_p10": 14.716,
+      "roas_p50": 17.744,
+      "roas_p90": 24.011,
+      "impressions": 333333,
+      "audience_size": 1000,
+      "clears_break_even": true,
+      "confidence_level": "low",
+      "copy_issue_count": 2,
+      "copy_ivan_count": 0,
+      "ling_grade": 2.7,
+      "ling_persuasion": 0
+    },
+    "li_copy_triggers": {
+      "runnable": true,
+      "forecast_valid": true,
+      "verdict_class": "weak_engagement",
+      "kpi_lead": "ctr",
+      "ctr_p50": 0.01022,
+      "cpm": 15.0,
+      "clicks_p50": 659.9,
+      "clicks_p10": 556.5,
+      "clicks_p90": 829.9,
+      "conv_p50": 12.3,
+      "roas_p10": 20.426,
+      "roas_p50": 24.576,
+      "roas_p90": 30.353,
+      "impressions": 66667,
+      "audience_size": 1000,
+      "clears_break_even": true,
+      "confidence_level": "low",
+      "copy_issue_count": 7,
+      "copy_ivan_count": 2,
+      "ling_grade": 8.2,
+      "ling_persuasion": 0
+    },
+    "li_copy_clean": {
+      "runnable": true,
+      "forecast_valid": true,
+      "verdict_class": "weak_engagement",
+      "kpi_lead": "ctr",
+      "ctr_p50": 0.00832,
+      "cpm": 15.0,
+      "clicks_p50": 517.0,
+      "clicks_p10": 421.8,
+      "clicks_p90": 710.2,
+      "conv_p50": 8.9,
+      "roas_p10": 14.716,
+      "roas_p50": 17.744,
+      "roas_p90": 24.011,
+      "impressions": 66667,
+      "audience_size": 1000,
+      "clears_break_even": true,
+      "confidence_level": "low",
+      "copy_issue_count": 3,
+      "copy_ivan_count": 0,
+      "ling_grade": 1.9,
+      "ling_persuasion": 0
+    },
+    "li_minimal": {
+      "runnable": true,
+      "forecast_valid": true,
+      "verdict_class": "weak_engagement",
+      "kpi_lead": "ctr",
+      "ctr_p50": 0.00826,
+      "cpm": 15.0,
+      "clicks_p50": 163.3,
+      "clicks_p10": 113.5,
+      "clicks_p90": 213.1,
+      "conv_p50": 2.7,
+      "roas_p10": 0.597,
+      "roas_p50": 0.815,
+      "roas_p90": 1.133,
+      "impressions": 20000,
+      "audience_size": 1000,
+      "clears_break_even": true,
+      "confidence_level": "low",
+      "copy_issue_count": 2,
+      "copy_ivan_count": 0,
+      "ling_grade": 6.6,
+      "ling_persuasion": 0
+    }
+  },
+  "status": {
+    "li_awareness": "ok",
+    "li_consideration": "ok",
+    "li_conversion": "ok",
+    "li_consideration_bigbudget": "ok",
+    "li_copy_triggers": "ok",
+    "li_copy_clean": "ok",
+    "blocked_image_no_creative": "blocked",
+    "li_minimal": "ok"
+  },
+  "invariants": [
+    {
+      "scenario": "li_awareness",
+      "name": "runs_without_error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scenario": "li_awareness",
+      "name": "viability_runnable",
+      "ok": true,
+      "detail": "viability.runnable is false"
+    },
+    {
+      "scenario": "li_awareness",
+      "name": "forecast_valid",
+      "ok": true,
+      "detail": "viability.forecast_valid is false"
+    },
+    {
+      "scenario": "li_awareness",
+      "name": "ctr_in_range",
+      "ok": true,
+      "detail": "ctr_p50=0.00832"
+    },
+    {
+      "scenario": "li_awareness",
+      "name": "roas_nonneg",
+      "ok": true,
+      "detail": "roas_p50=17.744"
+    },
+    {
+      "scenario": "li_awareness",
+      "name": "impressions_positive",
+      "ok": true,
+      "detail": "impressions=66667"
+    },
+    {
+      "scenario": "li_awareness",
+      "name": "clicks_band_ordered",
+      "ok": true,
+      "detail": "421.8 <= 517.0 <= 710.2"
+    },
+    {
+      "scenario": "li_awareness",
+      "name": "roas_band_ordered",
+      "ok": true,
+      "detail": "14.716 <= 17.744 <= 24.011"
+    },
+    {
+      "scenario": "li_awareness",
+      "name": "kpi_lead_matches_objective",
+      "ok": true,
+      "detail": "lead=cpm not in ['cpm', 'reach', 'impressions']"
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "runs_without_error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "viability_runnable",
+      "ok": true,
+      "detail": "viability.runnable is false"
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "forecast_valid",
+      "ok": true,
+      "detail": "viability.forecast_valid is false"
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "ctr_in_range",
+      "ok": true,
+      "detail": "ctr_p50=0.00832"
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "roas_nonneg",
+      "ok": true,
+      "detail": "roas_p50=17.744"
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "impressions_positive",
+      "ok": true,
+      "detail": "impressions=66667"
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "clicks_band_ordered",
+      "ok": true,
+      "detail": "421.8 <= 517.0 <= 710.2"
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "roas_band_ordered",
+      "ok": true,
+      "detail": "14.716 <= 17.744 <= 24.011"
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "kpi_lead_matches_objective",
+      "ok": true,
+      "detail": "lead=ctr not in ['ctr']"
+    },
+    {
+      "scenario": "li_conversion",
+      "name": "runs_without_error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scenario": "li_conversion",
+      "name": "viability_runnable",
+      "ok": true,
+      "detail": "viability.runnable is false"
+    },
+    {
+      "scenario": "li_conversion",
+      "name": "forecast_valid",
+      "ok": true,
+      "detail": "viability.forecast_valid is false"
+    },
+    {
+      "scenario": "li_conversion",
+      "name": "ctr_in_range",
+      "ok": true,
+      "detail": "ctr_p50=0.01103"
+    },
+    {
+      "scenario": "li_conversion",
+      "name": "roas_nonneg",
+      "ok": true,
+      "detail": "roas_p50=21.108"
+    },
+    {
+      "scenario": "li_conversion",
+      "name": "impressions_positive",
+      "ok": true,
+      "detail": "impressions=66667"
+    },
+    {
+      "scenario": "li_conversion",
+      "name": "clicks_band_ordered",
+      "ok": true,
+      "detail": "598.6 <= 727.9 <= 866.7"
+    },
+    {
+      "scenario": "li_conversion",
+      "name": "roas_band_ordered",
+      "ok": true,
+      "detail": "17.271 <= 21.108 <= 24.957"
+    },
+    {
+      "scenario": "li_conversion",
+      "name": "kpi_lead_matches_objective",
+      "ok": true,
+      "detail": "lead=roas not in ['roas']"
+    },
+    {
+      "scenario": "li_consideration_bigbudget",
+      "name": "runs_without_error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scenario": "li_consideration_bigbudget",
+      "name": "viability_runnable",
+      "ok": true,
+      "detail": "viability.runnable is false"
+    },
+    {
+      "scenario": "li_consideration_bigbudget",
+      "name": "forecast_valid",
+      "ok": true,
+      "detail": "viability.forecast_valid is false"
+    },
+    {
+      "scenario": "li_consideration_bigbudget",
+      "name": "ctr_in_range",
+      "ok": true,
+      "detail": "ctr_p50=0.00832"
+    },
+    {
+      "scenario": "li_consideration_bigbudget",
+      "name": "roas_nonneg",
+      "ok": true,
+      "detail": "roas_p50=17.744"
+    },
+    {
+      "scenario": "li_consideration_bigbudget",
+      "name": "impressions_positive",
+      "ok": true,
+      "detail": "impressions=333333"
+    },
+    {
+      "scenario": "li_consideration_bigbudget",
+      "name": "clicks_band_ordered",
+      "ok": true,
+      "detail": "2108.8 <= 2585.0 <= 3551.0"
+    },
+    {
+      "scenario": "li_consideration_bigbudget",
+      "name": "roas_band_ordered",
+      "ok": true,
+      "detail": "14.716 <= 17.744 <= 24.011"
+    },
+    {
+      "scenario": "li_consideration_bigbudget",
+      "name": "kpi_lead_matches_objective",
+      "ok": true,
+      "detail": "lead=ctr not in ['ctr']"
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "runs_without_error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "viability_runnable",
+      "ok": true,
+      "detail": "viability.runnable is false"
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "forecast_valid",
+      "ok": true,
+      "detail": "viability.forecast_valid is false"
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "ctr_in_range",
+      "ok": true,
+      "detail": "ctr_p50=0.01022"
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "roas_nonneg",
+      "ok": true,
+      "detail": "roas_p50=24.576"
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "impressions_positive",
+      "ok": true,
+      "detail": "impressions=66667"
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "clicks_band_ordered",
+      "ok": true,
+      "detail": "556.5 <= 659.9 <= 829.9"
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "roas_band_ordered",
+      "ok": true,
+      "detail": "20.426 <= 24.576 <= 30.353"
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "copy_ivan_min",
+      "ok": true,
+      "detail": "ivan=2 < 2"
+    },
+    {
+      "scenario": "li_copy_triggers",
+      "name": "linguistics_present",
+      "ok": true,
+      "detail": "linguistics missing"
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "runs_without_error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "viability_runnable",
+      "ok": true,
+      "detail": "viability.runnable is false"
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "forecast_valid",
+      "ok": true,
+      "detail": "viability.forecast_valid is false"
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "ctr_in_range",
+      "ok": true,
+      "detail": "ctr_p50=0.00832"
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "roas_nonneg",
+      "ok": true,
+      "detail": "roas_p50=17.744"
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "impressions_positive",
+      "ok": true,
+      "detail": "impressions=66667"
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "clicks_band_ordered",
+      "ok": true,
+      "detail": "421.8 <= 517.0 <= 710.2"
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "roas_band_ordered",
+      "ok": true,
+      "detail": "14.716 <= 17.744 <= 24.011"
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "copy_ivan_max",
+      "ok": true,
+      "detail": "ivan=0 > 0"
+    },
+    {
+      "scenario": "li_copy_clean",
+      "name": "linguistics_present",
+      "ok": true,
+      "detail": "linguistics missing"
+    },
+    {
+      "scenario": "blocked_image_no_creative",
+      "name": "blocks_as_expected",
+      "ok": true,
+      "detail": "status=blocked (wanted blocked); detail={'status_code': 400, 'detail': \"Sponsored Content \u2014 Single Image needs an image "
+    },
+    {
+      "scenario": "li_minimal",
+      "name": "runs_without_error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scenario": "li_minimal",
+      "name": "viability_runnable",
+      "ok": true,
+      "detail": "viability.runnable is false"
+    },
+    {
+      "scenario": "li_minimal",
+      "name": "forecast_valid",
+      "ok": true,
+      "detail": "viability.forecast_valid is false"
+    },
+    {
+      "scenario": "li_minimal",
+      "name": "ctr_in_range",
+      "ok": true,
+      "detail": "ctr_p50=0.00826"
+    },
+    {
+      "scenario": "li_minimal",
+      "name": "roas_nonneg",
+      "ok": true,
+      "detail": "roas_p50=0.815"
+    },
+    {
+      "scenario": "li_minimal",
+      "name": "impressions_positive",
+      "ok": true,
+      "detail": "impressions=20000"
+    },
+    {
+      "scenario": "li_minimal",
+      "name": "clicks_band_ordered",
+      "ok": true,
+      "detail": "113.5 <= 163.3 <= 213.1"
+    },
+    {
+      "scenario": "li_minimal",
+      "name": "roas_band_ordered",
+      "ok": true,
+      "detail": "0.597 <= 0.815 <= 1.133"
+    },
+    {
+      "scenario": "li_consideration",
+      "name": "deterministic_rerun",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "scenario": "li_consideration_bigbudget\u2265li_consideration",
+      "name": "budget_monotonic_impressions",
+      "ok": true,
+      "detail": "impressions: 333333 vs 66667"
+    }
+  ]
+}
