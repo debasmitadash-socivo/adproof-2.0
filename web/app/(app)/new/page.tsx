@@ -539,6 +539,16 @@ export default function NewAnalysisPage() {
         Score a new <span className="gradient-text">ad campaign</span>
       </div>
 
+      {running && (
+        <div className="fixed inset-0 z-50 bg-bg-deep/70 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-surface border border-border rounded-xl shadow-soft p-8 max-w-sm text-center mx-4">
+            <div className="w-10 h-10 mx-auto mb-4 rounded-full border-[3px] border-coral border-t-transparent animate-spin" />
+            <div className="font-heading text-[16px] font-bold mb-1">Running your forecast…</div>
+            <div className="text-[13px] text-ink-muted leading-snug">This can take up to a minute — longer with multiple variants, which run one at a time. Keep this tab open.</div>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-1 mt-6 mb-8">
         {STEPS.map((label, i) => {
           const n = i + 1;
@@ -547,10 +557,9 @@ export default function NewAnalysisPage() {
           return (
             <div
               key={label}
-              onClick={() => done && w.setStep(n)}
+              onClick={() => w.setStep(n)}
               className={clsx(
-                'flex-1 flex items-center gap-2.5 py-3.5 px-3 border-b-[3px] text-[13.5px] font-medium transition-colors',
-                done && 'cursor-pointer',
+                'flex-1 flex items-center gap-2.5 py-3.5 px-3 border-b-[3px] text-[13.5px] font-medium transition-colors cursor-pointer hover:opacity-80',
                 active && 'border-coral text-coral font-semibold',
                 done && 'border-success text-success',
                 !active && !done && 'border-border text-ink-muted',
