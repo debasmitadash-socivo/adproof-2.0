@@ -14,27 +14,53 @@ import type {
   ProviderHealthSnapshot,
 } from './types';
 
+// Plain-English explanation for infrastructure / HTTP errors that don't carry
+// a FastAPI {detail}. So the UI always shows words, never a bare "502".
+export function friendlyHttpError(status: number, fallback = ''): string {
+  switch (status) {
+    case 502:
+    case 503:
+      return `The server was briefly unavailable — usually a quick restart or a heavy job finishing. Wait a few seconds and try again.`;
+    case 504:
+      return `That took too long and timed out. Try again — with fewer variants or a smaller budget if it was a big run.`;
+    case 500:
+      return `Something went wrong on our end while processing that. Try again; if it keeps happening the run hit an unexpected error.`;
+    case 429:
+      return `Too many requests in a short window — give it a moment, then try again.`;
+    case 413:
+      return `That file or request was too large (max 25 MB). Try a smaller file.`;
+    case 401:
+    case 403:
+      return `You're not signed in, or not allowed to do that — try signing in again.`;
+    case 404:
+      return `We couldn't find what that request was pointing at.`;
+    default:
+      return fallback || `Request failed (error ${status}). Please try again.`;
+  }
+}
+
+// Pull a FastAPI {detail} (our own plain-English errors) from a response body.
+function fastapiDetail(text: string): string {
+  try {
+    const body = JSON.parse(text);
+    if (body?.detail) {
+      return typeof body.detail === 'string' ? body.detail : (body.detail.message || '');
+    }
+  } catch { /* response wasn't JSON */ }
+  return '';
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...init });
+  } catch {
+    throw new Error(`Couldn't reach the server — check your connection and try again.`);
+  }
   if (!res.ok) {
     const text = await res.text();
-    // FastAPI returns errors as {"detail": "..."} (or {"detail": {...}}).
-    // Surface the human message rather than the raw JSON envelope.
-    let message = text || res.statusText;
-    try {
-      const body = JSON.parse(text);
-      if (body && body.detail) {
-        message = typeof body.detail === 'string'
-          ? body.detail
-          : (body.detail.message || JSON.stringify(body.detail));
-      }
-    } catch {
-      /* response wasn't JSON — keep the raw text */
-    }
-    throw new Error(message);
+    // Prefer our own plain-English detail; otherwise translate the status code.
+    throw new Error(fastapiDetail(text) || friendlyHttpError(res.status, res.statusText));
   }
   return res.json() as Promise<T>;
 }
@@ -90,10 +116,15 @@ export const api = {
   upload: async (file: File): Promise<UploadResponse> => {
     const fd = new FormData();
     fd.append('file', file);
-    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    let res: Response;
+    try {
+      res = await fetch('/api/upload', { method: 'POST', body: fd });
+    } catch {
+      throw new Error(`Couldn't reach the server to upload — check your connection and try again.`);
+    }
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Upload failed (${res.status}): ${text || res.statusText}`);
+      throw new Error(fastapiDetail(text) || friendlyHttpError(res.status, res.statusText));
     }
     return res.json();
   },
@@ -112,17 +143,15 @@ export const api = {
     fd.append('file', file);
     fd.append('segment', segment);   // tags fatigue thresholds (B2B fatigues sooner)
     fd.append('platform', platform); // which ad platform this export is from (calibration isolation)
-    const res = await fetch('/api/ingest-outcomes', { method: 'POST', body: fd });
+    let res: Response;
+    try {
+      res = await fetch('/api/ingest-outcomes', { method: 'POST', body: fd });
+    } catch {
+      throw new Error(`Couldn't reach the server to read that file — check your connection and try again.`);
+    }
     if (!res.ok) {
       const text = await res.text();
-      let message = text || res.statusText;
-      try {
-        const body = JSON.parse(text);
-        if (body?.detail) {
-          message = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
-        }
-      } catch { /* keep raw text */ }
-      throw new Error(message);
+      throw new Error(fastapiDetail(text) || friendlyHttpError(res.status, res.statusText));
     }
     return res.json();
   },
