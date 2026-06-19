@@ -162,6 +162,7 @@ export default function DataPage() {
   const [since, setSince] = useState(() => new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10));
   const [until, setUntil] = useState(() => new Date().toISOString().slice(0, 10));
   const [syncing, setSyncing] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   // Per-workspace: calibration belongs to the active workspace, not the user
   // overall. Reload when the workspace changes.
   const currentCompanyId = useApp((s) => s.currentCompanyId);
@@ -257,9 +258,41 @@ export default function DataPage() {
 
       {/* LIVE PULL — read-only ad-account connection (Phase 3, first cut). */}
       <Card className="mb-5">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 relative">
           <div className="font-heading text-[15px] font-bold">Or pull live from your ad account</div>
           <Pill tone="violet">beta · Meta</Pill>
+          <button
+            type="button"
+            onClick={() => setShowHelp((v) => !v)}
+            aria-label="How to get a Meta access token"
+            aria-expanded={showHelp}
+            className="w-5 h-5 rounded-full border border-violet/50 text-violet text-[11px] font-bold leading-none flex items-center justify-center hover:bg-violet/10"
+          >i</button>
+          {showHelp && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowHelp(false)} />
+              <div className="absolute z-50 top-8 left-0 w-[min(440px,92vw)] bg-surface border border-border rounded-lg shadow-soft p-4 text-[12.5px] text-ink leading-snug">
+                <div className="flex items-center justify-between mb-2">
+                  <strong className="text-[13px]">How to get a Meta access token</strong>
+                  <button type="button" onClick={() => setShowHelp(false)} aria-label="Close" className="text-ink-muted hover:text-ink text-[14px]">✕</button>
+                </div>
+                <ol className="list-decimal pl-4 space-y-1.5">
+                  <li>Open <a className="text-violet underline" href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">Graph API Explorer</a>.</li>
+                  <li>Top-right, pick your app (or create one — any app works).</li>
+                  <li>Click <strong>Generate Access Token</strong> and log in.</li>
+                  <li>Under Permissions, add <span className="font-mono">ads_read</span> and <span className="font-mono">read_insights</span>.</li>
+                  <li>Copy the token (starts with <span className="font-mono">EAAG…</span>) and paste it above.</li>
+                </ol>
+                <p className="text-[11.5px] text-ink-muted mt-2">
+                  Explorer tokens last ~1-2 hours — fine for a one-off pull. For ongoing use, create a{' '}
+                  <a className="text-violet underline" href="https://business.facebook.com/settings/system-users" target="_blank" rel="noreferrer">System User</a> token with <span className="font-mono">ads_read</span>.
+                </p>
+                <p className="text-[11.5px] text-ink-muted mt-2">
+                  <strong>Ad account ID:</strong> in <a className="text-violet underline" href="https://adsmanager.facebook.com/" target="_blank" rel="noreferrer">Ads Manager</a>, open the account dropdown (top-left) — it&apos;s the <span className="font-mono">act_…</span> number, or in the page URL after <span className="font-mono">act=</span>.
+                </p>
+              </div>
+            </>
+          )}
         </div>
         <p className="text-[12.5px] text-ink-muted mb-3 leading-snug">
           Read-only. Paste a Meta access token (from Graph API Explorer or a System User) and your
@@ -272,11 +305,19 @@ export default function DataPage() {
             <label className="label">Meta access token</label>
             <input className="input font-mono text-[12px]" type="password" autoComplete="off"
               value={token} onChange={(e) => setToken(e.target.value)} placeholder="EAAG…" />
+            <a className="text-[11.5px] text-violet underline mt-1 inline-block"
+              href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">
+              Get a token in Graph API Explorer →
+            </a>
           </div>
           <div>
             <label className="label">Ad account ID</label>
             <input className="input font-mono" value={accountId} onChange={(e) => setAccountId(e.target.value)}
               placeholder="act_1234567890 (or just the digits)" />
+            <a className="text-[11.5px] text-violet underline mt-1 inline-block"
+              href="https://adsmanager.facebook.com/" target="_blank" rel="noreferrer">
+              Find your ad-account ID →
+            </a>
           </div>
           <div>
             <label className="label">From</label>
