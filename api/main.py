@@ -503,7 +503,8 @@ async def upload_creative(file: UploadFile = File(...)) -> dict:
 
 @app.post("/api/ingest-outcomes")
 async def ingest_outcomes(file: UploadFile = File(...),
-                          segment: str = Form("general")) -> dict:
+                          segment: str = Form("general"),
+                          platform: str = Form("auto")) -> dict:
     """Parse a real ad-performance export (Meta/Google/our template) and
     compute per-account real benchmarks — CTR/CPM/CPC, plus conversion-rate
     and ROAS where the file actually contains that data.
@@ -525,8 +526,12 @@ async def ingest_outcomes(file: UploadFile = File(...),
     if len(data) > 25 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large (max 25 MB).")
     seg = segment if segment in ("general", "b2b_saas") else "general"
+    plat = platform if platform in (
+        "auto", "linkedin", "tiktok", "google_search",
+        "meta_facebook", "meta_instagram") else "auto"
     try:
-        return ingest_and_calibrate(data, file.filename or "upload", segment=seg)
+        return ingest_and_calibrate(data, file.filename or "upload",
+                                    segment=seg, platform=plat)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=422,
                             detail=f"Could not parse this export: {str(e)[:300]}")

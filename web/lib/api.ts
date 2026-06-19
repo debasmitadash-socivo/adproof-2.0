@@ -107,10 +107,11 @@ export const api = {
     request<IngestResult>('/api/connections/sync', {
       method: 'POST', body: JSON.stringify(payload),
     }),
-  ingestOutcomes: async (file: File, segment: 'general' | 'b2b_saas' = 'general'): Promise<IngestResult> => {
+  ingestOutcomes: async (file: File, segment: 'general' | 'b2b_saas' = 'general', platform = 'auto'): Promise<IngestResult> => {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('segment', segment);   // tags fatigue thresholds (B2B fatigues sooner)
+    fd.append('platform', platform); // which ad platform this export is from (calibration isolation)
     const res = await fetch('/api/ingest-outcomes', { method: 'POST', body: fd });
     if (!res.ok) {
       const text = await res.text();

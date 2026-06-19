@@ -39,24 +39,34 @@ CANONICAL_FIELDS: dict[str, list[str]] = {
     "campaign":      ["campaign name", "campaign"],
     "platform":      ["platform", "publisher platform"],
     "placement":     ["placement", "position"],
-    "spend":         ["amount spent", "spend", "cost", "total spent"],
-    "impressions":   ["impressions", "impr."],
+    "spend":         ["amount spent", "total spent", "total cost", "spend", "cost"],
+    "impressions":   ["impressions", "impr.", "impression"],
     "reach":         ["reach"],
     "frequency":     ["frequency", "freq"],
-    "clicks":        ["link clicks", "clicks (all)", "clicks", "link click"],
-    "ctr_reported":  ["ctr (all)", "ctr (link click-through rate)", "ctr (link)", "ctr"],
-    "cpc_reported":  ["cpc (cost per link click)", "cpc (all)", "cpc", "cost per click"],
+    "clicks":        ["link clicks", "clicks (destination)", "clicks (all)",
+                      "total clicks", "clicks", "link click"],
+    "ctr_reported":  ["ctr (link click-through rate)", "ctr (destination)",
+                      "click through rate (ctr)", "click-through rate (ctr)",
+                      "ctr (all)", "ctr (link)", "click through rate", "ctr"],
+    "cpc_reported":  ["cpc (cost per link click)", "cpc (destination)",
+                      "average cpc", "avg. cpc", "cpc (all)", "cpc", "cost per click"],
     # NB: bare "result" is intentionally excluded — it would wrongly grab the
     # text "Result type" column. "Cost per result" is mapped separately below.
-    "conversions":   ["results", "purchases", "conversions", "website purchases",
+    "conversions":   ["results", "purchases", "website purchases",
+                      "external website conversions", "total conversions",
+                      "complete payment", "complete payments", "conversions",
                       "leads"],
     "result_type":   ["result type", "result indicator"],
     "cost_per_result": ["cost per result", "cost per result type"],
-    "revenue":       ["purchase conversion value", "conversion value",
-                      "purchases conversion value", "revenue", "total conversion value"],
-    "currency":      ["currency"],
-    "date_start":    ["reporting starts", "day", "date start", "starts", "week"],
-    "date_end":      ["reporting ends", "date end", "ends"],
+    "revenue":       ["purchase conversion value", "purchases conversion value",
+                      "total complete payment value", "total conv. value",
+                      "all conv. value", "conv. value", "purchase value",
+                      "conversion value", "revenue", "total conversion value"],
+    "currency":      ["currency", "currency code"],
+    "date_start":    ["reporting starts", "start date (in utc)", "start date",
+                      "day", "date start", "starts", "week"],
+    "date_end":      ["reporting ends", "end date (in utc)", "end date",
+                      "date end", "ends"],
     "objective":     ["objective"],
     "ad_copy":       ["body", "primary text", "ad copy", "title", "headline"],
     "test_group":    ["test group", "test_group", "experiment"],
@@ -72,7 +82,8 @@ CANONICAL_FIELDS: dict[str, list[str]] = {
 
 # Header synonyms we scan for when locating the header row under title rows.
 _HEADER_HINTS = {"ad name", "campaign name", "impressions", "amount spent",
-                 "link clicks", "reach", "placement"}
+                 "link clicks", "reach", "placement", "clicks", "cost",
+                 "spend", "conversions"}
 
 _NUMERIC_FIELDS = {"spend", "impressions", "reach", "frequency", "clicks",
                    "ctr_reported", "cpc_reported", "conversions",
@@ -496,7 +507,8 @@ def _trend(d: pd.DataFrame) -> dict | None:
     }
 
 
-def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120) -> dict:
+def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120,
+              platform: str = "auto") -> dict:
     """Per-platform + overall real benchmarks, impression-weighted.
 
     Calibrates on RECENT data when dates allow (click-rates decay over time, so
@@ -518,7 +530,13 @@ def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120) -
                 "by_interest": {}, "by_segment_interest": {},
                 "usable": False}
     d = df.copy()
-    d["_platform"] = d.apply(_platform_key, axis=1)
+    # Explicit per-upload platform tag wins (a LinkedIn upload only ever writes
+    # the linkedin cell — isolation). Default "auto" keeps the original
+    # row-by-row detection (Meta exports unchanged).
+    if platform and platform != "auto":
+        d["_platform"] = platform
+    else:
+        d["_platform"] = d.apply(_platform_key, axis=1)
     d["_segment"] = d.apply(_segment_key, axis=1)
     # Pillar B+: per-row interest tagging. _interests is the full list,
     # _interest is the dominant bucket for the cross-tab.
@@ -664,14 +682,14 @@ def backtest(df: pd.DataFrame, min_ads: int = 12) -> dict:
 
 
 def ingest_and_calibrate(data: bytes | str, filename: str = "",
-                         segment: str = "general") -> dict:
+                         segment: str = "general", platform: str = "auto") -> dict:
     """End-to-end: normalize a file then calibrate + backtest + fatigue.
 
     ``segment`` tags the fatigue thresholds (b2b_saas audiences fatigue sooner
     than a broad/general one). JSON-able dict.
     """
     df, report = normalize_export(data, filename)
-    cal = calibrate(df, currency=report.currency)
+    cal = calibrate(df, currency=report.currency, platform=platform)
     bt = backtest(df)
     # Creative-fatigue screen — best-effort, never break a calibration.
     try:

@@ -151,6 +151,7 @@ function CalTable({ cal }: { cal: AccountCalibration }) {
 
 export default function DataPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [platform, setPlatform] = useState('auto');   // which ad platform the upload is from
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IngestResult | null>(null);
@@ -181,7 +182,7 @@ export default function DataPage() {
     if (!file) return;
     setBusy(true); setError(null); setResult(null); setSaved(null);
     try {
-      setResult(await api.ingestOutcomes(file, segment));
+      setResult(await api.ingestOutcomes(file, segment, platform));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to read that file.');
     } finally {
@@ -225,7 +226,7 @@ export default function DataPage() {
     <div className="max-w-4xl">
       <h1 className="display-italic text-[34px] mb-1">Calibrate to <span className="gradient-text">your data</span></h1>
       <p className="text-ink-muted text-[14.5px] mb-6 max-w-2xl">
-        Upload a past ad-performance export (Meta or Google Ads, or our template). We learn <strong>your</strong> real
+        Upload a past ad-performance export (Meta, LinkedIn, TikTok or Google Ads, or our template). We learn <strong>your</strong> real
         click-through and cost rates per platform and use them in every forecast — instead of generic industry averages.
         Your data stays private to your account.
       </p>
@@ -249,6 +250,17 @@ export default function DataPage() {
             onChange={(e) => { setFile(e.target.files?.[0] ?? null); setResult(null); setSaved(null); setError(null); }}
             className="text-[13.5px] file:mr-3 file:rounded-lg file:border-0 file:bg-ink file:text-white file:px-4 file:py-2 file:font-semibold"
           />
+          <select
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value)}
+            title="Which platform is this export from? Keeps each platform's calibration separate."
+            className="input !w-auto text-[13px]"
+          >
+            <option value="auto">Auto-detect (Meta)</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="tiktok">TikTok</option>
+            <option value="google_search">Google Ads</option>
+          </select>
           <Button onClick={analyze} disabled={!file || busy}>{busy ? 'Reading…' : 'Analyze'}</Button>
         </div>
         <div className="text-[12px] text-ink-faint mt-2">
