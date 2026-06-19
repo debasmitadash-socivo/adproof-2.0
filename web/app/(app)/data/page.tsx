@@ -264,7 +264,7 @@ export default function DataPage() {
           <Button onClick={analyze} disabled={!file || busy}>{busy ? 'Reading…' : 'Analyze'}</Button>
         </div>
         <div className="text-[12px] text-ink-faint mt-2">
-          .csv or .xlsx · we auto-detect Meta / Google columns · max 25 MB · for the visual side, see the template&apos;s notes.
+          .csv or .xlsx · max 25 MB · Meta is auto-detected — for <strong>LinkedIn / TikTok / Google</strong>, pick the platform in the dropdown above.
         </div>
       </Card>
 
