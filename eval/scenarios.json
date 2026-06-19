@@ -70,7 +70,7 @@
     {
       "id": "li_copy_triggers",
       "expect": "runnable",
-      "assert": { "copy_ivan_min": 2, "linguistics_present": true },
+      "assert": { "copy_socivo_min": 2, "linguistics_present": true },
       "request": {
         "company_description": "A B2B SaaS that automates financial reporting for finance teams.",
         "objective": "consideration", "platform_id": "linkedin", "format_id": "linkedin_message",
@@ -84,7 +84,7 @@
     {
       "id": "li_copy_clean",
       "expect": "runnable",
-      "assert": { "copy_ivan_max": 0, "linguistics_present": true },
+      "assert": { "copy_socivo_max": 0, "linguistics_present": true },
       "request": {
         "company_description": "A B2B SaaS that automates financial reporting for finance teams.",
         "objective": "consideration", "platform_id": "linkedin", "format_id": "linkedin_message",

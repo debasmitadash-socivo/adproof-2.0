@@ -1,2 +1,4 @@
 {"ts": "2026-06-19T12-09-42Z", "git": "7388ecd", "scenarios": 8, "invariants_passed": 67, "invariants_failed": 0, "determinism_ok": true, "diffs_vs_baseline": 0}
 {"ts": "2026-06-19T12-14-14Z", "git": "7388ecd", "scenarios": 8, "invariants_passed": 67, "invariants_failed": 0, "determinism_ok": true, "diffs_vs_baseline": 0}
+{"ts": "2026-06-19T18-01-17Z", "git": "923a14d", "scenarios": 8, "invariants_passed": 66, "invariants_failed": 1, "determinism_ok": true, "diffs_vs_baseline": 1}
+{"ts": "2026-06-19T18-04-29Z", "git": "923a14d", "scenarios": 8, "invariants_passed": 67, "invariants_failed": 0, "determinism_ok": true, "diffs_vs_baseline": 7}

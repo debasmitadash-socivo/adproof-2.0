@@ -1,6 +1,6 @@
 {
-  "ts": "2026-06-19T12-14-14Z",
-  "git": "7388ecd",
+  "ts": "2026-06-19T18-04-29Z",
+  "git": "923a14d",
   "fingerprints": {
     "li_awareness": {
       "runnable": true,
@@ -21,7 +21,7 @@
       "clears_break_even": true,
       "confidence_level": "low",
       "copy_issue_count": 2,
-      "copy_ivan_count": 0,
+      "copy_socivo_count": 0,
       "ling_grade": 4.8,
       "ling_persuasion": 0
     },
@@ -44,7 +44,7 @@
       "clears_break_even": true,
       "confidence_level": "low",
       "copy_issue_count": 2,
-      "copy_ivan_count": 0,
+      "copy_socivo_count": 0,
       "ling_grade": 2.7,
       "ling_persuasion": 0
     },
@@ -67,7 +67,7 @@
       "clears_break_even": true,
       "confidence_level": "low",
       "copy_issue_count": 2,
-      "copy_ivan_count": 0,
+      "copy_socivo_count": 0,
       "ling_grade": 0.0,
       "ling_persuasion": 1
     },
@@ -90,7 +90,7 @@
       "clears_break_even": true,
       "confidence_level": "low",
       "copy_issue_count": 2,
-      "copy_ivan_count": 0,
+      "copy_socivo_count": 0,
       "ling_grade": 2.7,
       "ling_persuasion": 0
     },
@@ -113,7 +113,7 @@
       "clears_break_even": true,
       "confidence_level": "low",
       "copy_issue_count": 7,
-      "copy_ivan_count": 2,
+      "copy_socivo_count": 2,
       "ling_grade": 8.2,
       "ling_persuasion": 0
     },
@@ -136,7 +136,7 @@
       "clears_break_even": true,
       "confidence_level": "low",
       "copy_issue_count": 3,
-      "copy_ivan_count": 0,
+      "copy_socivo_count": 0,
       "ling_grade": 1.9,
       "ling_persuasion": 0
     },
@@ -159,7 +159,7 @@
       "clears_break_even": true,
       "confidence_level": "low",
       "copy_issue_count": 2,
-      "copy_ivan_count": 0,
+      "copy_socivo_count": 0,
       "ling_grade": 6.6,
       "ling_persuasion": 0
     }
@@ -441,9 +441,9 @@
     },
     {
       "scenario": "li_copy_triggers",
-      "name": "copy_ivan_min",
+      "name": "copy_socivo_min",
       "ok": true,
-      "detail": "ivan=2 < 2"
+      "detail": "socivo=2 < 2"
     },
     {
       "scenario": "li_copy_triggers",
@@ -501,9 +501,9 @@
     },
     {
       "scenario": "li_copy_clean",
-      "name": "copy_ivan_max",
+      "name": "copy_socivo_max",
       "ok": true,
-      "detail": "ivan=0 > 0"
+      "detail": "socivo=0 > 0"
     },
     {
       "scenario": "li_copy_clean",

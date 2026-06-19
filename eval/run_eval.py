@@ -118,7 +118,7 @@ def _fingerprint(resp: dict) -> dict:
         "clears_break_even": _dig(resp, "economics.clears_break_even"),
         "confidence_level": _dig(resp, "confidence.level"),
         "copy_issue_count": len(cc),
-        "copy_ivan_count":  sum(1 for c in cc if c.get("source") == "ivan"),
+        "copy_socivo_count":  sum(1 for c in cc if c.get("source") == "socivo"),
         "ling_grade":       ling.get("grade_level"),
         "ling_persuasion":  ling.get("persuasion_count"),
     }
@@ -192,12 +192,12 @@ def _check_invariants(sc: dict, status: str, payload) -> list[dict]:
 
     # Copy-detector bounds
     asrt = sc.get("assert") or {}
-    if "copy_ivan_min" in asrt:
-        add("copy_ivan_min", fp["copy_ivan_count"] >= asrt["copy_ivan_min"],
-            f"ivan={fp['copy_ivan_count']} < {asrt['copy_ivan_min']}")
-    if "copy_ivan_max" in asrt:
-        add("copy_ivan_max", fp["copy_ivan_count"] <= asrt["copy_ivan_max"],
-            f"ivan={fp['copy_ivan_count']} > {asrt['copy_ivan_max']}")
+    if "copy_socivo_min" in asrt:
+        add("copy_socivo_min", fp["copy_socivo_count"] >= asrt["copy_socivo_min"],
+            f"socivo={fp['copy_socivo_count']} < {asrt['copy_socivo_min']}")
+    if "copy_socivo_max" in asrt:
+        add("copy_socivo_max", fp["copy_socivo_count"] <= asrt["copy_socivo_max"],
+            f"socivo={fp['copy_socivo_count']} > {asrt['copy_socivo_max']}")
     if asrt.get("linguistics_present"):
         add("linguistics_present", fp["ling_grade"] is not None, "linguistics missing")
 
@@ -308,7 +308,7 @@ def main_run(set_baseline: bool, quiet: bool) -> int:
             mark = "FAIL" if bad else "ok  "
             fp = current_fps.get(sid, {})
             summary = (f"lead={fp.get('kpi_lead')} ctr={fp.get('ctr_p50')} "
-                       f"roas={fp.get('roas_p50')} ivan={fp.get('copy_ivan_count')} "
+                       f"roas={fp.get('roas_p50')} socivo={fp.get('copy_socivo_count')} "
                        f"grade={fp.get('ling_grade')}") if fp else f"({raw_status.get(sid)})"
             print(f"  [{mark}] {sid:30s} {summary}")
             for b in bad:
