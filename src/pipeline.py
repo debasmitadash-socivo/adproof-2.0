@@ -886,6 +886,20 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
     payload["monte_carlo"].pop("daily_records_per_run", None)
     json_str = json.dumps(payload, indent=2, default=str)
 
+    # Visual Prominence (Moat Step 2): spectral-residual saliency heatmap on
+    # the image creative. Pure numpy/PIL, gc'd. Defensive — never fail the run.
+    visual_prominence = None
+    if image_path:
+        try:
+            try:
+                from src.visual_prominence import analyze_visual_prominence
+            except ImportError:
+                from visual_prominence import analyze_visual_prominence
+            vp = analyze_visual_prominence(image_path)
+            visual_prominence = vp if vp.get("found") else None
+        except Exception:                                  # noqa: BLE001
+            visual_prominence = None
+
     _step(1.0, "Done.")
     return {
         "headline_md": headline_md,
@@ -900,4 +914,5 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
         "script_critique": script_critique,
         "linkedin_critique": linkedin_critique,
         "meta_critique": meta_critique,
+        "visual_prominence": visual_prominence,
     }

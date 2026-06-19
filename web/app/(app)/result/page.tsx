@@ -1623,6 +1623,48 @@ export default function ResultPage() {
           <PolicyCheckSection result={result} />
 
 
+          {/* VISUAL PROMINENCE — spectral-residual saliency heatmap (Moat Step 2).
+              Honest: shows what pops, NOT eye-tracking. Image creatives only. */}
+          {result.visual_prominence?.found && (() => {
+            const vp = result.visual_prominence!;
+            const Zone = ({ label, pct }: { label: string; pct: number }) => (
+              <div className="flex-1">
+                <div className="flex items-baseline justify-between mb-0.5">
+                  <span className="text-[11.5px] text-ink-muted">{label}</span>
+                  <span className="mono text-[13px] font-bold text-ink">{pct}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-bg-deep overflow-hidden">
+                  <div className="h-full bg-coral" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+            return (
+              <>
+                <h2 className="display-italic text-[28px] mt-7 mb-2">Visual prominence</h2>
+                <p className="text-ink-muted text-[14px] mb-3">A heatmap of what your creative makes the eye land on first.</p>
+                <Card className="!p-0 overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={vp.overlay} alt="visual prominence heatmap" className="w-full h-full object-cover bg-bg-deep" />
+                    <div className="p-6">
+                      <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em] mb-1">Focal point</div>
+                      <div className="display-italic text-[26px] capitalize mb-4">{vp.focal_point.replace('-', ' ')}</div>
+                      <div className="flex gap-4 mb-4">
+                        <Zone label="Top" pct={vp.top_third_pct} />
+                        <Zone label="Middle" pct={vp.middle_third_pct} />
+                        <Zone label="Bottom" pct={vp.bottom_third_pct} />
+                      </div>
+                      <div className="text-[13px] text-ink leading-snug">{vp.insight}</div>
+                    </div>
+                  </div>
+                  <div className="px-6 py-3 text-[11.5px] text-ink-muted border-t border-border bg-bg-deep leading-snug">
+                    <strong>What this is.</strong> &ldquo;Visual prominence&rdquo; shows what <em>pops</em> — contrast, edges, colour structure — using a published saliency algorithm. It is <strong>not eye-tracking</strong>: it doesn&apos;t prove where people actually look, just what stands out. Use it to check your key message isn&apos;t hiding in a cold zone.
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
+
           {/* READABILITY & PERSUASION — directional linguistic read (pure-Python,
               approximate Flesch-Kincaid + persuasion-marker scan). Moat Step 1. */}
           {result.linguistics && !result.linguistics.is_empty && (() => {

@@ -469,6 +469,19 @@ export interface SimulateResponse {
     insights: string[];
     is_empty: boolean;
   } | null;
+  // Visual Prominence (Moat Step 2): spectral-residual saliency heatmap on the
+  // image creative. Honest — shows what POPS, NOT eye-tracking. null when no image.
+  visual_prominence?: {
+    found: boolean;
+    label: string;
+    overlay: string;            // JPEG data URI: heatmap overlaid on the creative
+    focal_point: string;        // e.g. "top-centre"
+    focal_xy_pct: [number, number];
+    top_third_pct: number;
+    middle_third_pct: number;
+    bottom_third_pct: number;
+    insight: string;
+  } | null;
   // Viability gate — fatal/severe creative problems void the forecast.
   viability?: {
     runnable: boolean;
