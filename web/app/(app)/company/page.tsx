@@ -6,6 +6,7 @@ import { Card, CardTitle } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { api } from '@/lib/api';
 import { useApp } from '@/lib/store';
+import { WorkspaceTeam } from '@/components/WorkspaceTeam';
 import type { CompanyProfile } from '@/lib/types';
 
 const CURRENCIES = ['GBP', 'USD', 'EUR', 'CAD', 'AUD'];
@@ -300,7 +301,8 @@ export default function CompanyPage() {
           </Card>
         </div>
 
-        <Card className="self-start">
+        <div className="space-y-5 self-start">
+        <Card>
           <CardTitle>Parsed profile</CardTitle>
           {profile ? (
             <div className="space-y-2 text-[13.5px]">
@@ -324,6 +326,9 @@ export default function CompanyPage() {
             <div className="text-ink-muted text-[13.5px]">No profile yet — write a description and parse it.</div>
           )}
         </Card>
+
+        <WorkspaceTeam workspaceId={profile?.id} isOwner={!profile?.shared} />
+        </div>
       </div>
     </>
   );

@@ -10,6 +10,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const hydrated = useApp((s) => s.hydrated);
   const dbSynced = useApp((s) => s.dbSynced);
+  const dbSyncError = useApp((s) => s.dbSyncError);
   const user = useApp((s) => s.user);
   const profile = useApp((s) => s.companyProfile);
   const setUser = useApp((s) => s.setUser);
@@ -76,6 +77,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />
+        {dbSyncError && (
+          <div className="mx-10 mt-4 text-[13px] text-danger bg-danger-soft border border-danger/30 rounded-md p-3">
+            Couldn&apos;t load your workspaces: {dbSyncError}. Your data may be out of date —
+            try refreshing. If this keeps happening, the database schema may need updating.
+          </div>
+        )}
         <main className="flex-1 px-10 py-8 overflow-y-auto">{children}</main>
       </div>
     </div>

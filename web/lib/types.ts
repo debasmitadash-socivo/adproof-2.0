@@ -23,6 +23,20 @@ export interface CompanyProfile {
   conversion_goal?: 'purchase' | 'lead' | 'demo' | 'signup' | 'awareness';
   sales_cycle?: 'impulse' | 'considered' | 'long' | 'enterprise';
   brand_color?: string;                     // hex e.g. '#FF5A4D'
+  // True when this workspace belongs to someone else and was shared with the
+  // current user via a team invite. Client-side flag only — never persisted.
+  shared?: boolean;
+}
+
+// One row of a workspace's team roster (company_members). The owner isn't
+// listed here — ownership lives on companies.user_id.
+export interface WorkspaceMember {
+  id: string;
+  companyId: string;
+  userId: string | null;         // null until the invite is claimed
+  email: string;
+  status: 'invited' | 'active';
+  createdAt: number;
 }
 
 // AI-proposed economics from /api/research-company — an ESTIMATE to confirm.

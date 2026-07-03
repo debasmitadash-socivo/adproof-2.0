@@ -7,6 +7,7 @@ import { getSupabase } from './supabase';
 import type {
   SavedCampaign, SavedVariantResult, SavedAudience, CompanyProfile,
   SimulateResponse, SimulateRequest, AccountCalibration, Backtest,
+  WorkspaceMember,
 } from './types';
 
 async function uid(): Promise<string | null> {
@@ -60,9 +61,20 @@ function companyRow(p: CompanyProfile, user_id: string) {
 
 export async function listCompanies(): Promise<CompanyProfile[]> {
   const sb = getSupabase(); if (!sb) return [];
-  const { data } = await sb.from('companies').select('*')
+  const me = await uid();
+  const { data, error } = await sb.from('companies').select('*')
     .eq('archived', false).order('created_at', { ascending: true });
-  return (data ?? []).map(rowToCompany);
+  // Surface (don't swallow) the error — a query failure here used to look
+  // identical to "you have zero workspaces", which silently hid problems
+  // like an unapplied migration (e.g. missing `archived` column).
+  if (error) throw new Error(`Couldn\'t load workspaces: ${error.message}`);
+  // RLS returns both owned and team-shared workspaces; flag the shared ones
+  // so the UI can badge them and keep owner-only actions (invites, profile
+  // edits) hidden for members.
+  return (data ?? []).map((d) => ({
+    ...rowToCompany(d),
+    shared: me != null && d.user_id !== me,
+  }));
 }
 
 /** Create a brand-new workspace. Throws on failure so the caller can surface
@@ -97,6 +109,85 @@ export async function saveCompany(p: CompanyProfile): Promise<void> {
 export async function getCompany(): Promise<CompanyProfile | null> {
   const list = await listCompanies();
   return list[0] ?? null;
+}
+
+// ============================== workspace members ===========================
+// Team invites: an "invite" is just a company_members row keyed by email —
+// no email gets sent. When someone signs in with that address,
+// claimPendingInvites() activates the row and the shared workspace shows up
+// in their switcher. See supabase/migrations/0007_team_members.sql.
+
+function rowToMember(d: Record<string, unknown>): WorkspaceMember {
+  return {
+    id: d.id as string,
+    companyId: d.company_id as string,
+    userId: (d.user_id as string) ?? null,
+    email: (d.invited_email as string) ?? '',
+    status: ((d.status as string) ?? 'invited') as WorkspaceMember['status'],
+    createdAt: new Date(d.created_at as string).getTime(),
+  };
+}
+
+/** Translate raw Postgres errors into something a person can act on. */
+function memberError(prefix: string, error: { code?: string; message: string }): Error {
+  if (error.code === '42P01') {
+    return new Error(
+      'Team invites need a database update — apply supabase/migrations/0007_team_members.sql first.',
+    );
+  }
+  if (error.code === '23505') return new Error('That email is already invited to this workspace.');
+  if (error.code === '42501') return new Error('Only the workspace owner can do that.');
+  return new Error(`${prefix}: ${error.message}`);
+}
+
+export async function listMembers(companyId: string): Promise<WorkspaceMember[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  const { data, error } = await sb.from('company_members').select('*')
+    .eq('company_id', companyId).order('created_at', { ascending: true });
+  if (error) throw memberError('Couldn\'t load the team', error);
+  return (data ?? []).map(rowToMember);
+}
+
+export async function inviteMember(companyId: string, email: string): Promise<WorkspaceMember> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured. Check NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY.');
+  const user_id = await uid();
+  if (!user_id) throw new Error('You\'re not signed in. Sign in again to invite teammates.');
+  const clean = email.trim().toLowerCase();
+  const { data, error } = await sb.from('company_members')
+    .insert({ company_id: companyId, invited_email: clean, invited_by: user_id })
+    .select('*').single();
+  if (error) throw memberError('Couldn\'t save the invite', error);
+  if (!data) throw new Error('Couldn\'t save the invite: no row returned.');
+  return rowToMember(data);
+}
+
+export async function removeMember(memberId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured.');
+  const { error } = await sb.from('company_members').delete().eq('id', memberId);
+  if (error) throw memberError('Couldn\'t remove the member', error);
+}
+
+/** Activate any invites addressed to the signed-in user's email. Returns
+ *  true if something was claimed (i.e. new shared workspaces may exist). */
+export async function claimPendingInvites(): Promise<boolean> {
+  const sb = getSupabase(); if (!sb) return false;
+  const { data: u } = await sb.auth.getUser();
+  const me = u.user;
+  if (!me?.email) return false;
+  const { data, error } = await sb.from('company_members')
+    .update({ user_id: me.id, status: 'active', accepted_at: new Date().toISOString() })
+    .eq('status', 'invited')
+    .ilike('invited_email', me.email)
+    .select('id');
+  // Missing table just means the migration isn't applied yet — invites can't
+  // exist, so there's nothing to claim. Don't break sign-in over it.
+  if (error) {
+    if (error.code !== '42P01') console.error('[db] claimPendingInvites', error.message);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
 }
 
 // ============================== audiences ===================================

@@ -79,6 +79,9 @@ export function Sidebar() {
           className="w-full flex items-center gap-2.5 px-2.5 py-2 border border-border rounded-lg bg-surface cursor-pointer hover:border-coral transition-colors text-left">
           <div className="w-[22px] h-[22px] rounded-md bg-gradient-aurora text-white font-bold text-[12px] flex items-center justify-center">{wsInitial}</div>
           <div className="text-[13.5px] font-semibold flex-1 truncate">{wsName}</div>
+          {profile?.shared && (
+            <span className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-soft text-violet">shared</span>
+          )}
           <div className="text-ink-muted text-[11px]">▾</div>
         </button>
         {wsOpen && (
@@ -93,7 +96,10 @@ export function Sidebar() {
                     <div className="w-5 h-5 rounded bg-gradient-aurora text-white font-bold text-[10.5px] flex items-center justify-center">
                       {(c.company_name || '?')[0]?.toUpperCase()}
                     </div>
-                    <span className="truncate">{c.company_name || 'Untitled workspace'}</span>
+                    <span className="truncate flex-1">{c.company_name || 'Untitled workspace'}</span>
+                    {c.shared && (
+                      <span className="text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-soft text-violet">shared</span>
+                    )}
                   </button>
                 ))}
                 <div className="h-px bg-border" />

@@ -22,6 +22,7 @@ import {
   saveCompany as dbSaveCompany,
   createCompany as dbCreateCompany,
   listCompanies as dbListCompanies,
+  claimPendingInvites as dbClaimPendingInvites,
 } from './db';
 import { getSupabase } from './supabase';
 
@@ -65,6 +66,10 @@ interface AppState {
   // company that lives only in the DB isn't mistaken for "no company".
   dbSynced: boolean;
   syncFromDb: () => Promise<void>;
+  // Set when syncFromDb (or a workspace reload) fails against Supabase, e.g.
+  // an unapplied migration. Shown as a banner so a broken load doesn't just
+  // look like "nothing happened".
+  dbSyncError: string | null;
 
   resetAccount: () => void;
 
@@ -279,12 +284,19 @@ export const useApp = create<AppState>()(
       hydrated: false,
       setHydrated: (b) => set({ hydrated: b }),
       dbSynced: false,
+      dbSyncError: null,
       syncFromDb: async () => {
         try {
           const sb = getSupabase();
           if (!sb) { set({ dbSynced: true }); return; }
           const { data } = await sb.auth.getUser();
           if (!data.user) { set({ dbSynced: true }); return; }
+          set({ dbSyncError: null });
+
+          // Claim any workspace invites addressed to this email FIRST, so a
+          // freshly shared workspace is already in the list we load below.
+          try { await dbClaimPendingInvites(); }
+          catch (e) { console.warn('[db] claimPendingInvites', e); }
 
           const local = get();
           let companies = await dbListCompanies();
@@ -347,7 +359,7 @@ export const useApp = create<AppState>()(
           });
         } catch (e) {
           console.error('[db] syncFromDb failed', e);
-          set({ dbSynced: true });
+          set({ dbSynced: true, dbSyncError: (e as Error).message });
         }
       },
       resetAccount: () =>
@@ -357,6 +369,7 @@ export const useApp = create<AppState>()(
           companyProfile: null,
           savedCampaigns: [],
           savedAudiences: [],
+          dbSyncError: null,
           ...transientDefaults,
         }),
 
