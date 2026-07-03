@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import { Button } from '@/components/ui/Button';
 import { Pill } from '@/components/ui/Pill';
@@ -8,19 +8,36 @@ import { api } from '@/lib/api';
 import { useApp } from '@/lib/store';
 import type { CompanyProfile } from '@/lib/types';
 
+// useSearchParams() must live under a Suspense boundary (same pattern as
+// /login) or `next build` fails the static prerender of this page.
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingInner />
+    </Suspense>
+  );
+}
+
+function OnboardingInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const hydrated = useApp((s) => s.hydrated);
   const setUser = useApp((s) => s.setUser);
   const setCompanyDescription = useApp((s) => s.setCompanyDescription);
   const setCompanyProfile = useApp((s) => s.setCompanyProfile);
   const createWorkspace = useApp((s) => s.createWorkspace);
 
+  // When ?new=1, this is a "create another workspace" flow — not first-time
+  // onboarding. MUST come from useSearchParams(), not window.location: during
+  // a client-side navigation this page renders BEFORE the address bar updates,
+  // so window.location.search still shows the previous page's URL. Reading it
+  // there missed the flag, and the redirect-if-onboarded effect below bounced
+  // the user straight back to /dashboard — "Create new workspace" appeared to
+  // do nothing.
+  const isNewWorkspace = searchParams.get('new') === '1';
+
   // New-workspace flow starts at the Company step (the user is already known).
-  const [step, setStep] = useState<1 | 2>(() =>
-    (typeof window !== 'undefined' &&
-     new URLSearchParams(window.location.search).get('new') === '1') ? 2 : 1,
-  );
+  const [step, setStep] = useState<1 | 2>(isNewWorkspace ? 2 : 1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [desc, setDesc] = useState('');
@@ -34,14 +51,6 @@ export default function OnboardingPage() {
   const [salesCycle, setSalesCycle] = useState<NonNullable<CompanyProfile['sales_cycle']> | ''>('');
   const [usps, setUsps] = useState<string[]>([]);
   const [brandColor, setBrandColor] = useState<string>('#FF5A4D');
-  // When ?new=1, this is a "create another workspace" flow — not first-time
-  // onboarding. Read the flag SYNCHRONOUSLY on the first render (lazy init) so
-  // the redirect-if-onboarded effect below sees the right value immediately —
-  // otherwise it bounces straight to /dashboard before the flag is set.
-  const [isNewWorkspace] = useState(() =>
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('new') === '1',
-  );
 
   // Skip onboarding if it's already been completed — UNLESS this is an
   // explicit "create another workspace" run.
