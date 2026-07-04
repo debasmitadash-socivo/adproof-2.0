@@ -64,6 +64,11 @@ export default function DashboardPage() {
   // against synced reality, and the test spend our catches protected.
   const acc = useAccuracyData();
   const profile = useApp((s) => s.companyProfile);
+  // Move-to-workspace repair action (fixes cross-workspace bleed).
+  const companies = useApp((s) => s.companies);
+  const currentCompanyId = useApp((s) => s.currentCompanyId);
+  const moveCampaign = useApp((s) => s.moveCampaign);
+  const otherWorkspaces = companies.filter((c) => c.id && c.id !== currentCompanyId);
 
   return (
     <>
@@ -152,8 +157,8 @@ export default function DashboardPage() {
           <table className="w-full">
             <thead>
               <tr className="bg-bg-deep">
-                {['Creative', 'Platform / Format', 'Audience', 'Budget', 'ROAS (p50)', 'Verdict', 'Updated'].map((h) => (
-                  <th key={h} className="text-left text-[11.5px] text-ink-muted font-bold uppercase tracking-[0.07em] px-4 py-3 border-b border-border">{h}</th>
+                {['Creative', 'Platform / Format', 'Audience', 'Budget', 'ROAS (p50)', 'Verdict', 'Updated', ''].map((h, i) => (
+                  <th key={i} className="text-left text-[11.5px] text-ink-muted font-bold uppercase tracking-[0.07em] px-4 py-3 border-b border-border">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -187,6 +192,32 @@ export default function DashboardPage() {
                   <td className="px-4 py-3.5 text-[13.5px] font-mono"><strong>{c.roasP50.toFixed(2)}×</strong></td>
                   <td className="px-4 py-3.5"><Pill tone={VERDICT_TONE[c.verdictClass]} dot>{VERDICT_LABEL[c.verdictClass]}</Pill></td>
                   <td className="px-4 py-3.5 text-[13.5px] text-ink-muted">{relativeTime(c.createdAt)}</td>
+                  {/* Move to another workspace — fixes a campaign that landed
+                      in the wrong company. Click must not open the report. */}
+                  <td className="px-2 py-3.5" onClick={(e) => e.stopPropagation()}>
+                    {otherWorkspaces.length > 0 && (
+                      <select
+                        value=""
+                        title="Move this analysis to another workspace"
+                        onChange={(e) => {
+                          const target = e.target.value;
+                          if (!target) return;
+                          const name = companies.find((w) => w.id === target)?.company_name || 'that workspace';
+                          if (window.confirm(`Move "${c.name}" to ${name}? It will leave this workspace.`)) {
+                            moveCampaign(c.id, target).catch((err) =>
+                              window.alert((err as Error).message));
+                          }
+                          e.target.value = '';
+                        }}
+                        className="text-[11.5px] text-ink-muted bg-transparent border border-border rounded-md px-1.5 py-1 cursor-pointer max-w-[92px]"
+                      >
+                        <option value="">Move to…</option>
+                        {otherWorkspaces.map((w) => (
+                          <option key={w.id} value={w.id}>{w.company_name || 'Untitled'}</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

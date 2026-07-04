@@ -473,6 +473,20 @@ export async function deleteCampaign(id: string): Promise<void> {
   await sb.from('campaigns').delete().eq('id', id);
 }
 
+/** Move a campaign (and its banked creative scores) to another workspace.
+ *  Fixes cross-workspace bleed — e.g. campaigns dumped into the wrong
+ *  workspace by the one-time localStorage import. */
+export async function moveCampaign(campaignId: string, targetCompanyId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured.');
+  const { error } = await sb.from('campaigns')
+    .update({ company_id: targetCompanyId }).eq('id', campaignId);
+  if (error) throw new Error(`Couldn\'t move the campaign: ${error.message}`);
+  // Keep the creative-score history (accuracy ledger source) with it.
+  await sb.from('creative_scores')
+    .update({ company_id: targetCompanyId }).eq('campaign_id', campaignId);
+}
+
 // ============================== ad_outcomes (Path B) ========================
 const OUTCOME_COLS = [
   'ad_name', 'date_start', 'date_end', 'platform', 'format', 'spend',

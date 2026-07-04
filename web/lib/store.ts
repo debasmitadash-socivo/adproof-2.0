@@ -15,6 +15,7 @@ import type {
 import {
   saveCampaign as dbSaveCampaign,
   deleteCampaign as dbDeleteCampaign,
+  moveCampaign as dbMoveCampaign,
   listCampaigns as dbListCampaigns,
   saveAudience as dbSaveAudience,
   deleteAudience as dbDeleteAudience,
@@ -53,6 +54,7 @@ interface AppState {
   savedCampaigns: SavedCampaign[];
   addCampaign: (c: SavedCampaign) => void;
   deleteCampaign: (id: string) => void;
+  moveCampaign: (id: string, targetCompanyId: string) => Promise<void>;
 
   savedAudiences: SavedAudience[];
   addAudience: (a: SavedAudience) => void;
@@ -270,6 +272,12 @@ export const useApp = create<AppState>()(
         set((s) => ({ savedCampaigns: s.savedCampaigns.filter((c) => c.id !== id) }));
         dbDeleteCampaign(id).catch((e) => console.error('[db] deleteCampaign', e));
       },
+      moveCampaign: async (id, targetCompanyId) => {
+        // DB first — only drop it from this workspace's list once the move
+        // actually happened (a failed move must not hide the campaign).
+        await dbMoveCampaign(id, targetCompanyId);
+        set((s) => ({ savedCampaigns: s.savedCampaigns.filter((c) => c.id !== id) }));
+      },
       savedAudiences: [],
       addAudience: (a) => {
         const st = get();
@@ -306,16 +314,30 @@ export const useApp = create<AppState>()(
           // (which would dump it into whatever workspace happens to be active).
           const firstEverAccount = companies.length === 0;
 
-          // Bootstrap: lift a local-only company up to the DB so there's a
-          // workspace to scope under.
-          if (firstEverAccount && local.companyProfile && !local.companyProfile.id) {
-            const newId = await dbCreateCompany(local.companyProfile);
-            if (newId) companies = await dbListCompanies();
+          // Bootstrap: recreate EVERY local workspace in the DB, not just the
+          // active one — and remember old-id → new-id so campaigns/audiences
+          // land in THEIR workspace. (The old single-workspace bootstrap
+          // dumped every local campaign into whichever company was active:
+          // that's how FC Construct campaigns ended up inside Men's Tee.)
+          const importIdMap = new Map<string, string>();
+          if (firstEverAccount) {
+            const localCompanies = local.companies.length
+              ? local.companies
+              : (local.companyProfile ? [local.companyProfile] : []);
+            for (const lc of localCompanies) {
+              try {
+                const newId = await dbCreateCompany(lc);
+                if (lc.id) importIdMap.set(lc.id, newId);
+              } catch (e) { console.error('[db] recreate workspace', e); }
+            }
+            if (localCompanies.length) companies = await dbListCompanies();
           }
 
-          // Pick the active workspace: persisted choice if still valid, else
-          // the first available company (sorted by created_at asc).
-          let currentId = local.currentCompanyId;
+          // Pick the active workspace: persisted choice (remapped if this was
+          // an import) if still valid, else the first available company.
+          let currentId = local.currentCompanyId
+            ? (importIdMap.get(local.currentCompanyId) ?? local.currentCompanyId)
+            : null;
           if (!currentId || !companies.some((c) => c.id === currentId)) {
             currentId = companies[0]?.id ?? null;
           }
@@ -332,9 +354,12 @@ export const useApp = create<AppState>()(
           if (firstEverAccount && currentId && local.savedCampaigns.length > 0) {
             const imported: SavedCampaign[] = [];
             for (const c of local.savedCampaigns) {
-              const cc = { ...c, id: isUuid(c.id) ? c.id : newId(), companyId: currentId };
+              // Route each campaign to ITS workspace via the id map; only the
+              // genuinely untagged (pre-workspace era) fall to the active one.
+              const mapped: string = (c.companyId && importIdMap.get(c.companyId)) || currentId;
+              const cc = { ...c, id: isUuid(c.id) ? c.id : newId(), companyId: mapped };
               await dbSaveCampaign(cc);
-              imported.push(cc);
+              if (mapped === currentId) imported.push(cc);
             }
             finalCampaigns = imported;
           }
@@ -342,9 +367,10 @@ export const useApp = create<AppState>()(
           if (firstEverAccount && currentId && local.savedAudiences.length > 0) {
             const imp: SavedAudience[] = [];
             for (const a of local.savedAudiences) {
-              const aa = { ...a, id: isUuid(a.id) ? a.id : newId(), companyId: currentId };
+              const mapped: string = (a.companyId && importIdMap.get(a.companyId)) || currentId;
+              const aa = { ...a, id: isUuid(a.id) ? a.id : newId(), companyId: mapped };
               await dbSaveAudience(aa);
-              imp.push(aa);
+              if (mapped === currentId) imp.push(aa);
             }
             finalAudiences = imp;
           }
