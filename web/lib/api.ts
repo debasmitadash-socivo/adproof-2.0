@@ -14,6 +14,7 @@ import type {
   ProviderHealthSnapshot,
   ConnectorProvider,
   CompanyIntel,
+  LabRunResult,
 } from './types';
 
 // Plain-English explanation for infrastructure / HTTP errors that don't carry
@@ -75,6 +76,18 @@ export const api = {
     version: string;
   }>('/api/healthz'),
   platforms: () => request<{ platforms: Platform[] }>('/api/platforms'),
+  // Simulation Lab: lightweight numeric-only engine run (no LLM/vision).
+  labRun: (payload: {
+    platform_id: string; format_id: string; objective: string;
+    budget: number; days: number; daily_reach: number; n_runs?: number;
+    segment: string; creative_quality: number;
+    target_ctr?: number | null; cpm_override?: number | null;
+    target_conversion_rate?: number | null; aov?: number | null;
+    fatigue_per_exposure?: number | null; reachable_audience?: number | null;
+  }) =>
+    request<LabRunResult>('/api/lab/run', {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
   providerHealth: () => request<ProviderHealthSnapshot>('/api/admin/provider-health'),
   pingProviders: () =>
     request<ProviderHealthSnapshot & { results: { provider: string; status: string; reason?: string }[] }>(

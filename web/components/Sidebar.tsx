@@ -50,6 +50,7 @@ export function Sidebar() {
   const links = [
     { href: '/dashboard', label: 'Dashboard', icon: Icon.Grid },
     { href: '/new', label: 'New analysis', icon: Icon.Bolt },
+    { href: '/lab', label: 'Simulation Lab', icon: Icon.Pulse },
     { href: '/campaigns', label: 'Campaigns', icon: Icon.Clock,
       badge: campaignCount > 0 ? String(campaignCount) : undefined },
     { href: '/audiences', label: 'Audiences', icon: Icon.Users,

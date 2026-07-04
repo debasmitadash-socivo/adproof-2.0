@@ -62,6 +62,31 @@ export interface CompanyIntel {
   disclaimer: string;
 }
 
+// ---- Simulation Lab (/api/lab/run) ----------------------------------------
+export interface LabBand { p10: number; p50: number; p90: number }
+export interface LabRunResult {
+  kpis: {
+    impressions: number;
+    ctr: number;                 // fraction
+    cpm: number | null;
+    spend: number;
+    clicks: LabBand;
+    conversions: LabBand;
+    revenue: LabBand;
+    roas: LabBand;
+    reach_agents: number;
+  };
+  daily: { day: number; clicks: Record<string, number>; conversions: Record<string, number> }[];
+  factors: Record<string, number>;
+  timeline: { agents: number; days: number; frames: string[] };
+  saturation: Record<string, unknown> | null;
+  meta: {
+    n_runs: number; sim_days: number; channel: string;
+    audience_personas: number; segment: string;
+    creative: string; fatigue_source: string;
+  };
+}
+
 // ---- Platform connections (multi-platform live data pulls) ---------------
 // Mirrors the backend connector registry (src/connectors PROVIDERS).
 export interface ConnectorField {
