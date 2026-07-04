@@ -559,20 +559,32 @@ export interface OutcomeRow {
   clicks: number;
   spend: number;
   revenue: number | null;
+  conversions?: number | null;
   realCtr: number | null;         // fraction
   realRoas: number | null;
   createdAt: number;
 }
 
-export async function listOutcomes(companyId?: string): Promise<OutcomeRow[]> {
+export async function listOutcomes(
+  companyId?: string, maxRows = 20000,
+): Promise<OutcomeRow[]> {
   const sb = getSupabase(); if (!sb) return [];
-  let q = sb.from('ad_outcomes')
-    .select('id, ad_name, creative_url, platform, date_start, impressions, clicks, spend, revenue, real_ctr, real_roas, created_at')
-    .order('created_at', { ascending: false }).limit(3000);
-  if (companyId) q = q.eq('company_id', companyId);
-  const { data, error } = await q;
-  if (error) { console.error('[db] listOutcomes', error.message); return []; }
-  return (data ?? []).map((d) => ({
+  // Daily-grain syncs produce MANY rows (1,000 ads × 90 days ≈ 90k) — page
+  // through in 1,000-row chunks up to maxRows instead of silently truncating.
+  const PAGE = 1000;
+  const all: Record<string, unknown>[] = [];
+  for (let from = 0; from < maxRows; from += PAGE) {
+    let q = sb.from('ad_outcomes')
+      .select('id, ad_name, creative_url, platform, date_start, impressions, clicks, spend, revenue, conversions, real_ctr, real_roas, created_at')
+      .order('created_at', { ascending: false })
+      .range(from, Math.min(from + PAGE, maxRows) - 1);
+    if (companyId) q = q.eq('company_id', companyId);
+    const { data, error } = await q;
+    if (error) { console.error('[db] listOutcomes', error.message); break; }
+    all.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;   // last page
+  }
+  return all.map((d) => ({
     id: d.id as string,
     adName: (d.ad_name as string) ?? null,
     creativeUrl: (d.creative_url as string) ?? null,
@@ -582,6 +594,7 @@ export async function listOutcomes(companyId?: string): Promise<OutcomeRow[]> {
     clicks: Number(d.clicks ?? 0),
     spend: Number(d.spend ?? 0),
     revenue: d.revenue == null ? null : Number(d.revenue),
+    conversions: d.conversions == null ? null : Number(d.conversions),
     realCtr: (d.real_ctr as number) ?? null,
     realRoas: (d.real_roas as number) ?? null,
     createdAt: new Date(d.created_at as string).getTime(),

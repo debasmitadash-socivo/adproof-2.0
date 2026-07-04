@@ -16,7 +16,7 @@ const PROTECTED_PATHS = [
   '/dashboard', '/new', '/result',
   '/audiences', '/creatives', '/campaigns',
   '/company', '/settings', '/onboarding',
-  '/admin', '/accuracy',
+  '/admin', '/accuracy', '/ads',
 ];
 
 function isProtected(pathname: string): boolean {

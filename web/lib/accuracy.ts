@@ -45,6 +45,7 @@ export interface PooledOutcome {
   clicks: number;
   spend: number;
   revenue: number | null;
+  conversions: number | null;
   realCtr: number | null;
   realRoas: number | null;
   firstDate: string | null;
@@ -59,7 +60,7 @@ export function poolOutcomes(rows: OutcomeRow[]): PooledOutcome[] {
     if (!p) {
       p = {
         key, adName: r.adName ?? '(unnamed ad)', platform: r.platform,
-        impressions: 0, clicks: 0, spend: 0, revenue: null,
+        impressions: 0, clicks: 0, spend: 0, revenue: null, conversions: null,
         realCtr: null, realRoas: null, firstDate: r.dateStart,
         creativeUrls: new Set(),
       };
@@ -69,6 +70,7 @@ export function poolOutcomes(rows: OutcomeRow[]): PooledOutcome[] {
     p.clicks += r.clicks;
     p.spend += r.spend;
     if (r.revenue != null) p.revenue = (p.revenue ?? 0) + r.revenue;
+    if (r.conversions != null) p.conversions = (p.conversions ?? 0) + r.conversions;
     if (r.creativeUrl) p.creativeUrls.add(r.creativeUrl);
     if (r.dateStart && (!p.firstDate || r.dateStart < p.firstDate)) p.firstDate = r.dateStart;
   }

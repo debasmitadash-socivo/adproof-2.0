@@ -55,6 +55,7 @@ export function Sidebar() {
     { href: '/audiences', label: 'Audiences', icon: Icon.Users,
       badge: audienceCount > 0 ? String(audienceCount) : undefined },
     { href: '/creatives', label: 'Creatives', icon: Icon.Sq },
+    { href: '/ads', label: 'Ad library', icon: Icon.Sq },
     { href: '/data', label: 'Your data', icon: Icon.Chart },
     { href: '/accuracy', label: 'Accuracy', icon: Icon.Pulse },
   ];
