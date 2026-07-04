@@ -7,7 +7,7 @@ import { getSupabase } from './supabase';
 import type {
   SavedCampaign, SavedVariantResult, SavedAudience, CompanyProfile,
   SimulateResponse, SimulateRequest, AccountCalibration, Backtest,
-  WorkspaceMember,
+  WorkspaceMember, PlatformConnection,
 } from './types';
 
 async function uid(): Promise<string | null> {
@@ -128,11 +128,19 @@ function rowToMember(d: Record<string, unknown>): WorkspaceMember {
   };
 }
 
+/** True when Supabase says the table doesn't exist yet: raw Postgres
+ *  (42P01) or PostgREST's schema-cache miss (PGRST205), which is what the
+ *  JS client actually returns for an unapplied migration. */
+function isMissingTable(error: { code?: string; message: string }): boolean {
+  return error.code === '42P01' || error.code === 'PGRST205'
+    || /schema cache|does not exist/i.test(error.message || '');
+}
+
 /** Translate raw Postgres errors into something a person can act on. */
 function memberError(prefix: string, error: { code?: string; message: string }): Error {
-  if (error.code === '42P01') {
+  if (isMissingTable(error)) {
     return new Error(
-      'Team invites need a database update — apply supabase/migrations/0007_team_members.sql first.',
+      'Team invites need a one-time database update — run supabase/migrations/0007_team_members.sql in your Supabase SQL editor, then refresh.',
     );
   }
   if (error.code === '23505') return new Error('That email is already invited to this workspace.');
@@ -184,10 +192,86 @@ export async function claimPendingInvites(): Promise<boolean> {
   // Missing table just means the migration isn't applied yet — invites can't
   // exist, so there's nothing to claim. Don't break sign-in over it.
   if (error) {
-    if (error.code !== '42P01') console.error('[db] claimPendingInvites', error.message);
+    if (!isMissingTable(error)) console.error('[db] claimPendingInvites', error.message);
     return false;
   }
   return (data?.length ?? 0) > 0;
+}
+
+// ============================== platform connections ========================
+// Saved ad-platform credentials per workspace (Meta / TikTok / Google /
+// LinkedIn / Reddit / X). Read-only performance scopes by design. RLS-scoped
+// to workspace owner + active members. See migrations/0008.
+
+function rowToConnection(d: Record<string, unknown>): PlatformConnection {
+  return {
+    id: d.id as string,
+    companyId: d.company_id as string,
+    provider: d.provider as string,
+    label: (d.label as string) ?? null,
+    credentials: (d.credentials as Record<string, string>) ?? {},
+    accountRef: (d.account_ref as string) ?? null,
+    status: ((d.status as string) ?? 'unverified') as PlatformConnection['status'],
+    statusNote: (d.status_note as string) ?? null,
+    lastSyncedAt: d.last_synced_at ? new Date(d.last_synced_at as string).getTime() : null,
+    createdAt: new Date(d.created_at as string).getTime(),
+  };
+}
+
+function connectionError(prefix: string, error: { code?: string; message: string }): Error {
+  if (isMissingTable(error)) {
+    return new Error(
+      'Saving connections needs a one-time database update — run supabase/migrations/0008_platform_connections.sql in your Supabase SQL editor, then refresh.',
+    );
+  }
+  return new Error(`${prefix}: ${error.message}`);
+}
+
+export async function listConnections(companyId: string): Promise<PlatformConnection[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  const { data, error } = await sb.from('platform_connections').select('*')
+    .eq('company_id', companyId).order('created_at', { ascending: true });
+  if (error) {
+    // Missing table = feature not migrated yet; show as "no connections"
+    // rather than an error — connecting will surface the actionable message.
+    if (isMissingTable(error)) return [];
+    throw connectionError('Couldn\'t load connections', error);
+  }
+  return (data ?? []).map(rowToConnection);
+}
+
+export async function saveConnection(c: {
+  companyId: string; provider: string; credentials: Record<string, string>;
+  label?: string | null; accountRef?: string | null;
+  status?: PlatformConnection['status']; statusNote?: string | null;
+}): Promise<PlatformConnection> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured.');
+  const user_id = await uid();
+  if (!user_id) throw new Error('You\'re not signed in.');
+  const { data, error } = await sb.from('platform_connections')
+    .upsert({
+      user_id, company_id: c.companyId, provider: c.provider,
+      credentials: c.credentials, label: c.label ?? null,
+      account_ref: c.accountRef ?? null,
+      status: c.status ?? 'unverified', status_note: c.statusNote ?? null,
+    }, { onConflict: 'company_id,provider' })
+    .select('*').single();
+  if (error) throw connectionError('Couldn\'t save the connection', error);
+  return rowToConnection(data as Record<string, unknown>);
+}
+
+export async function deleteConnection(id: string): Promise<void> {
+  const sb = getSupabase(); if (!sb) return;
+  const { error } = await sb.from('platform_connections').delete().eq('id', id);
+  if (error) throw connectionError('Couldn\'t remove the connection', error);
+}
+
+export async function markConnectionSynced(id: string, note: string): Promise<void> {
+  const sb = getSupabase(); if (!sb) return;
+  await sb.from('platform_connections')
+    .update({ last_synced_at: new Date().toISOString(), status: 'ok', status_note: note })
+    .eq('id', id);
 }
 
 // ============================== audiences ===================================

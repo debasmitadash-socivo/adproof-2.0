@@ -12,6 +12,7 @@ import type {
   UploadResponse,
   IngestResult,
   ProviderHealthSnapshot,
+  ConnectorProvider,
 } from './types';
 
 // Plain-English explanation for infrastructure / HTTP errors that don't carry
@@ -128,10 +129,18 @@ export const api = {
     }
     return res.json();
   },
+  // Multi-platform connector registry — which platforms exist, what
+  // credentials each needs, how gated its access is. UI renders from this.
+  connectionProviders: () =>
+    request<{ providers: ConnectorProvider[] }>('/api/connections/providers'),
+  // Verify credentials read-only (one cheap GET against the platform).
+  testConnection: (payload: { provider: string; credentials: Record<string, string> }) =>
+    request<{ ok: boolean; detail: string; account_name?: string | null; currency?: string | null }>(
+      '/api/connections/test', { method: 'POST', body: JSON.stringify(payload) }),
   // Live ad-account pull (read-only): returns the same shape as ingestOutcomes
   // so the data page renders calibration + backtest + fatigue identically.
   syncConnection: (payload: {
-    provider: string; access_token: string; account_id: string;
+    provider: string; credentials: Record<string, string>;
     since: string; until: string;
     segment?: 'general' | 'b2b_saas'; currency?: string;
   }) =>

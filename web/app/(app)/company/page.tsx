@@ -12,7 +12,16 @@ import type { CompanyProfile } from '@/lib/types';
 const CURRENCIES = ['GBP', 'USD', 'EUR', 'CAD', 'AUD'];
 const MARKETS = ['UK', 'US', 'EU', 'Canada', 'Australia', 'Global'];
 
+// The form below copies profile fields into local state ONCE at mount — so a
+// workspace switch must remount it, or the previous company's values linger
+// in the inputs (the "MTC data showing on FCC" bug). Keying by workspace id
+// forces a clean remount with the new workspace's data.
 export default function CompanyPage() {
+  const currentCompanyId = useApp((s) => s.currentCompanyId);
+  return <CompanyPageInner key={currentCompanyId ?? 'none'} />;
+}
+
+function CompanyPageInner() {
   const desc = useApp((s) => s.companyDescription);
   const profile = useApp((s) => s.companyProfile);
   const setDesc = useApp((s) => s.setCompanyDescription);
@@ -60,6 +69,41 @@ export default function CompanyPage() {
   const [researching, setResearching] = useState(false);
   const [researchMsg, setResearchMsg] = useState<string | null>(null);
   const [researchSources, setResearchSources] = useState<{ title: string; uri: string }[]>([]);
+
+  // Inline editing of the AI-parsed fields. The AI proposes; you correct; your
+  // correction is final. Snapshot the profile when editing STARTS (not at
+  // mount) so an async profile load can't leave the form stale.
+  const [editing, setEditing] = useState(false);
+  const [edit, setEdit] = useState<Record<string, string>>({});
+  function startEditing() {
+    setEdit({
+      company_name: profile?.company_name ?? '',
+      industry: profile?.industry ?? '',
+      business_model: profile?.business_model ?? 'b2c',
+      product_category: profile?.product_category ?? '',
+      price_position: profile?.price_position ?? 'mid',
+      brand_tone: profile?.brand_tone ?? '',
+      value_proposition: profile?.value_proposition ?? '',
+    });
+    setEditing(true);
+  }
+  function saveDetails() {
+    persist({
+      company_name: edit.company_name.trim(),
+      industry: edit.industry.trim(),
+      business_model: edit.business_model,
+      product_category: edit.product_category.trim(),
+      price_position: edit.price_position,
+      brand_tone: edit.brand_tone.trim(),
+      value_proposition: edit.value_proposition.trim(),
+    });
+    setEditing(false);
+  }
+  const eField = (k: string) => ({
+    value: edit[k] ?? '',
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setEdit((cur) => ({ ...cur, [k]: e.target.value })),
+  });
 
   function persist(patch: Partial<CompanyProfile>) {
     const base: CompanyProfile = profile ?? {
@@ -303,8 +347,59 @@ export default function CompanyPage() {
 
         <div className="space-y-5 self-start">
         <Card>
-          <CardTitle>Parsed profile</CardTitle>
-          {profile ? (
+          <div className="flex items-center justify-between">
+            <CardTitle>Parsed profile</CardTitle>
+            {profile && !editing && (
+              <button type="button" onClick={startEditing}
+                className="text-[12px] text-violet underline -mt-2">Edit details</button>
+            )}
+          </div>
+          {profile && editing ? (
+            <div className="space-y-2.5 text-[13px]">
+              <div>
+                <label className="label">Name</label>
+                <input className="input" {...eField('company_name')} />
+              </div>
+              <div>
+                <label className="label">Industry</label>
+                <input className="input" {...eField('industry')} placeholder="e.g. apparel e-commerce" />
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="label">Business model</label>
+                  <select className="input" {...eField('business_model')}>
+                    {['b2c', 'b2b', 'dtc', 'marketplace', 'saas'].map((m) => (
+                      <option key={m} value={m}>{m.toUpperCase()}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Price position</label>
+                  <select className="input" {...eField('price_position')}>
+                    {['budget', 'mid', 'premium', 'luxury'].map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="label">Category</label>
+                <input className="input" {...eField('product_category')} placeholder="e.g. apparel" />
+              </div>
+              <div>
+                <label className="label">Brand tone</label>
+                <input className="input" {...eField('brand_tone')} placeholder="e.g. bold, playful" />
+              </div>
+              <div>
+                <label className="label">Value proposition</label>
+                <textarea className="input min-h-[70px]" rows={3} {...eField('value_proposition')} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" onClick={saveDetails}>Save details</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : profile ? (
             <div className="space-y-2 text-[13.5px]">
               <div><strong>Name:</strong> {profile.company_name || '—'}</div>
               <div><strong>Industry:</strong> {profile.industry || '—'}</div>

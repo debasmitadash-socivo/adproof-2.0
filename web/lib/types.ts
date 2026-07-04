@@ -28,6 +28,40 @@ export interface CompanyProfile {
   shared?: boolean;
 }
 
+// ---- Platform connections (multi-platform live data pulls) ---------------
+// Mirrors the backend connector registry (src/connectors PROVIDERS).
+export interface ConnectorField {
+  key: string;
+  label: string;
+  secret: boolean;
+  placeholder?: string;
+  help_url?: string;
+  optional?: boolean;
+}
+export interface ConnectorProvider {
+  id: string;                       // 'meta' | 'tiktok' | 'google' | 'linkedin' | 'reddit' | 'x'
+  label: string;
+  platforms: string[];
+  access: 'ready' | 'gated';
+  access_note: string;
+  sync: boolean;                    // false = connection verify only (X, for now)
+  fields: ConnectorField[];
+  how_to: string[];
+}
+// One saved connection (platform_connections row), workspace-scoped.
+export interface PlatformConnection {
+  id: string;
+  companyId: string;
+  provider: string;
+  label: string | null;             // account name from the verify call
+  credentials: Record<string, string>;
+  accountRef: string | null;
+  status: 'unverified' | 'ok' | 'error';
+  statusNote: string | null;
+  lastSyncedAt: number | null;
+  createdAt: number;
+}
+
 // One row of a workspace's team roster (company_members). The owner isn't
 // listed here — ownership lives on companies.user_id.
 export interface WorkspaceMember {

@@ -6,6 +6,7 @@ import { Pill } from '@/components/ui/Pill';
 import { api } from '@/lib/api';
 import { saveCalibration, insertOutcomes, getLatestCalibration } from '@/lib/db';
 import { useApp } from '@/lib/store';
+import { PlatformConnections } from '@/components/PlatformConnections';
 import type { IngestResult, AccountCalibration, PlatformCalibration } from '@/lib/types';
 
 const CONF_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
@@ -17,6 +18,7 @@ const FAT_TONE: Record<'healthy' | 'warning' | 'urgent' | 'depleted', 'success' 
 const PLATFORM_LABEL: Record<string, string> = {
   meta_facebook: 'Facebook', meta_instagram: 'Instagram', linkedin: 'LinkedIn',
   tiktok: 'TikTok', youtube: 'YouTube', google_search: 'Google Search',
+  reddit: 'Reddit', x_twitter: 'X (Twitter)',
 };
 
 function pct(x: number | null | undefined) { return x == null ? '—' : `${(x * 100).toFixed(2)}%`; }
@@ -157,13 +159,9 @@ export default function DataPage() {
   const [result, setResult] = useState<IngestResult | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [existing, setExisting] = useState<AccountCalibration | null>(null);
-  // Live ad-account pull (Phase 3, read-only). Token used per-request, not stored.
-  const [token, setToken] = useState('');
-  const [accountId, setAccountId] = useState('');
-  const [since, setSince] = useState(() => new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10));
-  const [until, setUntil] = useState(() => new Date().toISOString().slice(0, 10));
-  const [syncing, setSyncing] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
+  // Where the current result came from: an uploaded file's name or a
+  // connected provider id — stored alongside the calibration for provenance.
+  const [resultSource, setResultSource] = useState<string | null>(null);
   // Per-workspace: calibration belongs to the active workspace, not the user
   // overall. Reload when the workspace changes.
   const currentCompanyId = useApp((s) => s.currentCompanyId);
@@ -183,6 +181,7 @@ export default function DataPage() {
     setBusy(true); setError(null); setResult(null); setSaved(null);
     try {
       setResult(await api.ingestOutcomes(file, segment, platform));
+      setResultSource(file.name);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to read that file.');
     } finally {
@@ -190,19 +189,11 @@ export default function DataPage() {
     }
   }
 
-  async function pullLive() {
-    if (!token.trim() || !accountId.trim()) return;
-    setSyncing(true); setError(null); setResult(null); setSaved(null);
-    try {
-      setResult(await api.syncConnection({
-        provider: 'meta', access_token: token.trim(), account_id: accountId.trim(),
-        since, until, segment, currency: existing?.currency || 'GBP',
-      }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not pull from that account.');
-    } finally {
-      setSyncing(false);
-    }
+  // A connected platform finished a live pull — same result shape as a CSV.
+  function onConnectionResult(r: IngestResult, provider: string) {
+    setError(null); setSaved(null);
+    setResult(r);
+    setResultSource(`api:${provider}`);
   }
 
   async function save() {
@@ -210,8 +201,9 @@ export default function DataPage() {
     setBusy(true); setError(null);
     try {
       const nAds = result.calibration.overall?.n_ads ?? result.report.n_rows_kept;
-      await saveCalibration(result.calibration, nAds, result.backtest, file?.name, currentCompanyId ?? undefined);
-      const n = await insertOutcomes(result.rows, file?.name, currentCompanyId ?? undefined);
+      const source = resultSource ?? file?.name;
+      await saveCalibration(result.calibration, nAds, result.backtest, source, currentCompanyId ?? undefined);
+      const n = await insertOutcomes(result.rows, source, currentCompanyId ?? undefined);
       setExisting(result.calibration);
       setSaved(`Saved. Your forecasts now use your real benchmarks (${n.toLocaleString()} ads stored).`);
       setResult(null); setFile(null);
@@ -268,84 +260,13 @@ export default function DataPage() {
         </div>
       </Card>
 
-      {/* LIVE PULL — read-only ad-account connection (Phase 3, first cut). */}
-      <Card className="mb-5">
-        <div className="flex items-center gap-2 mb-1 relative">
-          <div className="font-heading text-[15px] font-bold">Or pull live from your ad account</div>
-          <Pill tone="violet">beta · Meta</Pill>
-          <button
-            type="button"
-            onClick={() => setShowHelp((v) => !v)}
-            aria-label="How to get a Meta access token"
-            aria-expanded={showHelp}
-            className="w-5 h-5 rounded-full border border-violet/50 text-violet text-[11px] font-bold leading-none flex items-center justify-center hover:bg-violet/10"
-          >i</button>
-          {showHelp && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowHelp(false)} />
-              <div className="absolute z-50 top-8 left-0 w-[min(440px,92vw)] bg-surface border border-border rounded-lg shadow-soft p-4 text-[12.5px] text-ink leading-snug">
-                <div className="flex items-center justify-between mb-2">
-                  <strong className="text-[13px]">How to get a Meta access token</strong>
-                  <button type="button" onClick={() => setShowHelp(false)} aria-label="Close" className="text-ink-muted hover:text-ink text-[14px]">✕</button>
-                </div>
-                <ol className="list-decimal pl-4 space-y-1.5">
-                  <li>Open <a className="text-violet underline" href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">Graph API Explorer</a>.</li>
-                  <li>Top-right, pick your app (or create one — any app works).</li>
-                  <li>Click <strong>Generate Access Token</strong> and log in.</li>
-                  <li>Under Permissions, add <span className="font-mono">ads_read</span> and <span className="font-mono">read_insights</span>.</li>
-                  <li>Copy the token (starts with <span className="font-mono">EAAG…</span>) and paste it above.</li>
-                </ol>
-                <p className="text-[11.5px] text-ink-muted mt-2">
-                  Explorer tokens last ~1-2 hours — fine for a one-off pull. For ongoing use, create a{' '}
-                  <a className="text-violet underline" href="https://business.facebook.com/settings/system-users" target="_blank" rel="noreferrer">System User</a> token with <span className="font-mono">ads_read</span>.
-                </p>
-                <p className="text-[11.5px] text-ink-muted mt-2">
-                  <strong>Ad account ID:</strong> in <a className="text-violet underline" href="https://adsmanager.facebook.com/" target="_blank" rel="noreferrer">Ads Manager</a>, open the account dropdown (top-left) — it&apos;s the <span className="font-mono">act_…</span> number, or in the page URL after <span className="font-mono">act=</span>.
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-        <p className="text-[12.5px] text-ink-muted mb-3 leading-snug">
-          Read-only. Paste a Meta access token (from Graph API Explorer or a System User) and your
-          ad-account ID — we pull your real performance and calibrate, no CSV needed. We only ever
-          <strong> read</strong> performance, never change your campaigns. The token is used for this
-          request only and isn&apos;t stored yet.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="label">Meta access token</label>
-            <input className="input font-mono text-[12px]" type="password" autoComplete="off"
-              value={token} onChange={(e) => setToken(e.target.value)} placeholder="EAAG…" />
-            <a className="text-[11.5px] text-violet underline mt-1 inline-block"
-              href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer">
-              Get a token in Graph API Explorer →
-            </a>
-          </div>
-          <div>
-            <label className="label">Ad account ID</label>
-            <input className="input font-mono" value={accountId} onChange={(e) => setAccountId(e.target.value)}
-              placeholder="act_1234567890 (or just the digits)" />
-            <a className="text-[11.5px] text-violet underline mt-1 inline-block"
-              href="https://adsmanager.facebook.com/" target="_blank" rel="noreferrer">
-              Find your ad-account ID →
-            </a>
-          </div>
-          <div>
-            <label className="label">From</label>
-            <input className="input" type="date" value={since} max={until} onChange={(e) => setSince(e.target.value)} />
-          </div>
-          <div>
-            <label className="label">To</label>
-            <input className="input" type="date" value={until} min={since} onChange={(e) => setUntil(e.target.value)} />
-          </div>
-        </div>
-        <div className="mt-3">
-          <Button onClick={pullLive} disabled={syncing || !token.trim() || !accountId.trim()}>
-            {syncing ? 'Pulling…' : 'Pull & calibrate'}
-          </Button>
-        </div>
-      </Card>
+      {/* LIVE PULL — multi-platform ad-account connections (read-only). */}
+      <PlatformConnections
+        workspaceId={currentCompanyId ?? undefined}
+        segment={segment}
+        currency={existing?.currency || 'GBP'}
+        onResult={onConnectionResult}
+      />
 
       {error && (
         <Card className="mb-5 !bg-danger-soft !border-danger/40">
