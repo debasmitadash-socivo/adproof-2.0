@@ -1,6 +1,5 @@
--- AdProof — full database setup. Runs migrations 0001–0008 in order.
+-- AdProof — full database setup. Runs migrations 0001–0009 in order.
 -- Safe to re-run. Paste into Supabase SQL editor and Run.
-
 
 -- ============================================================
 -- 0001_init.sql
@@ -192,7 +191,6 @@ begin
   end loop;
 end $$;
 
-
 -- ============================================================
 -- 0002_workspaces.sql
 -- ============================================================
@@ -256,7 +254,6 @@ create index if not exists outcomes_company_idx     on public.ad_outcomes(compan
 -- Add a `name` constraint and `archived` flag on companies for the switcher.
 alter table public.companies add column if not exists archived boolean not null default false;
 
-
 -- ============================================================
 -- 0003_company_richer.sql
 -- ============================================================
@@ -268,7 +265,6 @@ alter table public.companies
   add column if not exists conversion_goal text,   -- purchase | lead | demo | signup | awareness
   add column if not exists sales_cycle     text,   -- impulse | considered | long | enterprise
   add column if not exists brand_color     text;   -- hex string, e.g. #FF5A4D
-
 
 -- ============================================================
 -- 0004_creative_scores.sql
@@ -331,7 +327,6 @@ create policy creative_scores_owner on public.creative_scores
   for all to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-
 -- ============================================================
 -- 0005_creative_scores_interests.sql
 -- ============================================================
@@ -349,7 +344,6 @@ create policy creative_scores_owner on public.creative_scores
 alter table public.creative_scores
   add column if not exists interests          jsonb,
   add column if not exists dominant_interest  text;
-
 
 -- ============================================================
 -- 0006_storage_creatives.sql
@@ -397,7 +391,6 @@ create policy "ad_creatives_own_delete"
   on storage.objects for delete to authenticated
   using (bucket_id = 'ad-creatives'
          and (storage.foldername(name))[1] = auth.uid()::text);
-
 
 -- ============================================================
 -- 0007_team_members.sql
@@ -567,7 +560,6 @@ create policy campaign_variants_member on public.campaign_variants
         and public.is_workspace_member(c.company_id))
   );
 
-
 -- ============================================================
 -- 0008_platform_connections.sql
 -- ============================================================
@@ -618,3 +610,27 @@ create policy platform_connections_member on public.platform_connections
   using (user_id = auth.uid() or public.is_workspace_member(company_id))
   with check (user_id = auth.uid() or public.is_workspace_member(company_id));
 
+-- ============================================================
+-- 0009_outcomes_richer.sql
+-- ============================================================
+-- Richer ad_outcomes: keep the structure + delivery fields the platforms
+-- already send us but we previously threw away at save time.
+--
+--   campaign_name / adset_name — Meta's insights carry both on every row;
+--     they power the Ad Library's group-by-campaign/ad-set views and let
+--     audience tagging read ad-set names ("Gen Z fitness broad").
+--   reach / frequency — needed to fit creative-fatigue from STORED history
+--     (previously only available in-memory at pull time, so re-calibrating
+--     from the database lost the fatigue signal).
+--
+-- All nullable — old rows and thin CSVs keep working untouched.
+-- Apply: paste into the Supabase SQL editor and run. Safe to re-run.
+
+alter table public.ad_outcomes
+  add column if not exists campaign_name text,
+  add column if not exists adset_name    text,
+  add column if not exists reach         bigint,
+  add column if not exists frequency     numeric;
+
+create index if not exists outcomes_campaign_idx
+  on public.ad_outcomes(company_id, campaign_name);

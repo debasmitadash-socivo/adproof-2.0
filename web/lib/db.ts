@@ -479,7 +479,12 @@ const OUTCOME_COLS = [
   'impressions', 'clicks', 'conversions', 'revenue', 'ad_copy', 'audience',
   'creative_url', 'test_group', 'conversion_type', 'objective', 'currency',
   'geo', 'product_price',
+  // Structure + delivery (migration 0009). insertOutcomes retries without
+  // these when the column doesn't exist yet, so pre-0009 databases keep
+  // working — they just don't store the extra fields.
+  'campaign_name', 'adset_name', 'reach', 'frequency',
 ];
+const OUTCOME_COLS_0009 = ['campaign_name', 'adset_name', 'reach', 'frequency'];
 
 function isoDate(v: unknown): string | null {
   if (!v) return null;
@@ -503,12 +508,28 @@ export async function insertOutcomes(
     return o;
   });
   let inserted = 0;
+  let dropNewCols = false;      // set when the DB predates migration 0009
   for (let i = 0; i < clean.length; i += 500) {
-    const { data, error } = await sb.from('ad_outcomes').insert(clean.slice(i, i + 500)).select('id');
+    let batch = clean.slice(i, i + 500);
+    if (dropNewCols) batch = batch.map(stripNewOutcomeCols);
+    let { data, error } = await sb.from('ad_outcomes').insert(batch).select('id');
+    // Unknown-column error (PGRST204 / 42703) → this DB hasn't run 0009.
+    // Retry the batch without the new fields rather than losing the sync.
+    if (error && /column|PGRST204/i.test(`${error.code} ${error.message}`) && !dropNewCols) {
+      dropNewCols = true;
+      ({ data, error } = await sb.from('ad_outcomes')
+        .insert(batch.map(stripNewOutcomeCols)).select('id'));
+    }
     if (error) { console.error('[db] insertOutcomes', error.message); break; }
     inserted += data?.length ?? 0;
   }
   return inserted;
+}
+
+function stripNewOutcomeCols(o: Record<string, unknown>): Record<string, unknown> {
+  const copy = { ...o };
+  for (const c of OUTCOME_COLS_0009) delete copy[c];
+  return copy;
 }
 
 // ============================== accuracy ledger reads =======================
@@ -560,6 +581,10 @@ export interface OutcomeRow {
   spend: number;
   revenue: number | null;
   conversions?: number | null;
+  campaignName?: string | null;   // 0009 — null on pre-migration DBs
+  adsetName?: string | null;
+  reach?: number | null;
+  frequency?: number | null;
   realCtr: number | null;         // fraction
   realRoas: number | null;
   createdAt: number;
@@ -572,16 +597,29 @@ export async function listOutcomes(
   // Daily-grain syncs produce MANY rows (1,000 ads × 90 days ≈ 90k) — page
   // through in 1,000-row chunks up to maxRows instead of silently truncating.
   const PAGE = 1000;
+  const BASE_SELECT = 'id, ad_name, creative_url, platform, date_start, impressions, clicks, spend, revenue, conversions, real_ctr, real_roas, created_at';
+  const RICH_SELECT = `${BASE_SELECT}, campaign_name, adset_name, reach, frequency`;
+  let select = RICH_SELECT;
   const all: Record<string, unknown>[] = [];
   for (let from = 0; from < maxRows; from += PAGE) {
     let q = sb.from('ad_outcomes')
-      .select('id, ad_name, creative_url, platform, date_start, impressions, clicks, spend, revenue, conversions, real_ctr, real_roas, created_at')
+      .select(select)
       .order('created_at', { ascending: false })
       .range(from, Math.min(from + PAGE, maxRows) - 1);
     if (companyId) q = q.eq('company_id', companyId);
-    const { data, error } = await q;
+    let { data, error } = await q;
+    // Pre-0009 DB: the rich columns don't exist — fall back to the base set.
+    if (error && from === 0 && select === RICH_SELECT
+      && /column|does not exist|42703/i.test(`${error.code} ${error.message}`)) {
+      select = BASE_SELECT;
+      let q2 = sb.from('ad_outcomes').select(select)
+        .order('created_at', { ascending: false })
+        .range(from, Math.min(from + PAGE, maxRows) - 1);
+      if (companyId) q2 = q2.eq('company_id', companyId);
+      ({ data, error } = await q2);
+    }
     if (error) { console.error('[db] listOutcomes', error.message); break; }
-    all.push(...(data ?? []));
+    all.push(...((data ?? []) as unknown as Record<string, unknown>[]));
     if (!data || data.length < PAGE) break;   // last page
   }
   return all.map((d) => ({
@@ -595,6 +633,10 @@ export async function listOutcomes(
     spend: Number(d.spend ?? 0),
     revenue: d.revenue == null ? null : Number(d.revenue),
     conversions: d.conversions == null ? null : Number(d.conversions),
+    campaignName: (d.campaign_name as string) ?? null,
+    adsetName: (d.adset_name as string) ?? null,
+    reach: d.reach == null ? null : Number(d.reach),
+    frequency: d.frequency == null ? null : Number(d.frequency),
     realCtr: (d.real_ctr as number) ?? null,
     realRoas: (d.real_roas as number) ?? null,
     createdAt: new Date(d.created_at as string).getTime(),

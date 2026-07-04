@@ -459,15 +459,22 @@ def _agg(df: pd.DataFrame) -> dict:
     cvr = conv / clicks if clicks and conv else None
     if cvr is not None and not (0 < cvr <= 1):
         cvr = None
+    # n_ads means DISTINCT ads, not rows — daily-grain syncs produce many rows
+    # per ad, and counting rows inflated "823 ads" out of ~40 real ads (and
+    # over-weighted thin cells in the shrinkage anchors + confidence tiers).
+    if "ad_name" in df.columns:
+        n_ads = int(df["ad_name"].fillna("(unnamed)").nunique())
+    else:
+        n_ads = int(len(df))
     out: dict[str, Any] = {
-        "n_ads": int(len(df)),
+        "n_ads": n_ads,
         "impressions": int(impr),
         "real_ctr": round(clicks / impr, 5) if impr else None,
         "real_cpm": round(spend / impr * 1000, 3) if impr else None,
         "real_cpc": round(spend / clicks, 3) if clicks else None,
         "real_cvr": round(cvr, 5) if cvr is not None else None,
         "real_roas": round(rev / spend, 3) if spend and rev else None,
-        "confidence": _confidence(int(len(df)), impr),
+        "confidence": _confidence(n_ads, impr),
     }
     return out
 

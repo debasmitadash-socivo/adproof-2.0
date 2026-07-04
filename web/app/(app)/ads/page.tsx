@@ -12,18 +12,20 @@ import { useApp } from '@/lib/store';
 import { listOutcomes } from '@/lib/db';
 import type { OutcomeRow } from '@/lib/db';
 import { poolOutcomes } from '@/lib/accuracy';
-import type { PooledOutcome } from '@/lib/accuracy';
+import type { PooledOutcome, PoolLevel } from '@/lib/accuracy';
 
 const PLATFORM_LABEL: Record<string, string> = {
   meta_facebook: 'Facebook', meta_instagram: 'Instagram', linkedin: 'LinkedIn',
   tiktok: 'TikTok', youtube: 'YouTube', google_search: 'Google Search',
-  reddit: 'Reddit', x_twitter: 'X (Twitter)',
+  reddit: 'Reddit', x_twitter: 'X (Twitter)', multi: 'FB + IG',
 };
 
-type SortKey = 'spend' | 'impressions' | 'clicks' | 'ctr' | 'cpm' | 'roas' | 'name' | 'date';
+type SortKey = 'spend' | 'impressions' | 'clicks' | 'ctr' | 'cpm' | 'roas' | 'name' | 'date' | 'frequency' | 'cvr' | 'cpa';
 
 const cpmOf = (a: PooledOutcome) => (a.impressions > 0 ? (a.spend / a.impressions) * 1000 : 0);
 const cpcOf = (a: PooledOutcome) => (a.clicks > 0 ? a.spend / a.clicks : null);
+const cvrOf = (a: PooledOutcome) => (a.conversions != null && a.clicks > 0 ? a.conversions / a.clicks : null);
+const cpaOf = (a: PooledOutcome) => (a.conversions != null && a.conversions > 0 ? a.spend / a.conversions : null);
 
 function sortVal(a: PooledOutcome, k: SortKey): number | string {
   switch (k) {
@@ -35,6 +37,9 @@ function sortVal(a: PooledOutcome, k: SortKey): number | string {
     case 'roas': return a.realRoas ?? -1;
     case 'name': return a.adName.toLowerCase();
     case 'date': return a.firstDate ?? '';
+    case 'frequency': return a.frequency ?? -1;
+    case 'cvr': return cvrOf(a) ?? -1;
+    case 'cpa': return cpaOf(a) ?? Number.MAX_SAFE_INTEGER;
   }
 }
 
@@ -52,6 +57,7 @@ export default function AdLibraryPage() {
   const [sortKey, setSortKey] = useState<SortKey>('spend');
   const [sortDesc, setSortDesc] = useState(true);
   const [shown, setShown] = useState(50);
+  const [level, setLevel] = useState<PoolLevel>('ad');
 
   useEffect(() => {
     let alive = true;
@@ -62,7 +68,7 @@ export default function AdLibraryPage() {
     return () => { alive = false; };
   }, [currentCompanyId]);
 
-  const pooled = useMemo(() => poolOutcomes(rows), [rows]);
+  const pooled = useMemo(() => poolOutcomes(rows, level), [rows, level]);
   const platforms = useMemo(
     () => [...new Set(pooled.map((a) => a.platform).filter(Boolean))] as string[],
     [pooled]);
@@ -71,7 +77,8 @@ export default function AdLibraryPage() {
     const q = search.trim().toLowerCase();
     let out = pooled;
     if (platform !== 'all') out = out.filter((a) => a.platform === platform);
-    if (q) out = out.filter((a) => a.adName.toLowerCase().includes(q));
+    if (q) out = out.filter((a) => a.adName.toLowerCase().includes(q)
+      || (a.campaignName ?? '').toLowerCase().includes(q));
     if (from) out = out.filter((a) => (a.firstDate ?? '') >= from);
     if (to) out = out.filter((a) => (a.firstDate ?? '9999') <= to);
     const dir = sortDesc ? -1 : 1;
@@ -118,7 +125,7 @@ export default function AdLibraryPage() {
       </p>
 
       {/* SUMMARY TILES — for the current filter */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         {[
           { label: 'Ads', value: sum.ads.toLocaleString() },
           { label: 'Spend', value: `${cur} ${Math.round(sum.spend).toLocaleString()}` },
@@ -126,6 +133,8 @@ export default function AdLibraryPage() {
           { label: 'CTR', value: aggCtr != null ? `${(aggCtr * 100).toFixed(2)}%` : '—' },
           { label: 'CPM', value: aggCpm != null ? `${cur} ${aggCpm.toFixed(2)}` : '—' },
           { label: 'ROAS', value: aggRoas != null ? `${aggRoas.toFixed(2)}×` : '—' },
+          { label: 'Conversions', value: sum.hasConv ? Math.round(sum.conversions).toLocaleString() : '—' },
+          { label: 'Cost / conversion', value: sum.hasConv && sum.conversions > 0 ? `${cur} ${(sum.spend / sum.conversions).toFixed(2)}` : '—' },
         ].map((m) => (
           <Card key={m.label} className="!p-3">
             <div className="text-[10.5px] text-ink-muted uppercase tracking-[0.08em] font-bold">{m.label}</div>
@@ -141,6 +150,18 @@ export default function AdLibraryPage() {
             <label className="label">Search ads</label>
             <input className="input" value={search} onChange={(e) => { setSearch(e.target.value); setShown(50); }}
               placeholder="Type any part of an ad name…" />
+          </div>
+          <div>
+            <label className="label">Group by</label>
+            <div className="inline-flex bg-bg-deep p-1 rounded-lg">
+              {(['ad', 'adset', 'campaign'] as const).map((l) => (
+                <button key={l} type="button"
+                  onClick={() => { setLevel(l); setShown(50); }}
+                  className={`px-3 py-1.5 rounded-md text-[12.5px] font-semibold transition-colors ${level === l ? 'bg-surface shadow-soft text-ink' : 'text-ink-muted'}`}>
+                  {l === 'ad' ? 'Ad' : l === 'adset' ? 'Ad set' : 'Campaign'}
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <label className="label">Platform</label>
@@ -212,7 +233,7 @@ export default function AdLibraryPage() {
       ) : (
         <Card className="!p-0 overflow-hidden">
           <div className="px-5 py-3 bg-bg-deep text-[11.5px] text-ink-muted uppercase tracking-[0.06em] font-bold">
-            {filtered.length.toLocaleString()} ad{filtered.length === 1 ? '' : 's'}
+            {filtered.length.toLocaleString()} {level === 'ad' ? 'ad' : level === 'adset' ? 'ad set' : 'campaign'}{filtered.length === 1 ? '' : 's'}
             {filtered.length !== pooled.length && <> (of {pooled.length.toLocaleString()})</>}
             {' '}· pooled from {rows.length.toLocaleString()} daily rows · click a column to sort
           </div>
@@ -220,7 +241,8 @@ export default function AdLibraryPage() {
             <table className="w-full text-[12.5px]">
               <thead className="text-[10.5px] text-ink-faint uppercase tracking-[0.06em]">
                 <tr>
-                  {header('Ad', 'name', 'text-left px-4')}
+                  {header(level === 'ad' ? 'Ad' : level === 'adset' ? 'Ad set' : 'Campaign', 'name', 'text-left px-4')}
+                  {level === 'ad' && <th className="text-left px-3 py-2.5">Campaign</th>}
                   <th className="text-left px-3 py-2.5">Platform</th>
                   {header('First seen', 'date')}
                   {header('Impressions', 'impressions')}
@@ -229,7 +251,10 @@ export default function AdLibraryPage() {
                   {header('Spend', 'spend')}
                   {header('CPM', 'cpm')}
                   <th className="text-right px-3 py-2.5">CPC</th>
+                  {header('Freq', 'frequency')}
                   <th className="text-right px-3 py-2.5">Conv.</th>
+                  {header('CVR', 'cvr')}
+                  {header('CPA', 'cpa')}
                   {header('ROAS', 'roas')}
                 </tr>
               </thead>
@@ -238,7 +263,10 @@ export default function AdLibraryPage() {
                   const cpc = cpcOf(a);
                   return (
                     <tr key={a.key} className="border-t border-border-soft hover:bg-bg-deep/40">
-                      <td className="px-4 py-2 max-w-[280px] truncate font-semibold" title={a.adName}>{a.adName}</td>
+                      <td className="px-4 py-2 max-w-[260px] truncate font-semibold" title={a.adName}>{a.adName}</td>
+                      {level === 'ad' && (
+                        <td className="px-3 py-2 max-w-[170px] truncate text-ink-muted" title={a.campaignName ?? undefined}>{a.campaignName ?? '—'}</td>
+                      )}
                       <td className="px-3 py-2 whitespace-nowrap">
                         <Pill tone="muted">{PLATFORM_LABEL[a.platform ?? ''] ?? a.platform ?? '—'}</Pill>
                       </td>
@@ -249,7 +277,10 @@ export default function AdLibraryPage() {
                       <td className="text-right px-3 py-2 font-mono">{Math.round(a.spend).toLocaleString()}</td>
                       <td className="text-right px-3 py-2 font-mono">{a.impressions > 0 ? cpmOf(a).toFixed(2) : '—'}</td>
                       <td className="text-right px-3 py-2 font-mono">{cpc != null ? cpc.toFixed(2) : '—'}</td>
+                      <td className="text-right px-3 py-2 font-mono">{a.frequency != null ? a.frequency.toFixed(1) : '—'}</td>
                       <td className="text-right px-3 py-2 font-mono">{a.conversions != null ? Math.round(a.conversions).toLocaleString() : '—'}</td>
+                      <td className="text-right px-3 py-2 font-mono">{cvrOf(a) != null ? `${((cvrOf(a) ?? 0) * 100).toFixed(1)}%` : '—'}</td>
+                      <td className="text-right px-3 py-2 font-mono">{cpaOf(a) != null ? (cpaOf(a) ?? 0).toFixed(2) : '—'}</td>
                       <td className="text-right px-3 py-2 font-mono">{a.realRoas != null ? `${a.realRoas.toFixed(2)}×` : '—'}</td>
                     </tr>
                   );

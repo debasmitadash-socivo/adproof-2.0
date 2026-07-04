@@ -40,28 +40,43 @@ export function nameSimilarity(a: string, b: string): number {
 export interface PooledOutcome {
   key: string;                    // creative_url or normalized name
   adName: string;
-  platform: string | null;
+  platform: string | null;        // one platform, or 'multi' when rows span several
+  platforms: Set<string>;
+  campaignName: string | null;
+  adsetName: string | null;
   impressions: number;
   clicks: number;
   spend: number;
   revenue: number | null;
   conversions: number | null;
+  reach: number | null;           // max across rows (reach doesn't sum cleanly)
+  frequency: number | null;       // impression-weighted average
   realCtr: number | null;
   realRoas: number | null;
   firstDate: string | null;
+  lastDate: string | null;
   creativeUrls: Set<string>;
 }
 
-export function poolOutcomes(rows: OutcomeRow[]): PooledOutcome[] {
+export type PoolLevel = 'ad' | 'adset' | 'campaign';
+
+export function poolOutcomes(rows: OutcomeRow[], level: PoolLevel = 'ad'): PooledOutcome[] {
   const byKey = new Map<string, PooledOutcome>();
+  const freqWeighted = new Map<string, number>();     // sum(frequency × impressions)
   for (const r of rows) {
-    const key = normalizeName(r.adName) || r.creativeUrl || r.id;
+    const name = level === 'campaign' ? (r.campaignName ?? r.adName)
+      : level === 'adset' ? (r.adsetName ?? r.adName)
+        : r.adName;
+    const key = normalizeName(name) || r.creativeUrl || r.id;
     let p = byKey.get(key);
     if (!p) {
       p = {
-        key, adName: r.adName ?? '(unnamed ad)', platform: r.platform,
+        key, adName: name ?? '(unnamed)', platform: r.platform,
+        platforms: new Set(), campaignName: r.campaignName ?? null,
+        adsetName: r.adsetName ?? null,
         impressions: 0, clicks: 0, spend: 0, revenue: null, conversions: null,
-        realCtr: null, realRoas: null, firstDate: r.dateStart,
+        reach: null, frequency: null,
+        realCtr: null, realRoas: null, firstDate: r.dateStart, lastDate: r.dateStart,
         creativeUrls: new Set(),
       };
       byKey.set(key, p);
@@ -71,12 +86,25 @@ export function poolOutcomes(rows: OutcomeRow[]): PooledOutcome[] {
     p.spend += r.spend;
     if (r.revenue != null) p.revenue = (p.revenue ?? 0) + r.revenue;
     if (r.conversions != null) p.conversions = (p.conversions ?? 0) + r.conversions;
+    // Don't let a null-platform row blank the whole ad — keep any non-null,
+    // and track the full set so mixed FB+IG ads can say so.
+    if (r.platform) { p.platforms.add(r.platform); p.platform = p.platform ?? r.platform; }
+    if (r.campaignName && !p.campaignName) p.campaignName = r.campaignName;
+    if (r.adsetName && !p.adsetName) p.adsetName = r.adsetName;
+    if (r.reach != null) p.reach = Math.max(p.reach ?? 0, r.reach);
+    if (r.frequency != null && r.impressions > 0) {
+      freqWeighted.set(key, (freqWeighted.get(key) ?? 0) + r.frequency * r.impressions);
+    }
     if (r.creativeUrl) p.creativeUrls.add(r.creativeUrl);
     if (r.dateStart && (!p.firstDate || r.dateStart < p.firstDate)) p.firstDate = r.dateStart;
+    if (r.dateStart && (!p.lastDate || r.dateStart > p.lastDate)) p.lastDate = r.dateStart;
   }
   for (const p of byKey.values()) {
     p.realCtr = p.impressions > 0 ? p.clicks / p.impressions : null;
     p.realRoas = (p.revenue != null && p.spend > 0) ? p.revenue / p.spend : null;
+    const fw = freqWeighted.get(p.key);
+    if (fw != null && p.impressions > 0) p.frequency = fw / p.impressions;
+    if (p.platforms.size > 1) p.platform = 'multi';
   }
   return [...byKey.values()];
 }

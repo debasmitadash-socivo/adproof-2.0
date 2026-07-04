@@ -73,6 +73,8 @@ def map_insights(insights: list[dict]) -> list[dict]:
         rev = _sum_actions(action_values, _REVENUE_ACTIONS)
         rows.append({
             "ad_name": ins.get("ad_name") or ins.get("campaign_name") or "Meta ad",
+            "campaign_name": ins.get("campaign_name") or None,
+            "adset_name": ins.get("adset_name") or None,
             "platform": _platform_for(ins),
             "date_start": ins.get("date_start"),
             "date_end": ins.get("date_stop"),
@@ -118,8 +120,9 @@ def pull(credentials: dict, since: str, until: str,
     if not access_token:
         raise ValueError("Missing Meta access token.")
     acct = account_id if str(account_id).startswith("act_") else f"act_{account_id}"
-    fields = ("ad_id,ad_name,campaign_name,impressions,reach,frequency,clicks,"
-              "ctr,spend,cpm,cpc,actions,action_values,date_start,date_stop")
+    fields = ("ad_id,ad_name,adset_name,campaign_name,impressions,reach,"
+              "frequency,clicks,ctr,spend,cpm,cpc,actions,action_values,"
+              "date_start,date_stop")
     params: dict = {
         "access_token": access_token,
         "level": "ad",
