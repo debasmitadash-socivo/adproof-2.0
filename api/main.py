@@ -543,12 +543,48 @@ async def ingest_outcomes(file: UploadFile = File(...),
 
 class ConnectionSyncRequest(BaseModel):
     provider: str = "meta"
-    access_token: str
-    account_id: str
+    credentials: dict = {}           # per-provider fields (see PROVIDERS registry)
+    # Back-compat with the original Meta-only payload:
+    access_token: str = ""
+    account_id: str = ""
     since: str                       # YYYY-MM-DD
     until: str                       # YYYY-MM-DD
     segment: str = "general"
     currency: str = "GBP"
+
+    def merged_credentials(self) -> dict:
+        creds = dict(self.credentials or {})
+        if self.access_token and "access_token" not in creds:
+            creds["access_token"] = self.access_token
+        if self.account_id and "account_id" not in creds:
+            creds["account_id"] = self.account_id
+        return creds
+
+
+class ConnectionTestRequest(BaseModel):
+    provider: str
+    credentials: dict = {}
+
+
+@app.get("/api/connections/providers")
+def connections_providers() -> dict:
+    """The connector registry — which platforms exist, what credentials each
+    needs, and how gated its API access is. The UI renders connect cards
+    straight from this, so adding a platform never needs a frontend change."""
+    from connectors import provider_meta
+    return {"providers": provider_meta()}
+
+
+@app.post("/api/connections/test")
+def connections_test(req: ConnectionTestRequest) -> dict:
+    """Verify credentials read-only (one cheap GET against the platform)."""
+    from connectors import test_connection
+    try:
+        return test_connection(req.provider, req.credentials or {})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:                            # noqa: BLE001
+        raise HTTPException(status_code=502, detail=str(e)[:400])
 
 
 @app.post("/api/connections/sync")
@@ -557,15 +593,13 @@ def connections_sync(req: ConnectionSyncRequest) -> dict:
     an ingest-shaped payload (calibration + backtest + fatigue + rows) for the
     frontend to render and persist under the logged-in user (RLS).
 
-    The token is used for THIS request only and is not stored here — persistent,
-    encrypted connections land in the next slice (the ad_connections table).
-    Works today with a Meta access token (e.g. from Graph API Explorer / a
-    System User token) — no registered OAuth app required to try it.
+    Credentials are used for THIS request only — persistence lives client-side
+    in the RLS-scoped platform_connections table, never on this server.
     """
     from connectors import pull_outcomes
     seg = req.segment if req.segment in ("general", "b2b_saas") else "general"
     try:
-        rows = pull_outcomes(req.provider, req.access_token, req.account_id,
+        rows = pull_outcomes(req.provider, req.merged_credentials(),
                              req.since, req.until)
     except NotImplementedError as e:
         raise HTTPException(status_code=501, detail=str(e))
