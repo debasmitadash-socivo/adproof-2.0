@@ -1834,6 +1834,61 @@ _SIMULATE_GATE = threading.Semaphore(
     max(1, int(os.environ.get("ADPROOF_SIMULATE_CONCURRENCY", "1") or "1")))
 
 
+# ===========================================================================
+# Simulation Lab (L1): the lightweight engine tap.
+# Numeric-only (no LLM / vision), hard-capped, cached, and behind the same
+# concurrency gate as the wizard so Lab traffic can never OOM the worker.
+# ===========================================================================
+
+class LabRunRequest(BaseModel):
+    platform_id: str = "meta_instagram"
+    format_id: str = "meta_ig_reels"
+    objective: str = "conversion"
+    budget: float = 5_000.0
+    days: int = 14
+    daily_reach: float = 0.35
+    n_runs: int = 6
+    segment: str = "all"
+    creative_quality: float = 0.55          # 0-1 → synthetic creative (hypothetical)
+    # Personalised anchors — the frontend sends the same shrunk values the
+    # wizard would (account calibration), so the Lab simulates THEIR market.
+    target_ctr: Optional[float] = None
+    cpm_override: Optional[float] = None
+    target_conversion_rate: Optional[float] = None
+    aov: Optional[float] = None
+    fatigue_per_exposure: Optional[float] = None
+    reachable_audience: Optional[int] = None
+
+
+@app.post("/api/lab/run")
+def lab_run(req: LabRunRequest) -> dict:
+    if req.format_id not in FORMATS:
+        raise HTTPException(status_code=400,
+                            detail=f"Unknown format_id '{req.format_id}'.")
+    try:
+        from lab import run_lab
+    except ImportError:
+        from src.lab import run_lab
+    with _SIMULATE_GATE:
+        try:
+            return run_lab(
+                platform_id=req.platform_id, format_id=req.format_id,
+                objective=req.objective, budget=req.budget, days=req.days,
+                daily_reach=min(max(req.daily_reach, 0.05), 1.0),
+                n_runs=req.n_runs, segment=req.segment,
+                creative_quality=req.creative_quality,
+                target_ctr=req.target_ctr, cpm_override=req.cpm_override,
+                target_conversion_rate=req.target_conversion_rate,
+                aov=req.aov, fatigue_per_exposure=req.fatigue_per_exposure,
+                reachable_audience=req.reachable_audience,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:                        # noqa: BLE001
+            raise HTTPException(status_code=500,
+                                detail=f"Lab run failed: {str(e)[:300]}")
+
+
 @app.post("/api/simulate")
 def simulate(req: SimulateRequest) -> dict:
     if req.format_id not in FORMATS:

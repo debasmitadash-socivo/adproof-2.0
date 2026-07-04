@@ -146,6 +146,7 @@ class AdSimulationModel(_MesaModel):
                  anchor_to_benchmark: bool = True,
                  target_ctr: float | None = None,
                  target_conversion_rate: float | None = 0.025,
+                 fatigue_per_exposure: float | None = None,
                  seed: int | None = None):
         """
         Parameters
@@ -195,6 +196,9 @@ class AdSimulationModel(_MesaModel):
         self.visual_weights = visual_weights
         self.daily_reach = daily_reach
         self.sim_days = sim_days
+        # Per-account fatigue override; agents read it via getattr, so None
+        # keeps the legacy FATIGUE_PER_EXPOSURE constant.
+        self.fatigue_per_exposure = fatigue_per_exposure
 
         # --- Build the agent population ----------------------------------
         self.consumer_agents = [

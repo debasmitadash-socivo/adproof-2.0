@@ -219,6 +219,7 @@ def monte_carlo(personas,
                 aov_multiplier: float = 1.0,
                 aov_override: float | None = None,
                 reachable_audience: int | None = None,
+                fatigue_per_exposure: float | None = None,
                 ) -> MonteCarloResults:
     """Run the model many times and produce a campaign forecast with bands.
 
@@ -264,6 +265,7 @@ def monte_carlo(personas,
             visual_weights=visual_weights,
             anchor_to_benchmark=anchor_to_benchmark, target_ctr=target_ctr,
             target_conversion_rate=target_conversion_rate,
+            fatigue_per_exposure=fatigue_per_exposure,
             seed=base_seed + i,
         )
         r = model.run()

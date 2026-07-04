@@ -357,7 +357,8 @@ def compute_click_probability(persona: dict,
                                visual_weights: dict | None = None,
                                social_influence: float = 0.0,
                                prior_exposures: int = 0,
-                               anchor_logit: float | None = None
+                               anchor_logit: float | None = None,
+                               fatigue_per_exposure: float | None = None,
                                ) -> ProbabilityBreakdown:
     """Probability that ``persona`` clicks ``ad`` on a single exposure.
 
@@ -399,7 +400,10 @@ def compute_click_probability(persona: dict,
         WOM_BASE_SCALE + _get(persona, "social_susceptibility"))
 
     # --- Ad fatigue -------------------------------------------------------
-    fatigue_logit = -FATIGUE_PER_EXPOSURE * min(prior_exposures, FATIGUE_CAP)
+    # Per-account override (P3b/Lab): when the caller carries a fitted or
+    # user-set decay, it replaces the generic constant. None = legacy 0.10.
+    _fpe = FATIGUE_PER_EXPOSURE if fatigue_per_exposure is None else fatigue_per_exposure
+    fatigue_logit = -_fpe * min(prior_exposures, FATIGUE_CAP)
 
     total = (base_logit + visual_logit + match_logit + psych_logit
              + wom_logit + fatigue_logit)
@@ -547,6 +551,7 @@ class AdConsumerAgent(_MesaAgent):
             social_influence=self.social_influence,
             prior_exposures=self.times_exposed,
             anchor_logit=getattr(model, "_click_anchor_logit", None),
+            fatigue_per_exposure=getattr(model, "fatigue_per_exposure", None),
         )
         self.last_click_breakdown = click
         self.times_exposed += 1
