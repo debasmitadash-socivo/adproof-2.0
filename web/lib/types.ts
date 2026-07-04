@@ -339,6 +339,22 @@ export interface AccountCalibration {
   usable: boolean;
   window?: string;
   trend?: CalibrationTrend | null;
+  // P3b: auction-layer params fitted from the account's own daily data.
+  auction?: {
+    cpm_seasonality: {
+      usable: boolean;
+      factors: Record<string, number>;   // month (1-12) -> CPM multiplier
+      n_ads: number;
+      months_covered: number;
+      reason?: string | null;
+    };
+    fatigue: {
+      usable: boolean;
+      lambda_per_exposure: number | null;  // logit decay per extra exposure
+      n_ads: number;
+      reason?: string | null;
+    };
+  };
 }
 export interface Backtest {
   usable: boolean;

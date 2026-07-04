@@ -594,6 +594,22 @@ def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120,
 
     n_unknown = int((used["_segment"] == "unknown").sum())
     n_interest_unknown = int((used["_interest"] == "unknown").sum())
+
+    # P3b: auction-layer parameters (CPM seasonality + fatigue slope) fitted
+    # from the same rows. Rides inside the calibration dict so it persists to
+    # calibrations.params (jsonb) with zero schema/frontend-save changes.
+    # Fitted on ALL history (d), not the recent window — seasonality needs
+    # the calendar breadth. Best-effort: never block calibration on it.
+    try:
+        try:
+            from src.auction import auction_block
+        except ImportError:
+            from auction import auction_block
+        auction = auction_block(d)
+    except Exception as exc:                          # noqa: BLE001
+        auction = {"cpm_seasonality": {"usable": False, "reason": str(exc)[:120]},
+                   "fatigue": {"usable": False, "reason": str(exc)[:120]}}
+
     return {
         "currency": currency,
         "overall": _agg(used),
@@ -606,6 +622,7 @@ def calibrate(df: pd.DataFrame, currency: str = "GBP", recent_days: int = 120,
         "usable": True,
         "window": window,
         "trend": _trend(d),
+        "auction": auction,
     }
 
 

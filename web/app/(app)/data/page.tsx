@@ -117,6 +117,58 @@ function CrossTabMatrix({ cal }: { cal: AccountCalibration }) {
   );
 }
 
+const MONTH_NAMES = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// P3b: what the auction layer learned from this account's own history —
+// month-by-month CPM drift + the creative-fatigue slope. Display-only here;
+// the wizard applies the current month's factor to the CPM anchor.
+function AuctionInsights({ cal }: { cal: AccountCalibration }) {
+  const a = cal.auction;
+  if (!a) return null;
+  const season = a.cpm_seasonality;
+  const fat = a.fatigue;
+  if (!season?.usable && !fat?.usable) return null;
+  return (
+    <div className="mt-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="font-heading text-[14.5px] font-bold">Your market, by the calendar</div>
+        <Pill tone="violet">auction layer</Pill>
+      </div>
+      {season?.usable && (
+        <div className="text-[12.5px] text-ink mb-2">
+          <span className="text-ink-muted">CPM seasonality fitted from {season.n_ads} ads across {season.months_covered} months — forecasts run this month use this month&apos;s factor:</span>
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {Object.entries(season.factors)
+              .sort(([a1], [b1]) => Number(a1) - Number(b1))
+              .map(([m, f]) => {
+                const isNow = Number(m) === new Date().getMonth() + 1;
+                return (
+                  <span key={m}
+                    className={`px-2 py-0.5 rounded font-mono text-[11.5px] ${isNow ? 'bg-coral text-white font-bold' : 'bg-bg-deep text-ink'}`}>
+                    {MONTH_NAMES[Number(m)]} {f >= 1 ? '+' : ''}{Math.round((f - 1) * 100)}%
+                  </span>
+                );
+              })}
+          </div>
+        </div>
+      )}
+      {fat?.usable && fat.lambda_per_exposure != null && (
+        <div className="text-[12.5px] text-ink">
+          <span className="text-ink-muted">Creative fatigue (fitted from {fat.n_ads} ads):</span>{' '}
+          {fat.lambda_per_exposure > 0.005 ? (
+            <>your click-through decays about <strong className="font-mono">
+              {Math.round((1 - Math.exp(-fat.lambda_per_exposure)) * 100)}%</strong> per extra
+              exposure — plan creative refreshes accordingly.</>
+          ) : (
+            <>no measurable fatigue in this window — your creatives hold up under repeat exposure.</>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CalTable({ cal }: { cal: AccountCalibration }) {
   const rows = Object.entries(cal.by_platform) as [string, PlatformCalibration][];
   return (
@@ -231,6 +283,7 @@ export default function DataPage() {
           </div>
           <CalTable cal={existing} />
           <CrossTabMatrix cal={existing} />
+          <AuctionInsights cal={existing} />
           <div className="text-[12px] text-ink-faint mt-2">Upload a fresh export below to update it.</div>
         </Card>
       )}
@@ -293,6 +346,7 @@ export default function DataPage() {
             </div>
             <CalTable cal={result.calibration} />
             <CrossTabMatrix cal={result.calibration} />
+            <AuctionInsights cal={result.calibration} />
             {result.report.warnings.length > 0 && (
               <ul className="mt-3 space-y-1">
                 {result.report.warnings.map((w, i) => (

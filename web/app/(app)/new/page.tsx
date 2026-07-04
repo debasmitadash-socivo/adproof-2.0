@@ -263,6 +263,14 @@ export default function NewAnalysisPage() {
           calCvr = pick.cvr;
           calSource = pick.source;
           calNAds = pick.nAds;
+          // P3b: adjust the CPM anchor for the CURRENT month's auction
+          // seasonality, fitted from the account's own history (shrunk +
+          // clamped server-side, so a noisy month can't distort it much).
+          const season = cal.auction?.cpm_seasonality;
+          if (calCpm != null && season?.usable) {
+            const f = season.factors[String(new Date().getMonth() + 1)];
+            if (f && f > 0) calCpm = calCpm * f;
+          }
         }
       } catch { /* calibration is best-effort — never block a run */ }
 
