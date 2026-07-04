@@ -13,6 +13,7 @@ import type {
   IngestResult,
   ProviderHealthSnapshot,
   ConnectorProvider,
+  CompanyIntel,
 } from './types';
 
 // Plain-English explanation for infrastructure / HTTP errors that don't carry
@@ -101,6 +102,13 @@ export const api = {
     }>('/api/suggest-audience', { method: 'POST', body: JSON.stringify(payload) }),
   researchCompany: (payload: { url?: string; description?: string; geo?: string }) =>
     request<ResearchProposal>('/api/research-company', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  // Deep one-shot intake: full profile + economics w/ competitor prices +
+  // brand color/logo from the real site + researched smart audiences.
+  companyIntel: (payload: { url?: string; description?: string; geo?: string }) =>
+    request<CompanyIntel>('/api/company-intel', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

@@ -1489,6 +1489,231 @@ the JSON stays small:
     }
 
 
+# ---------------------------------------------------------------------------
+# Deep company intelligence: one call that understands the whole business.
+# Website fetch (brand color / logo / copy) + grounded research (economics
+# with competitor context, location-aware pricing) + researched SMART
+# AUDIENCES mapped onto the simulator's real taxonomy — so the audience
+# proposals actually move the forecast instead of being free text.
+# ---------------------------------------------------------------------------
+
+# The simulator's actual levers — smart audiences MUST map onto these or the
+# suggestion is cosmetic. Kept in sync with personas.AUDIENCE_SEGMENTS and
+# outcomes.INTEREST_BUCKETS via the imports in company_intel().
+_SEGMENT_IDS = ("all", "gen_z", "millennials", "gen_x", "boomers",
+                "high_income", "budget_conscious", "early_adopters",
+                "socially_influenced")
+_INTEREST_IDS = ("fitness", "fashion", "beauty", "tech", "travel", "food",
+                 "home", "finance", "automotive", "entertainment",
+                 "business", "wellness")
+
+
+def _peek_website(url: str, timeout: int = 12) -> dict:
+    """Fetch the homepage (SSRF-guarded, size-capped) and pull brand signals
+    straight from the HTML: theme color, logo candidates, title/description
+    text. Real bytes from their site beat an LLM guess for brand color."""
+    import re as _re
+    from urllib.parse import urljoin
+
+    import requests as _requests
+
+    full = url if "://" in url else f"https://{url}"
+    out: dict = {"fetched": False, "url": full}
+    try:
+        resp = _requests.get(
+            full, timeout=timeout, stream=True,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; AdProofBot/1.0)"})
+        raw = resp.raw.read(500_000, decode_content=True)
+        html = raw.decode(resp.encoding or "utf-8", errors="replace")
+    except Exception:                                 # noqa: BLE001
+        return out
+    out["fetched"] = True
+
+    def _meta(pattern: str) -> str:
+        m = _re.search(pattern, html, _re.IGNORECASE | _re.DOTALL)
+        return (m.group(1).strip() if m else "")[:300]
+
+    out["title"] = _meta(r"<title[^>]*>([^<]{1,200})")
+    out["description"] = _meta(
+        r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)')
+    theme = _meta(r'<meta[^>]+name=["\']theme-color["\'][^>]+content=["\']([^"\']+)')
+    if _re.fullmatch(r"#[0-9a-fA-F]{3,8}", theme or ""):
+        out["theme_color"] = theme
+    # Logo candidates, best first: og:image, apple-touch-icon, icon links.
+    logo = _meta(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)') \
+        or _meta(r'<link[^>]+rel=["\']apple-touch-icon["\'][^>]+href=["\']([^"\']+)') \
+        or _meta(r'<link[^>]+rel=["\'](?:shortcut )?icon["\'][^>]+href=["\']([^"\']+)')
+    if logo:
+        out["logo_url"] = urljoin(full, logo)
+    # A slab of visible text for the LLM to ground on even if search finds
+    # nothing (tiny/local businesses).
+    text = _re.sub(r"<script.*?</script>|<style.*?</style>", " ", html,
+                   flags=_re.IGNORECASE | _re.DOTALL)
+    text = _re.sub(r"<[^>]+>", " ", text)
+    out["page_text"] = _re.sub(r"\s+", " ", text).strip()[:2500]
+    return out
+
+
+class CompanyIntelRequest(BaseModel):
+    url: Optional[str] = None
+    description: str = ""
+    geo: str = "UK"
+
+
+@app.post("/api/company-intel")
+def company_intel(req: CompanyIntelRequest) -> dict:
+    """Deep one-shot understanding of a business from its website: full
+    profile, location-aware economics WITH competitor price context, brand
+    color/logo (from the real HTML when possible), and up to 4 researched
+    smart audiences mapped onto the simulator's segment/interest taxonomy.
+
+    Everything returned is a PROPOSAL the user can edit — never silently
+    authoritative. Sources are returned so the user can see receipts.
+    """
+    import os as _os
+    key = _os.environ.get("GEMINI_API_KEY")
+    if not key:
+        raise HTTPException(
+            status_code=400,
+            detail="Connect a Gemini key in /settings to auto-research a business.")
+
+    url = (req.url or "").strip()
+    site: dict = {}
+    if url:
+        ok, why = _is_safe_public_url(url)
+        if not ok:
+            raise HTTPException(status_code=400, detail=f"Unsafe URL: {why}")
+        site = _peek_website(url)
+    if not url and not req.description.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Provide a website URL or a description to research.")
+
+    site_block = ""
+    if site.get("fetched"):
+        site_block = (
+            f"WEBSITE CONTENT (fetched just now from {site['url']}):\n"
+            f"Title: {site.get('title', '')}\n"
+            f"Meta description: {site.get('description', '')}\n"
+            f"Page text: {site.get('page_text', '')[:2000]}\n\n")
+    desc_block = (f"They describe themselves as: \"{req.description.strip()[:600]}\"\n\n"
+                  if req.description.strip() else "")
+
+    prompt = f"""You are a senior marketing strategist doing a deep intake on ONE business
+so an ad-forecasting tool can model it accurately. The user confirms/edits
+everything, so give your best researched estimates rather than nulls.
+
+{site_block}{desc_block}Primary market: {req.geo}
+Website: {url or 'not given'}
+
+Use web search to research: what they sell, typical prices for THEM and for
+2-3 direct COMPETITORS in the {req.geo} market (price context makes the
+average-order-value estimate defensible), and who actually buys.
+
+AUDIENCE RULES — the simulator only understands this taxonomy, so every
+audience MUST use it:
+- segment: exactly one of {list(_SEGMENT_IDS)}
+- interests: 1-3 of {list(_INTEREST_IDS)}
+Propose 2-4 DISTINCT audiences a paid-social strategist would actually test,
+ordered most-promising first. The "description" must be one natural targeting
+sentence (mention ages/interests/behaviours), because it also feeds a matcher.
+
+Return ONLY this JSON:
+{{
+  "profile": {{
+    "company_name": "", "industry": "", "business_model": "b2c|b2b|dtc|saas|marketplace|services",
+    "product_category": "", "value_proposition": "<one line>",
+    "target_customer_summary": "<one line>", "price_position": "budget|mid|premium|luxury",
+    "brand_tone": "<2-3 words>"
+  }},
+  "economics": {{
+    "estimated_avg_order_value": <number>, "currency": "<GBP|USD|...>",
+    "location": "{req.geo}",
+    "competitor_context": [{{"name": "", "price_note": "<their typical price>"}}],
+    "price_range_low": <number>, "price_range_high": <number>,
+    "confidence": "low|medium|high",
+    "reasoning": "<ONE sentence citing the competitor prices>"
+  }},
+  "brand": {{"brand_color_hex": "<#RRGGBB best guess from their branding>"}},
+  "audiences": [
+    {{"name": "<short name>", "description": "<one targeting sentence>",
+      "segment": "<taxonomy id>", "interests": ["<taxonomy ids>"],
+      "gender": "all|women|men", "age_range": "<e.g. 25-40>",
+      "rationale": "<one sentence why this audience>"}}
+  ]
+}}"""
+
+    try:
+        response, model_used = _gemini_grounded_call(prompt, max_tokens=3000)
+    except Exception as exc:                          # noqa: BLE001
+        msg = str(exc)
+        status = 503 if "429" in msg or "RESOURCE_EXHAUSTED" in msg else 502
+        raise HTTPException(
+            status_code=status,
+            detail=f"Research failed: {msg[:240]}. You can still fill the profile manually.")
+
+    import re as _re
+    raw_text = response.text or ""
+    cleaned = _re.sub(r"^```(?:json)?\s*", "", raw_text.strip())
+    cleaned = _re.sub(r"\s*```$", "", cleaned)
+    start, end = cleaned.find("{"), cleaned.rfind("}")
+    parsed: dict = {}
+    if start != -1 and end != -1 and end > start:
+        try:
+            parsed = json.loads(cleaned[start:end + 1])
+        except json.JSONDecodeError:
+            parsed = {}
+
+    # Clamp audiences to the REAL taxonomy so a hallucinated segment can never
+    # reach the simulator.
+    audiences = []
+    for a in (parsed.get("audiences") or [])[:4]:
+        seg = a.get("segment") if a.get("segment") in _SEGMENT_IDS else "all"
+        interests = [i for i in (a.get("interests") or []) if i in _INTEREST_IDS][:3]
+        gender = a.get("gender") if a.get("gender") in ("all", "women", "men") else "all"
+        if not (a.get("name") and a.get("description")):
+            continue
+        audiences.append({
+            "name": str(a["name"])[:60],
+            "description": str(a["description"])[:300],
+            "segment": seg, "interests": interests, "gender": gender,
+            "age_range": str(a.get("age_range", ""))[:20],
+            "rationale": str(a.get("rationale", ""))[:220],
+        })
+
+    # Brand color: real bytes from their site beat the LLM's guess.
+    brand_color = site.get("theme_color") \
+        or (parsed.get("brand") or {}).get("brand_color_hex")
+    if not isinstance(brand_color, str) or not _re.fullmatch(
+            r"#[0-9a-fA-F]{3,8}", brand_color or ""):
+        brand_color = None
+
+    grounding_urls: list = []
+    try:
+        gm = response.candidates[0].grounding_metadata
+        if gm and gm.grounding_chunks:
+            for ch in gm.grounding_chunks:
+                if ch.web:
+                    grounding_urls.append({"title": ch.web.title or "",
+                                            "uri": ch.web.uri or ""})
+    except Exception:                                 # noqa: BLE001
+        pass
+
+    return {
+        "profile": parsed.get("profile") or {},
+        "economics": parsed.get("economics") or {},
+        "brand": {"brand_color_hex": brand_color,
+                  "logo_url": site.get("logo_url"),
+                  "color_source": "website" if site.get("theme_color") else "estimate"},
+        "audiences": audiences,
+        "site_fetched": bool(site.get("fetched")),
+        "model": model_used,
+        "sources": grounding_urls[:6],
+        "disclaimer": "AI-researched proposal from public web data — confirm or "
+                      "correct anything; your numbers drive the forecast, not ours.",
+    }
+
+
 # ===========================================================================
 # Main simulation
 # ===========================================================================

@@ -28,6 +28,39 @@ export interface CompanyProfile {
   shared?: boolean;
 }
 
+// ---- Deep company intelligence (/api/company-intel) -----------------------
+// One-shot researched understanding of a business: profile + economics with
+// competitor context + brand + smart audiences mapped to the simulator's
+// real segment/interest taxonomy. Always a PROPOSAL the user can edit.
+export interface SmartAudience {
+  name: string;
+  description: string;           // one targeting sentence (feeds the matcher)
+  segment: string;               // one of the 9 simulator segments
+  interests: string[];           // subset of the 12 interest buckets
+  gender: 'all' | 'women' | 'men';
+  age_range: string;
+  rationale: string;
+}
+export interface CompanyIntel {
+  profile: Partial<CompanyProfile> & { target_customer_summary?: string };
+  economics: {
+    estimated_avg_order_value?: number;
+    currency?: string;
+    location?: string;
+    competitor_context?: { name: string; price_note: string }[];
+    price_range_low?: number;
+    price_range_high?: number;
+    confidence?: 'low' | 'medium' | 'high';
+    reasoning?: string;
+  };
+  brand: { brand_color_hex?: string | null; logo_url?: string | null; color_source?: string };
+  audiences: SmartAudience[];
+  site_fetched: boolean;
+  model: string;
+  sources: { title: string; uri: string }[];
+  disclaimer: string;
+}
+
 // ---- Platform connections (multi-platform live data pulls) ---------------
 // Mirrors the backend connector registry (src/connectors PROVIDERS).
 export interface ConnectorField {

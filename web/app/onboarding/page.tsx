@@ -41,8 +41,10 @@ function OnboardingInner() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [desc, setDesc] = useState('');
+  const [website, setWebsite] = useState('');
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // Richer onboarding (Phase 5 of UX): the four chip-picker fields that
@@ -70,6 +72,47 @@ function OnboardingInner() {
       setErr((e as Error).message);
     } finally {
       setParsing(false);
+    }
+  }
+
+  // One-shot deep intake from their website: fetches the real site + web
+  // research → full profile, economics, brand color. Fastest possible
+  // onboarding — paste URL, click once, confirm.
+  async function analyzeWebsite() {
+    if (!website.trim()) return;
+    setAnalyzing(true); setErr(null);
+    try {
+      const r = await api.companyIntel({
+        url: website.trim(),
+        description: desc.trim() || undefined,
+        geo: 'UK',
+      });
+      const p = r.profile || {};
+      const built: CompanyProfile = {
+        raw_description: desc.trim() || p.value_proposition || '',
+        company_name: p.company_name || '',
+        industry: p.industry || '',
+        business_model: p.business_model || 'b2c',
+        product_category: p.product_category || 'general',
+        value_proposition: p.value_proposition || '',
+        target_customer_summary: p.target_customer_summary || '',
+        price_position: p.price_position || 'mid',
+        brand_tone: p.brand_tone || 'neutral',
+        source: 'llm',
+        website: website.trim(),
+        location: r.economics?.location,
+        avg_order_value: r.economics?.estimated_avg_order_value,
+        currency: r.economics?.currency,
+      };
+      setProfile(built);
+      if (!desc.trim() && (p.value_proposition || p.target_customer_summary)) {
+        setDesc([p.value_proposition, p.target_customer_summary].filter(Boolean).join(' — '));
+      }
+      if (r.brand?.brand_color_hex) setBrandColor(r.brand.brand_color_hex);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setAnalyzing(false);
     }
   }
 
@@ -201,7 +244,23 @@ function OnboardingInner() {
               </p>
 
               <div className="mb-4">
-                <label className="label">Company description</label>
+                <label className="label">Your website <span className="text-ink-muted font-normal">· fastest way</span></label>
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1 font-mono text-[13px]"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://yourcompany.com"
+                  />
+                  <Button variant="secondary" size="sm" onClick={analyzeWebsite} disabled={analyzing || !website.trim()}>
+                    {analyzing ? 'Researching…' : '✨ Analyze my website'}
+                  </Button>
+                </div>
+                <div className="help mt-1.5">We read your site + research your market, then fill everything below for you to confirm.</div>
+              </div>
+
+              <div className="mb-4">
+                <label className="label">Company description <span className="text-ink-muted font-normal">· or describe it yourself</span></label>
                 <textarea
                   className="input min-h-[140px]"
                   rows={5}
