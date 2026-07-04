@@ -9,8 +9,8 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { useApp } from '@/lib/store';
-import { listOutcomes } from '@/lib/db';
-import type { OutcomeRow } from '@/lib/db';
+import { listOutcomes, listBreakdowns } from '@/lib/db';
+import type { OutcomeRow, BreakdownRow } from '@/lib/db';
 import { poolOutcomes } from '@/lib/accuracy';
 import type { PooledOutcome, PoolLevel } from '@/lib/accuracy';
 
@@ -59,11 +59,15 @@ export default function AdLibraryPage() {
   const [shown, setShown] = useState(50);
   const [level, setLevel] = useState<PoolLevel>('ad');
 
+  const [breakdowns, setBreakdowns] = useState<BreakdownRow[]>([]);
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    listOutcomes(currentCompanyId ?? undefined)
-      .then((r) => { if (alive) { setRows(r); setLoading(false); } })
+    Promise.all([
+      listOutcomes(currentCompanyId ?? undefined),
+      listBreakdowns(currentCompanyId ?? undefined),
+    ]).then(([r, b]) => { if (alive) { setRows(r); setBreakdowns(b); setLoading(false); } })
       .catch(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [currentCompanyId]);
@@ -187,6 +191,10 @@ export default function AdLibraryPage() {
         </div>
       </Card>
 
+      {/* BY AUDIENCE — who actually responds (age × gender), from the
+          separate ad_breakdowns table so totals above stay honest. */}
+      <AudienceGrid breakdowns={breakdowns} cur={cur} />
+
       {/* TOP / BOTTOM PERFORMERS */}
       {(top.length >= 3) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
@@ -299,5 +307,77 @@ export default function AdLibraryPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+
+// Age × gender response grid. Cells: CTR (the response signal) + spend share
+// (where the money actually went). Best cell (volume-gated) highlighted.
+function AudienceGrid({ breakdowns, cur }: { breakdowns: BreakdownRow[]; cur: string }) {
+  if (!breakdowns.length) return null;
+  const cell = new Map<string, { impressions: number; clicks: number; spend: number }>();
+  const ages = new Set<string>(); const genders = new Set<string>();
+  let totalSpend = 0;
+  for (const b of breakdowns) {
+    if (b.age === 'unknown' && b.gender === 'unknown') continue;
+    ages.add(b.age); genders.add(b.gender);
+    const k = `${b.gender}::${b.age}`;
+    const c = cell.get(k) ?? { impressions: 0, clicks: 0, spend: 0 };
+    c.impressions += b.impressions; c.clicks += b.clicks; c.spend += b.spend;
+    cell.set(k, c); totalSpend += b.spend;
+  }
+  if (!cell.size) return null;
+  const ageList = [...ages].sort();
+  const genderList = [...genders].sort();
+  let bestKey: string | null = null; let bestCtr = 0;
+  for (const [k, c] of cell) {
+    if (c.impressions >= 1000 && c.clicks / c.impressions > bestCtr) {
+      bestCtr = c.clicks / c.impressions; bestKey = k;
+    }
+  }
+  return (
+    <Card className="!p-4 mb-5">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="text-[11px] text-ink-muted uppercase tracking-[0.08em] font-bold">Who responds — age × gender</div>
+        <Pill tone="violet">from your real delivery</Pill>
+      </div>
+      <p className="text-[12px] text-ink-muted mb-2.5">
+        Click-through per cell, with each cell's share of your spend underneath. Highlighted = your best-responding audience (≥1k impressions).
+      </p>
+      <div className="overflow-x-auto">
+        <table className="text-[12.5px] border-collapse">
+          <thead>
+            <tr>
+              <th className="text-left px-3 py-2 bg-bg-deep text-[10.5px] text-ink-muted uppercase tracking-[0.06em] font-bold">Gender ↓ / Age →</th>
+              {ageList.map((a) => (
+                <th key={a} className="text-right px-3 py-2 bg-bg-deep text-[10.5px] text-ink-muted uppercase tracking-[0.06em] font-bold">{a}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {genderList.map((g) => (
+              <tr key={g} className="border-b border-border-soft last:border-b-0">
+                <td className="text-left px-3 py-2 font-semibold capitalize bg-bg-deep/50">{g}</td>
+                {ageList.map((a) => {
+                  const c = cell.get(`${g}::${a}`);
+                  const isBest = bestKey === `${g}::${a}`;
+                  if (!c || c.impressions === 0) {
+                    return <td key={a} className="text-right px-3 py-2 text-ink-faint">—</td>;
+                  }
+                  return (
+                    <td key={a} className={`text-right px-3 py-2 font-mono whitespace-nowrap ${isBest ? 'bg-lime-soft font-bold' : ''}`}>
+                      {((c.clicks / c.impressions) * 100).toFixed(2)}%
+                      <div className="text-[10.5px] text-ink-faint font-normal">
+                        {totalSpend > 0 ? `${Math.round((c.spend / totalSpend) * 100)}% of spend` : `${cur} ${Math.round(c.spend)}`}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }

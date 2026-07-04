@@ -407,6 +407,9 @@ export interface IngestResult {
   fatigue: Fatigue;
   preview: Record<string, unknown>[];
   rows: Record<string, unknown>[];
+  // Audience breakdowns (age × gender per ad) from live pulls — stored in the
+  // separate ad_breakdowns table so they never double-count outcome totals.
+  breakdowns?: { rows: Record<string, unknown>[]; n: number; note: string };
 }
 
 export interface DistBand {

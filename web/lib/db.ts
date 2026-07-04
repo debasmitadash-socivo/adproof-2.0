@@ -532,6 +532,87 @@ function stripNewOutcomeCols(o: Record<string, unknown>): Record<string, unknown
   return copy;
 }
 
+// ============================== ad_breakdowns (audience) ====================
+// WHO responded: age × gender per ad, from live pulls. Separate table from
+// ad_outcomes on purpose — breakdown rows re-slice the same spend, so mixing
+// them into outcomes would double-count every pooled total. See 0010.
+
+const BREAKDOWN_COLS = [
+  'ad_name', 'campaign_name', 'adset_name', 'platform', 'age', 'gender',
+  'impressions', 'clicks', 'spend', 'conversions', 'revenue',
+  'window_start', 'window_end',
+];
+
+export async function insertBreakdowns(
+  rows: Record<string, unknown>[], provider?: string, companyId?: string,
+): Promise<number> {
+  const sb = getSupabase(); const user_id = await uid();
+  if (!sb || !user_id || !rows.length) return 0;
+  // Replace this workspace's previous window for the provider — breakdowns
+  // are window aggregates, so stacking pulls would double-count.
+  if (companyId) {
+    await sb.from('ad_breakdowns').delete()
+      .eq('company_id', companyId).eq('provider', provider ?? 'meta');
+  }
+  const clean = rows.map((r) => {
+    const o: Record<string, unknown> = {
+      user_id, company_id: companyId ?? null, provider: provider ?? 'meta',
+    };
+    for (const c of BREAKDOWN_COLS) if (r[c] !== undefined) o[c] = r[c];
+    return o;
+  });
+  let inserted = 0;
+  for (let i = 0; i < clean.length; i += 500) {
+    const { data, error } = await sb.from('ad_breakdowns')
+      .insert(clean.slice(i, i + 500)).select('id');
+    if (error) {
+      // Pre-0010 DB — breakdowns just don't persist yet; never fail the save.
+      if (!isMissingTable(error)) console.error('[db] insertBreakdowns', error.message);
+      return 0;
+    }
+    inserted += data?.length ?? 0;
+  }
+  return inserted;
+}
+
+export interface BreakdownRow {
+  adName: string | null;
+  campaignName: string | null;
+  platform: string | null;
+  age: string;
+  gender: string;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  conversions: number | null;
+  revenue: number | null;
+}
+
+export async function listBreakdowns(companyId?: string): Promise<BreakdownRow[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  let q = sb.from('ad_breakdowns')
+    .select('ad_name, campaign_name, platform, age, gender, impressions, clicks, spend, conversions, revenue')
+    .limit(20000);
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data, error } = await q;
+  if (error) {
+    if (!isMissingTable(error)) console.error('[db] listBreakdowns', error.message);
+    return [];
+  }
+  return (data ?? []).map((d) => ({
+    adName: (d.ad_name as string) ?? null,
+    campaignName: (d.campaign_name as string) ?? null,
+    platform: (d.platform as string) ?? null,
+    age: (d.age as string) ?? 'unknown',
+    gender: (d.gender as string) ?? 'unknown',
+    impressions: Number(d.impressions ?? 0),
+    clicks: Number(d.clicks ?? 0),
+    spend: Number(d.spend ?? 0),
+    conversions: d.conversions == null ? null : Number(d.conversions),
+    revenue: d.revenue == null ? null : Number(d.revenue),
+  }));
+}
+
 // ============================== accuracy ledger reads =======================
 // The ledger joins what we PREDICTED (creative_scores, stamped at every
 // forecast) with what actually HAPPENED (ad_outcomes, from CSV/API sync).

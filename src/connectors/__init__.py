@@ -205,3 +205,16 @@ def test_connection(provider: str, credentials: dict) -> dict:
     """Verify credentials read-only. Returns {ok: bool, detail: str, ...}."""
     p = _canonical(provider)
     return _module(p).test(credentials)
+
+
+def pull_breakdowns(provider: str, credentials: dict,
+                    since: str, until: str) -> list[dict]:
+    """Audience breakdown rows (age × gender per ad) for providers that
+    support it. Returns [] rather than raising when a provider doesn't —
+    breakdowns are an enrichment, never a reason to fail a sync."""
+    p = _canonical(provider)
+    mod = _module(p)
+    fn = getattr(mod, "pull_breakdowns", None)
+    if fn is None:
+        return []
+    return fn(credentials, since, until)

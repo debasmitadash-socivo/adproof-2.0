@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { api } from '@/lib/api';
-import { saveCalibration, insertOutcomes, getLatestCalibration } from '@/lib/db';
+import { saveCalibration, insertOutcomes, insertBreakdowns, getLatestCalibration } from '@/lib/db';
 import { useApp } from '@/lib/store';
 import { PlatformConnections } from '@/components/PlatformConnections';
 import type { IngestResult, AccountCalibration, PlatformCalibration } from '@/lib/types';
@@ -256,8 +256,15 @@ export default function DataPage() {
       const source = resultSource ?? file?.name;
       await saveCalibration(result.calibration, nAds, result.backtest, source, currentCompanyId ?? undefined);
       const n = await insertOutcomes(result.rows, source, currentCompanyId ?? undefined);
+      // Audience breakdowns (live pulls only) — separate table, best-effort.
+      let bdNote = '';
+      if (result.breakdowns?.rows?.length) {
+        const provider = (resultSource ?? '').replace(/^api:/, '') || 'meta';
+        const nb = await insertBreakdowns(result.breakdowns.rows, provider, currentCompanyId ?? undefined);
+        if (nb > 0) bdNote = ` Audience breakdown stored (${nb.toLocaleString()} age×gender cells) — see the Ad library.`;
+      }
       setExisting(result.calibration);
-      setSaved(`Saved. Your forecasts now use your real benchmarks (${n.toLocaleString()} ads stored).`);
+      setSaved(`Saved. Your forecasts now use your real benchmarks (${n.toLocaleString()} rows stored).${bdNote}`);
       setResult(null); setFile(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save to your account.');

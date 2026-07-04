@@ -600,7 +600,7 @@ def connections_sync(req: ConnectionSyncRequest) -> dict:
     Credentials are used for THIS request only — persistence lives client-side
     in the RLS-scoped platform_connections table, never on this server.
     """
-    from connectors import pull_outcomes
+    from connectors import pull_outcomes, pull_breakdowns
     seg = req.segment if req.segment in ("general", "b2b_saas") else "general"
     try:
         rows = pull_outcomes(req.provider, req.merged_credentials(),
@@ -615,8 +615,26 @@ def connections_sync(req: ConnectionSyncRequest) -> dict:
         raise HTTPException(
             status_code=404,
             detail="No ads returned for that account / date range.")
-    return calibrate_rows(rows, currency=req.currency, segment=seg,
-                          source=req.provider)
+    result = calibrate_rows(rows, currency=req.currency, segment=seg,
+                            source=req.provider)
+
+    # Audience breakdowns (age × gender per ad) — an enrichment, never a
+    # reason to fail the sync. Stored client-side in the separate
+    # ad_breakdowns table so they can't double-count ad_outcomes totals.
+    try:
+        bd = pull_breakdowns(req.provider, req.merged_credentials(),
+                             req.since, req.until)
+        result["breakdowns"] = {
+            "rows": bd, "n": len(bd),
+            "note": ("Audience breakdown (age × gender) pulled for the same "
+                     "window." if bd else
+                     "This platform's connector doesn't provide audience "
+                     "breakdowns yet."),
+        }
+    except Exception as e:                            # noqa: BLE001
+        result["breakdowns"] = {"rows": [], "n": 0,
+                                "note": f"Breakdown pull skipped: {str(e)[:200]}"}
+    return result
 
 
 # Serve uploaded files back so the wizard can preview them.

@@ -110,6 +110,61 @@ def test(credentials: dict) -> dict:
             "account_name": data.get("name"), "currency": data.get("currency")}
 
 
+def pull_breakdowns(credentials: dict, since: str, until: str,
+                    *, timeout: int = 90) -> list[dict]:
+    """WHO responded: ad-level insights broken down by age × gender,
+    aggregated over the whole [since, until] window (no day grain — the
+    audience read doesn't need it and the row count stays sane).
+
+    Meta only allows certain breakdown combos in one call; age,gender is a
+    valid pair. Placement (publisher_platform) can't join them, so platform
+    here is the ad's default bucket, not a per-row split.
+    """
+    access_token = (credentials.get("access_token") or "").strip()
+    account_id = (credentials.get("account_id") or "").strip()
+    if not access_token:
+        raise ValueError("Missing Meta access token.")
+    acct = account_id if str(account_id).startswith("act_") else f"act_{account_id}"
+    params: dict = {
+        "access_token": access_token,
+        "level": "ad",
+        "fields": ("ad_id,ad_name,adset_name,campaign_name,impressions,"
+                   "clicks,spend,actions,action_values"),
+        "breakdowns": "age,gender",
+        "time_range": f'{{"since":"{since}","until":"{until}"}}',
+        "limit": 500,
+    }
+    url = f"{_BASE}/{acct}/insights"
+    rows: list[dict] = []
+    while url:
+        resp = requests.get(url, params=params, timeout=timeout)
+        data = resp.json()
+        if isinstance(data, dict) and "error" in data:
+            err = data["error"]
+            raise RuntimeError(f"Meta API error: {err.get('message', err)}")
+        for ins in data.get("data", []):
+            conv = _sum_actions(ins.get("actions") or [], _CONVERSION_ACTIONS)
+            rev = _sum_actions(ins.get("action_values") or [], _REVENUE_ACTIONS)
+            rows.append({
+                "ad_name": ins.get("ad_name") or ins.get("campaign_name") or "Meta ad",
+                "campaign_name": ins.get("campaign_name") or None,
+                "adset_name": ins.get("adset_name") or None,
+                "platform": _platform_for(ins),
+                "age": str(ins.get("age") or "unknown"),
+                "gender": str(ins.get("gender") or "unknown"),
+                "impressions": _int(ins.get("impressions")),
+                "clicks": _int(ins.get("clicks")),
+                "spend": float(ins.get("spend", 0) or 0),
+                "conversions": conv or None,
+                "revenue": rev or None,
+                "window_start": since,
+                "window_end": until,
+            })
+        url = (data.get("paging") or {}).get("next")
+        params = {}
+    return rows
+
+
 def pull(credentials: dict, since: str, until: str,
          *, breakdown_platform: bool = True, timeout: int = 60) -> list[dict]:
     """Pull AD-level daily insights for [since, until] (YYYY-MM-DD) and return
