@@ -23,6 +23,87 @@ export interface CompanyProfile {
   conversion_goal?: 'purchase' | 'lead' | 'demo' | 'signup' | 'awareness';
   sales_cycle?: 'impulse' | 'considered' | 'long' | 'enterprise';
   brand_color?: string;                     // hex e.g. '#FF5A4D'
+  // True when this workspace belongs to someone else and was shared with the
+  // current user via a team invite. Client-side flag only — never persisted.
+  shared?: boolean;
+}
+
+// ---- Deep company intelligence (/api/company-intel) -----------------------
+// One-shot researched understanding of a business: profile + economics with
+// competitor context + brand + smart audiences mapped to the simulator's
+// real segment/interest taxonomy. Always a PROPOSAL the user can edit.
+export interface SmartAudience {
+  name: string;
+  description: string;           // one targeting sentence (feeds the matcher)
+  segment: string;               // one of the 9 simulator segments
+  interests: string[];           // subset of the 12 interest buckets
+  gender: 'all' | 'women' | 'men';
+  age_range: string;
+  rationale: string;
+}
+export interface CompanyIntel {
+  profile: Partial<CompanyProfile> & { target_customer_summary?: string };
+  economics: {
+    estimated_avg_order_value?: number;
+    currency?: string;
+    location?: string;
+    competitor_context?: { name: string; price_note: string }[];
+    price_range_low?: number;
+    price_range_high?: number;
+    confidence?: 'low' | 'medium' | 'high';
+    reasoning?: string;
+  };
+  brand: { brand_color_hex?: string | null; logo_url?: string | null; color_source?: string };
+  audiences: SmartAudience[];
+  site_fetched: boolean;
+  model: string;
+  sources: { title: string; uri: string }[];
+  disclaimer: string;
+}
+
+// ---- Platform connections (multi-platform live data pulls) ---------------
+// Mirrors the backend connector registry (src/connectors PROVIDERS).
+export interface ConnectorField {
+  key: string;
+  label: string;
+  secret: boolean;
+  placeholder?: string;
+  help_url?: string;
+  optional?: boolean;
+}
+export interface ConnectorProvider {
+  id: string;                       // 'meta' | 'tiktok' | 'google' | 'linkedin' | 'reddit' | 'x'
+  label: string;
+  platforms: string[];
+  access: 'ready' | 'gated';
+  access_note: string;
+  sync: boolean;                    // false = connection verify only (X, for now)
+  fields: ConnectorField[];
+  how_to: string[];
+}
+// One saved connection (platform_connections row), workspace-scoped.
+export interface PlatformConnection {
+  id: string;
+  companyId: string;
+  provider: string;
+  label: string | null;             // account name from the verify call
+  credentials: Record<string, string>;
+  accountRef: string | null;
+  status: 'unverified' | 'ok' | 'error';
+  statusNote: string | null;
+  lastSyncedAt: number | null;
+  createdAt: number;
+}
+
+// One row of a workspace's team roster (company_members). The owner isn't
+// listed here — ownership lives on companies.user_id.
+export interface WorkspaceMember {
+  id: string;
+  companyId: string;
+  userId: string | null;         // null until the invite is claimed
+  email: string;
+  status: 'invited' | 'active';
+  createdAt: number;
 }
 
 // AI-proposed economics from /api/research-company — an ESTIMATE to confirm.
@@ -205,6 +286,8 @@ export interface SimulateRequest {
   // / platform- / overall-calibrated).
   calibration_source?: string | null;       // 'segment:<seg>:interest:<int>' | 'segment:<seg>' | 'interest:<int>' | 'platform:<plat>' | 'overall' | null
   calibration_n_ads?: number | null;
+  // Honest-ROAS: picks the cited industry CVR range when uncalibrated.
+  conversion_goal?: string | null;
   // Pillar B+: the user-chosen interests after wizard mapping to the
   // canonical taxonomy (see outcomes.INTEREST_BUCKETS).
   interests?: string[];
@@ -448,6 +531,18 @@ export interface SimulateResponse {
     cpm_vs_bench_pct?: number;
     reach_value?: number;
     break_even_chance_pct: number;
+    // Honest-ROAS provenance: 'your_data' = a real conversion rate calibrated
+    // this forecast; 'default_cvr' = ROAS shown as a cited scenario band.
+    roas_scenarios?: {
+      basis: 'your_data' | 'user_input' | 'default_cvr';
+      cvr_used: number;
+      n_ads?: number | null;
+      source?: string;
+      cvr_low?: number;
+      cvr_high?: number;
+      roas_low?: number;
+      roas_high?: number;
+    };
   };
   factor_plain: { name: string; share: number; direction: '+' | '-'; label: string }[];
   data_sources: { label: string; value: string; note: string }[];

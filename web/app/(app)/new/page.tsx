@@ -401,6 +401,9 @@ export default function NewAnalysisPage() {
         // ads it was built from — surfaced in the report's data-provenance row.
         calibration_source: calSource,
         calibration_n_ads: calNAds,
+        // Honest-ROAS: the workspace's conversion goal picks the CITED
+        // industry CVR range shown when no real data calibrates the account.
+        conversion_goal: cp?.conversion_goal ?? null,
         // Pillar B+: the user's mapped interests, sent so the backend can
         // store them on creative_scores + label the calibration source.
         interests: userInterests,
@@ -714,7 +717,10 @@ export default function NewAnalysisPage() {
                   m === 'saved' && w.savedAudiences.length === 0 && 'opacity-40 cursor-not-allowed',
                 )}
               >
-                {m === 'filters' ? 'Build with filters' : m === 'words' ? 'Describe in words' : `Saved audience${w.savedAudiences.length === 0 ? ' · empty' : ''}`}
+                {m === 'filters' ? 'Build with filters' : m === 'words' ? 'Describe in words'
+                  : w.savedAudiences.some((a) => a.name.startsWith('✨'))
+                    ? '✨ Smart & saved'
+                    : `Saved audience${w.savedAudiences.length === 0 ? ' · empty' : ''}`}
               </button>
             ))}
           </div>
@@ -729,13 +735,29 @@ export default function NewAnalysisPage() {
                 {w.savedAudiences.map((a) => (
                   <button
                     key={a.id}
-                    onClick={() => w.setAudienceSegment(a.segment)}
+                    onClick={() => {
+                      // Set BOTH the segment (drives the persona filter) and
+                      // the description (drives the interest-based calibration
+                      // anchor + matcher) — segment alone silently dropped the
+                      // audience's interests from the forecast.
+                      w.setAudienceSegment(a.segment);
+                      w.setAudienceDescription(a.description);
+                    }}
                     className={clsx(
                       'text-left border-2 rounded-md p-4 transition-all bg-surface',
-                      w.audienceSegment === a.segment ? 'border-coral bg-coral-soft' : 'border-border hover:border-ink-faint',
+                      w.audienceSegment === a.segment && w.audienceDescription === a.description
+                        ? 'border-coral bg-coral-soft' : 'border-border hover:border-ink-faint',
                     )}
                   >
-                    <div className="font-semibold">{a.name}</div>
+                    <div className="font-semibold flex items-center gap-2">
+                      {a.name}
+                      {a.name.startsWith('✨') && (
+                        <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-coral-soft text-coral">smart · researched</span>
+                      )}
+                      {a.segment !== 'all' && (
+                        <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-soft text-violet">{a.segment.replace(/_/g, ' ')}</span>
+                      )}
+                    </div>
                     <div className="text-ink-muted text-[12.5px]">{a.description}</div>
                   </button>
                 ))}

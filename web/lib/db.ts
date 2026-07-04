@@ -7,6 +7,7 @@ import { getSupabase } from './supabase';
 import type {
   SavedCampaign, SavedVariantResult, SavedAudience, CompanyProfile,
   SimulateResponse, SimulateRequest, AccountCalibration, Backtest,
+  WorkspaceMember, PlatformConnection,
 } from './types';
 
 async function uid(): Promise<string | null> {
@@ -60,9 +61,20 @@ function companyRow(p: CompanyProfile, user_id: string) {
 
 export async function listCompanies(): Promise<CompanyProfile[]> {
   const sb = getSupabase(); if (!sb) return [];
-  const { data } = await sb.from('companies').select('*')
+  const me = await uid();
+  const { data, error } = await sb.from('companies').select('*')
     .eq('archived', false).order('created_at', { ascending: true });
-  return (data ?? []).map(rowToCompany);
+  // Surface (don't swallow) the error — a query failure here used to look
+  // identical to "you have zero workspaces", which silently hid problems
+  // like an unapplied migration (e.g. missing `archived` column).
+  if (error) throw new Error(`Couldn\'t load workspaces: ${error.message}`);
+  // RLS returns both owned and team-shared workspaces; flag the shared ones
+  // so the UI can badge them and keep owner-only actions (invites, profile
+  // edits) hidden for members.
+  return (data ?? []).map((d) => ({
+    ...rowToCompany(d),
+    shared: me != null && d.user_id !== me,
+  }));
 }
 
 /** Create a brand-new workspace. Throws on failure so the caller can surface
@@ -97,6 +109,169 @@ export async function saveCompany(p: CompanyProfile): Promise<void> {
 export async function getCompany(): Promise<CompanyProfile | null> {
   const list = await listCompanies();
   return list[0] ?? null;
+}
+
+// ============================== workspace members ===========================
+// Team invites: an "invite" is just a company_members row keyed by email —
+// no email gets sent. When someone signs in with that address,
+// claimPendingInvites() activates the row and the shared workspace shows up
+// in their switcher. See supabase/migrations/0007_team_members.sql.
+
+function rowToMember(d: Record<string, unknown>): WorkspaceMember {
+  return {
+    id: d.id as string,
+    companyId: d.company_id as string,
+    userId: (d.user_id as string) ?? null,
+    email: (d.invited_email as string) ?? '',
+    status: ((d.status as string) ?? 'invited') as WorkspaceMember['status'],
+    createdAt: new Date(d.created_at as string).getTime(),
+  };
+}
+
+/** True when Supabase says the table doesn't exist yet: raw Postgres
+ *  (42P01) or PostgREST's schema-cache miss (PGRST205), which is what the
+ *  JS client actually returns for an unapplied migration. */
+function isMissingTable(error: { code?: string; message: string }): boolean {
+  return error.code === '42P01' || error.code === 'PGRST205'
+    || /schema cache|does not exist/i.test(error.message || '');
+}
+
+/** Translate raw Postgres errors into something a person can act on. */
+function memberError(prefix: string, error: { code?: string; message: string }): Error {
+  if (isMissingTable(error)) {
+    return new Error(
+      'Team invites need a one-time database update — run supabase/migrations/0007_team_members.sql in your Supabase SQL editor, then refresh.',
+    );
+  }
+  if (error.code === '23505') return new Error('That email is already invited to this workspace.');
+  if (error.code === '42501') return new Error('Only the workspace owner can do that.');
+  return new Error(`${prefix}: ${error.message}`);
+}
+
+export async function listMembers(companyId: string): Promise<WorkspaceMember[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  const { data, error } = await sb.from('company_members').select('*')
+    .eq('company_id', companyId).order('created_at', { ascending: true });
+  if (error) throw memberError('Couldn\'t load the team', error);
+  return (data ?? []).map(rowToMember);
+}
+
+export async function inviteMember(companyId: string, email: string): Promise<WorkspaceMember> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured. Check NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY.');
+  const user_id = await uid();
+  if (!user_id) throw new Error('You\'re not signed in. Sign in again to invite teammates.');
+  const clean = email.trim().toLowerCase();
+  const { data, error } = await sb.from('company_members')
+    .insert({ company_id: companyId, invited_email: clean, invited_by: user_id })
+    .select('*').single();
+  if (error) throw memberError('Couldn\'t save the invite', error);
+  if (!data) throw new Error('Couldn\'t save the invite: no row returned.');
+  return rowToMember(data);
+}
+
+export async function removeMember(memberId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured.');
+  const { error } = await sb.from('company_members').delete().eq('id', memberId);
+  if (error) throw memberError('Couldn\'t remove the member', error);
+}
+
+/** Activate any invites addressed to the signed-in user's email. Returns
+ *  true if something was claimed (i.e. new shared workspaces may exist). */
+export async function claimPendingInvites(): Promise<boolean> {
+  const sb = getSupabase(); if (!sb) return false;
+  const { data: u } = await sb.auth.getUser();
+  const me = u.user;
+  if (!me?.email) return false;
+  const { data, error } = await sb.from('company_members')
+    .update({ user_id: me.id, status: 'active', accepted_at: new Date().toISOString() })
+    .eq('status', 'invited')
+    .ilike('invited_email', me.email)
+    .select('id');
+  // Missing table just means the migration isn't applied yet — invites can't
+  // exist, so there's nothing to claim. Don't break sign-in over it.
+  if (error) {
+    if (!isMissingTable(error)) console.error('[db] claimPendingInvites', error.message);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
+// ============================== platform connections ========================
+// Saved ad-platform credentials per workspace (Meta / TikTok / Google /
+// LinkedIn / Reddit / X). Read-only performance scopes by design. RLS-scoped
+// to workspace owner + active members. See migrations/0008.
+
+function rowToConnection(d: Record<string, unknown>): PlatformConnection {
+  return {
+    id: d.id as string,
+    companyId: d.company_id as string,
+    provider: d.provider as string,
+    label: (d.label as string) ?? null,
+    credentials: (d.credentials as Record<string, string>) ?? {},
+    accountRef: (d.account_ref as string) ?? null,
+    status: ((d.status as string) ?? 'unverified') as PlatformConnection['status'],
+    statusNote: (d.status_note as string) ?? null,
+    lastSyncedAt: d.last_synced_at ? new Date(d.last_synced_at as string).getTime() : null,
+    createdAt: new Date(d.created_at as string).getTime(),
+  };
+}
+
+function connectionError(prefix: string, error: { code?: string; message: string }): Error {
+  if (isMissingTable(error)) {
+    return new Error(
+      'Saving connections needs a one-time database update — run supabase/migrations/0008_platform_connections.sql in your Supabase SQL editor, then refresh.',
+    );
+  }
+  return new Error(`${prefix}: ${error.message}`);
+}
+
+export async function listConnections(companyId: string): Promise<PlatformConnection[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  const { data, error } = await sb.from('platform_connections').select('*')
+    .eq('company_id', companyId).order('created_at', { ascending: true });
+  if (error) {
+    // Missing table = feature not migrated yet; show as "no connections"
+    // rather than an error — connecting will surface the actionable message.
+    if (isMissingTable(error)) return [];
+    throw connectionError('Couldn\'t load connections', error);
+  }
+  return (data ?? []).map(rowToConnection);
+}
+
+export async function saveConnection(c: {
+  companyId: string; provider: string; credentials: Record<string, string>;
+  label?: string | null; accountRef?: string | null;
+  status?: PlatformConnection['status']; statusNote?: string | null;
+}): Promise<PlatformConnection> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured.');
+  const user_id = await uid();
+  if (!user_id) throw new Error('You\'re not signed in.');
+  const { data, error } = await sb.from('platform_connections')
+    .upsert({
+      user_id, company_id: c.companyId, provider: c.provider,
+      credentials: c.credentials, label: c.label ?? null,
+      account_ref: c.accountRef ?? null,
+      status: c.status ?? 'unverified', status_note: c.statusNote ?? null,
+    }, { onConflict: 'company_id,provider' })
+    .select('*').single();
+  if (error) throw connectionError('Couldn\'t save the connection', error);
+  return rowToConnection(data as Record<string, unknown>);
+}
+
+export async function deleteConnection(id: string): Promise<void> {
+  const sb = getSupabase(); if (!sb) return;
+  const { error } = await sb.from('platform_connections').delete().eq('id', id);
+  if (error) throw connectionError('Couldn\'t remove the connection', error);
+}
+
+export async function markConnectionSynced(id: string, note: string): Promise<void> {
+  const sb = getSupabase(); if (!sb) return;
+  await sb.from('platform_connections')
+    .update({ last_synced_at: new Date().toISOString(), status: 'ok', status_note: note })
+    .eq('id', id);
 }
 
 // ============================== audiences ===================================
@@ -334,6 +509,83 @@ export async function insertOutcomes(
     inserted += data?.length ?? 0;
   }
   return inserted;
+}
+
+// ============================== accuracy ledger reads =======================
+// The ledger joins what we PREDICTED (creative_scores, stamped at every
+// forecast) with what actually HAPPENED (ad_outcomes, from CSV/API sync).
+// Matching happens client-side in lib/accuracy.ts — these are just the reads.
+
+export interface PredictionRow {
+  id: string;
+  campaignId: string | null;
+  adName: string | null;          // variant label
+  creativeUrl: string | null;
+  forecastCtr: number | null;     // fraction, e.g. 0.012
+  forecastRoas: number | null;
+  verdictClass: string | null;
+  platformId: string | null;
+  createdAt: number;
+}
+
+export async function listCreativeScores(companyId?: string): Promise<PredictionRow[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  let q = sb.from('creative_scores')
+    .select('id, campaign_id, ad_name, creative_url, forecast_ctr_p50, forecast_roas_p50, verdict_class, platform_id, created_at')
+    .order('created_at', { ascending: false }).limit(1000);
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data, error } = await q;
+  if (error) { console.error('[db] listCreativeScores', error.message); return []; }
+  return (data ?? []).map((d) => ({
+    id: d.id as string,
+    campaignId: (d.campaign_id as string) ?? null,
+    adName: (d.ad_name as string) ?? null,
+    creativeUrl: (d.creative_url as string) ?? null,
+    forecastCtr: (d.forecast_ctr_p50 as number) ?? null,
+    forecastRoas: (d.forecast_roas_p50 as number) ?? null,
+    verdictClass: (d.verdict_class as string) ?? null,
+    platformId: (d.platform_id as string) ?? null,
+    createdAt: new Date(d.created_at as string).getTime(),
+  }));
+}
+
+export interface OutcomeRow {
+  id: string;
+  adName: string | null;
+  creativeUrl: string | null;
+  platform: string | null;
+  dateStart: string | null;       // YYYY-MM-DD
+  impressions: number;
+  clicks: number;
+  spend: number;
+  revenue: number | null;
+  realCtr: number | null;         // fraction
+  realRoas: number | null;
+  createdAt: number;
+}
+
+export async function listOutcomes(companyId?: string): Promise<OutcomeRow[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  let q = sb.from('ad_outcomes')
+    .select('id, ad_name, creative_url, platform, date_start, impressions, clicks, spend, revenue, real_ctr, real_roas, created_at')
+    .order('created_at', { ascending: false }).limit(3000);
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data, error } = await q;
+  if (error) { console.error('[db] listOutcomes', error.message); return []; }
+  return (data ?? []).map((d) => ({
+    id: d.id as string,
+    adName: (d.ad_name as string) ?? null,
+    creativeUrl: (d.creative_url as string) ?? null,
+    platform: (d.platform as string) ?? null,
+    dateStart: (d.date_start as string) ?? null,
+    impressions: Number(d.impressions ?? 0),
+    clicks: Number(d.clicks ?? 0),
+    spend: Number(d.spend ?? 0),
+    revenue: d.revenue == null ? null : Number(d.revenue),
+    realCtr: (d.real_ctr as number) ?? null,
+    realRoas: (d.real_roas as number) ?? null,
+    createdAt: new Date(d.created_at as string).getTime(),
+  }));
 }
 
 // ============================== calibrations (Path B) =======================

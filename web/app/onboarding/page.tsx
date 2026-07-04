@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import clsx from 'clsx';
 import { Button } from '@/components/ui/Button';
 import { Pill } from '@/components/ui/Pill';
@@ -8,24 +8,43 @@ import { api } from '@/lib/api';
 import { useApp } from '@/lib/store';
 import type { CompanyProfile } from '@/lib/types';
 
+// useSearchParams() must live under a Suspense boundary (same pattern as
+// /login) or `next build` fails the static prerender of this page.
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingInner />
+    </Suspense>
+  );
+}
+
+function OnboardingInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const hydrated = useApp((s) => s.hydrated);
   const setUser = useApp((s) => s.setUser);
   const setCompanyDescription = useApp((s) => s.setCompanyDescription);
   const setCompanyProfile = useApp((s) => s.setCompanyProfile);
   const createWorkspace = useApp((s) => s.createWorkspace);
 
+  // When ?new=1, this is a "create another workspace" flow — not first-time
+  // onboarding. MUST come from useSearchParams(), not window.location: during
+  // a client-side navigation this page renders BEFORE the address bar updates,
+  // so window.location.search still shows the previous page's URL. Reading it
+  // there missed the flag, and the redirect-if-onboarded effect below bounced
+  // the user straight back to /dashboard — "Create new workspace" appeared to
+  // do nothing.
+  const isNewWorkspace = searchParams.get('new') === '1';
+
   // New-workspace flow starts at the Company step (the user is already known).
-  const [step, setStep] = useState<1 | 2>(() =>
-    (typeof window !== 'undefined' &&
-     new URLSearchParams(window.location.search).get('new') === '1') ? 2 : 1,
-  );
+  const [step, setStep] = useState<1 | 2>(isNewWorkspace ? 2 : 1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [desc, setDesc] = useState('');
+  const [website, setWebsite] = useState('');
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // Richer onboarding (Phase 5 of UX): the four chip-picker fields that
@@ -34,14 +53,6 @@ export default function OnboardingPage() {
   const [salesCycle, setSalesCycle] = useState<NonNullable<CompanyProfile['sales_cycle']> | ''>('');
   const [usps, setUsps] = useState<string[]>([]);
   const [brandColor, setBrandColor] = useState<string>('#FF5A4D');
-  // When ?new=1, this is a "create another workspace" flow — not first-time
-  // onboarding. Read the flag SYNCHRONOUSLY on the first render (lazy init) so
-  // the redirect-if-onboarded effect below sees the right value immediately —
-  // otherwise it bounces straight to /dashboard before the flag is set.
-  const [isNewWorkspace] = useState(() =>
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('new') === '1',
-  );
 
   // Skip onboarding if it's already been completed — UNLESS this is an
   // explicit "create another workspace" run.
@@ -61,6 +72,47 @@ export default function OnboardingPage() {
       setErr((e as Error).message);
     } finally {
       setParsing(false);
+    }
+  }
+
+  // One-shot deep intake from their website: fetches the real site + web
+  // research → full profile, economics, brand color. Fastest possible
+  // onboarding — paste URL, click once, confirm.
+  async function analyzeWebsite() {
+    if (!website.trim()) return;
+    setAnalyzing(true); setErr(null);
+    try {
+      const r = await api.companyIntel({
+        url: website.trim(),
+        description: desc.trim() || undefined,
+        geo: 'UK',
+      });
+      const p = r.profile || {};
+      const built: CompanyProfile = {
+        raw_description: desc.trim() || p.value_proposition || '',
+        company_name: p.company_name || '',
+        industry: p.industry || '',
+        business_model: p.business_model || 'b2c',
+        product_category: p.product_category || 'general',
+        value_proposition: p.value_proposition || '',
+        target_customer_summary: p.target_customer_summary || '',
+        price_position: p.price_position || 'mid',
+        brand_tone: p.brand_tone || 'neutral',
+        source: 'llm',
+        website: website.trim(),
+        location: r.economics?.location,
+        avg_order_value: r.economics?.estimated_avg_order_value,
+        currency: r.economics?.currency,
+      };
+      setProfile(built);
+      if (!desc.trim() && (p.value_proposition || p.target_customer_summary)) {
+        setDesc([p.value_proposition, p.target_customer_summary].filter(Boolean).join(' — '));
+      }
+      if (r.brand?.brand_color_hex) setBrandColor(r.brand.brand_color_hex);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setAnalyzing(false);
     }
   }
 
@@ -192,7 +244,23 @@ export default function OnboardingPage() {
               </p>
 
               <div className="mb-4">
-                <label className="label">Company description</label>
+                <label className="label">Your website <span className="text-ink-muted font-normal">· fastest way</span></label>
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1 font-mono text-[13px]"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://yourcompany.com"
+                  />
+                  <Button variant="secondary" size="sm" onClick={analyzeWebsite} disabled={analyzing || !website.trim()}>
+                    {analyzing ? 'Researching…' : '✨ Analyze my website'}
+                  </Button>
+                </div>
+                <div className="help mt-1.5">We read your site + research your market, then fill everything below for you to confirm.</div>
+              </div>
+
+              <div className="mb-4">
+                <label className="label">Company description <span className="text-ink-muted font-normal">· or describe it yourself</span></label>
                 <textarea
                   className="input min-h-[140px]"
                   rows={5}

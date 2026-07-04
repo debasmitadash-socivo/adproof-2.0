@@ -87,11 +87,34 @@ def map_insights(insights: list[dict]) -> list[dict]:
     return rows
 
 
-def pull(access_token: str, account_id: str, since: str, until: str,
+def test(credentials: dict) -> dict:
+    """Verify the token can read the ad account. Read-only, one GET."""
+    token = (credentials.get("access_token") or "").strip()
+    account_id = (credentials.get("account_id") or "").strip()
+    if not token or not account_id:
+        raise ValueError("Missing Meta access token or ad account ID.")
+    acct = account_id if account_id.startswith("act_") else f"act_{account_id}"
+    resp = requests.get(
+        f"{_BASE}/{acct}",
+        params={"access_token": token, "fields": "name,currency,account_status"},
+        timeout=30)
+    data = resp.json()
+    if isinstance(data, dict) and "error" in data:
+        err = data["error"]
+        raise RuntimeError(f"Meta API error: {err.get('message', err)}")
+    return {"ok": True,
+            "detail": f"Connected to “{data.get('name', acct)}” "
+                      f"({data.get('currency', '?')}).",
+            "account_name": data.get("name"), "currency": data.get("currency")}
+
+
+def pull(credentials: dict, since: str, until: str,
          *, breakdown_platform: bool = True, timeout: int = 60) -> list[dict]:
     """Pull AD-level daily insights for [since, until] (YYYY-MM-DD) and return
     ad_outcomes rows. ``account_id`` may be given with or without the act_ prefix.
     """
+    access_token = (credentials.get("access_token") or "").strip()
+    account_id = (credentials.get("account_id") or "").strip()
     if not access_token:
         raise ValueError("Missing Meta access token.")
     acct = account_id if str(account_id).startswith("act_") else f"act_{account_id}"

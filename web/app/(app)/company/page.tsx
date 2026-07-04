@@ -6,16 +6,28 @@ import { Card, CardTitle } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { api } from '@/lib/api';
 import { useApp } from '@/lib/store';
-import type { CompanyProfile } from '@/lib/types';
+import { WorkspaceTeam } from '@/components/WorkspaceTeam';
+import type { CompanyProfile, CompanyIntel, SmartAudience } from '@/lib/types';
 
 const CURRENCIES = ['GBP', 'USD', 'EUR', 'CAD', 'AUD'];
 const MARKETS = ['UK', 'US', 'EU', 'Canada', 'Australia', 'Global'];
 
+// The form below copies profile fields into local state ONCE at mount — so a
+// workspace switch must remount it, or the previous company's values linger
+// in the inputs (the "MTC data showing on FCC" bug). Keying by workspace id
+// forces a clean remount with the new workspace's data.
 export default function CompanyPage() {
+  const currentCompanyId = useApp((s) => s.currentCompanyId);
+  return <CompanyPageInner key={currentCompanyId ?? 'none'} />;
+}
+
+function CompanyPageInner() {
   const desc = useApp((s) => s.companyDescription);
   const profile = useApp((s) => s.companyProfile);
   const setDesc = useApp((s) => s.setCompanyDescription);
   const setProfile = useApp((s) => s.setCompanyProfile);
+  const savedAudiences = useApp((s) => s.savedAudiences);
+  const addAudience = useApp((s) => s.addAudience);
 
   const [text, setText] = useState(desc);
   const [parsing, setParsing] = useState(false);
@@ -60,6 +72,41 @@ export default function CompanyPage() {
   const [researchMsg, setResearchMsg] = useState<string | null>(null);
   const [researchSources, setResearchSources] = useState<{ title: string; uri: string }[]>([]);
 
+  // Inline editing of the AI-parsed fields. The AI proposes; you correct; your
+  // correction is final. Snapshot the profile when editing STARTS (not at
+  // mount) so an async profile load can't leave the form stale.
+  const [editing, setEditing] = useState(false);
+  const [edit, setEdit] = useState<Record<string, string>>({});
+  function startEditing() {
+    setEdit({
+      company_name: profile?.company_name ?? '',
+      industry: profile?.industry ?? '',
+      business_model: profile?.business_model ?? 'b2c',
+      product_category: profile?.product_category ?? '',
+      price_position: profile?.price_position ?? 'mid',
+      brand_tone: profile?.brand_tone ?? '',
+      value_proposition: profile?.value_proposition ?? '',
+    });
+    setEditing(true);
+  }
+  function saveDetails() {
+    persist({
+      company_name: edit.company_name.trim(),
+      industry: edit.industry.trim(),
+      business_model: edit.business_model,
+      product_category: edit.product_category.trim(),
+      price_position: edit.price_position,
+      brand_tone: edit.brand_tone.trim(),
+      value_proposition: edit.value_proposition.trim(),
+    });
+    setEditing(false);
+  }
+  const eField = (k: string) => ({
+    value: edit[k] ?? '',
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setEdit((cur) => ({ ...cur, [k]: e.target.value })),
+  });
+
   function persist(patch: Partial<CompanyProfile>) {
     const base: CompanyProfile = profile ?? {
       raw_description: text, company_name: '', industry: '', business_model: 'b2c',
@@ -83,29 +130,77 @@ export default function CompanyPage() {
     } finally { setParsing(false); }
   }
 
+  // Deep one-shot intake: /api/company-intel fetches their actual homepage
+  // (brand color, logo, copy) + web-researches economics with competitor
+  // prices + proposes smart audiences on the simulator's real taxonomy.
+  const [intel, setIntel] = useState<CompanyIntel | null>(null);
+  const [audiencesSaved, setAudiencesSaved] = useState(false);
+
   async function analyzeWebsite() {
     setResearching(true); setResearchMsg(null); setResearchSources([]);
+    setIntel(null); setAudiencesSaved(false);
     try {
-      const r = await api.researchCompany({
+      const r = await api.companyIntel({
         url: website.trim() || undefined,
         description: text.trim() || undefined,
         geo: location,
       });
-      const p = r.proposed || {};
-      // Pre-fill — user confirms/edits. Never silently authoritative.
-      if (p.estimated_avg_order_value != null) setAov(String(p.estimated_avg_order_value));
-      if (p.currency) setCurrency(p.currency);
-      if (p.location) setLocation(p.location);
+      setIntel(r);
+      const eco = r.economics || {};
+      const p = r.profile || {};
+      // Pre-fill economics — user confirms/edits. Never silently authoritative.
+      if (eco.estimated_avg_order_value != null) setAov(String(eco.estimated_avg_order_value));
+      if (eco.currency) setCurrency(eco.currency);
+      if (eco.location) setLocation(eco.location);
+      if (r.brand?.brand_color_hex) setBrandColor(r.brand.brand_color_hex);
+      // Merge researched profile fields onto the workspace profile (only
+      // non-empty values, so a thin research result never wipes real data).
+      const patch: Partial<CompanyProfile> = {};
+      for (const k of ['company_name', 'industry', 'business_model', 'product_category',
+        'value_proposition', 'target_customer_summary', 'price_position', 'brand_tone'] as const) {
+        const v = (p as Record<string, unknown>)[k];
+        if (typeof v === 'string' && v.trim()) (patch as Record<string, unknown>)[k] = v.trim();
+      }
+      if (eco.estimated_avg_order_value != null) patch.avg_order_value = eco.estimated_avg_order_value;
+      if (eco.currency) patch.currency = eco.currency;
+      if (eco.location) patch.location = eco.location;
+      if (r.brand?.brand_color_hex) patch.brand_color = r.brand.brand_color_hex;
+      if (website.trim()) patch.website = website.trim();
+      if (Object.keys(patch).length) persist(patch);
+
       setResearchSources(r.sources || []);
+      const comp = (eco.competitor_context || [])
+        .map((c) => `${c.name} (${c.price_note})`).join(', ');
       setResearchMsg(
-        `${p.confidence ? p.confidence.toUpperCase() + ' confidence — ' : ''}` +
-        `${p.reasoning || 'Estimated from public data.'} ` +
-        `(${p.industry || 'industry n/a'}, ${p.price_point || 'price n/a'}). ` +
-        `Confirm or correct the numbers below — your figures drive the forecast, not ours.`,
+        `${eco.confidence ? eco.confidence.toUpperCase() + ' confidence — ' : ''}` +
+        `${eco.reasoning || 'Estimated from public data.'}` +
+        `${comp ? ` Competitor prices: ${comp}.` : ''}` +
+        `${eco.price_range_low != null && eco.price_range_high != null
+          ? ` Typical market range: ${eco.currency || currency} ${eco.price_range_low}–${eco.price_range_high}.` : ''}` +
+        ` Confirm or correct below — your figures drive the forecast, not ours.`,
       );
     } catch (e) {
       setResearchMsg(`Couldn't auto-research: ${(e as Error).message}. Enter your numbers manually below.`);
     } finally { setResearching(false); }
+  }
+
+  function saveSmartAudiences() {
+    if (!intel?.audiences?.length) return;
+    const existing = new Set(savedAudiences.map((a) => a.name));
+    for (const a of intel.audiences) {
+      const name = `✨ ${a.name}`;
+      if (existing.has(name)) continue;
+      addAudience({
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name,
+        description: a.description,
+        segment: a.segment,
+        createdAt: Date.now(),
+        usedInCount: 0,
+      });
+    }
+    setAudiencesSaved(true);
   }
 
   function saveEconomics() {
@@ -177,6 +272,44 @@ export default function CompanyPage() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* SMART AUDIENCES — researched, mapped to the simulator's real
+                  taxonomy, saved per workspace so the wizard can use them. */}
+              {intel && intel.audiences.length > 0 && (
+                <div className="border border-coral/30 bg-coral-soft/40 rounded-md p-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="font-heading text-[14px] font-bold">✨ Smart audiences for you</div>
+                    <Pill tone="coral">{intel.audiences.length} researched</Pill>
+                  </div>
+                  <p className="text-[12px] text-ink-muted mb-3">
+                    Built from what your business actually sells and who buys it — each maps to a real
+                    simulator segment, so picking one genuinely changes the forecast.
+                  </p>
+                  <div className="space-y-2.5">
+                    {intel.audiences.map((a: SmartAudience, i: number) => (
+                      <div key={i} className="bg-surface border border-border rounded-md p-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <strong className="text-[13.5px]">{a.name}</strong>
+                          <Pill tone="violet">{a.segment.replace(/_/g, ' ')}</Pill>
+                          {a.age_range && <Pill tone="muted">{a.age_range}</Pill>}
+                          {a.gender !== 'all' && <Pill tone="muted">{a.gender}</Pill>}
+                          {a.interests.map((it) => <Pill key={it} tone="lime">{it}</Pill>)}
+                        </div>
+                        <div className="text-[12.5px] text-ink mt-1">{a.description}</div>
+                        {a.rationale && <div className="text-[11.5px] text-ink-muted mt-0.5">{a.rationale}</div>}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <Button size="sm" onClick={saveSmartAudiences} disabled={audiencesSaved}>
+                      {audiencesSaved ? '✓ Saved to your audiences' : 'Save all to my audiences'}
+                    </Button>
+                    <span className="text-[11.5px] text-ink-muted">
+                      They&apos;ll appear in the New-analysis wizard under saved audiences.
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -300,9 +433,61 @@ export default function CompanyPage() {
           </Card>
         </div>
 
-        <Card className="self-start">
-          <CardTitle>Parsed profile</CardTitle>
-          {profile ? (
+        <div className="space-y-5 self-start">
+        <Card>
+          <div className="flex items-center justify-between">
+            <CardTitle>Parsed profile</CardTitle>
+            {profile && !editing && (
+              <button type="button" onClick={startEditing}
+                className="text-[12px] text-violet underline -mt-2">Edit details</button>
+            )}
+          </div>
+          {profile && editing ? (
+            <div className="space-y-2.5 text-[13px]">
+              <div>
+                <label className="label">Name</label>
+                <input className="input" {...eField('company_name')} />
+              </div>
+              <div>
+                <label className="label">Industry</label>
+                <input className="input" {...eField('industry')} placeholder="e.g. apparel e-commerce" />
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="label">Business model</label>
+                  <select className="input" {...eField('business_model')}>
+                    {['b2c', 'b2b', 'dtc', 'marketplace', 'saas'].map((m) => (
+                      <option key={m} value={m}>{m.toUpperCase()}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Price position</label>
+                  <select className="input" {...eField('price_position')}>
+                    {['budget', 'mid', 'premium', 'luxury'].map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="label">Category</label>
+                <input className="input" {...eField('product_category')} placeholder="e.g. apparel" />
+              </div>
+              <div>
+                <label className="label">Brand tone</label>
+                <input className="input" {...eField('brand_tone')} placeholder="e.g. bold, playful" />
+              </div>
+              <div>
+                <label className="label">Value proposition</label>
+                <textarea className="input min-h-[70px]" rows={3} {...eField('value_proposition')} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" onClick={saveDetails}>Save details</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : profile ? (
             <div className="space-y-2 text-[13.5px]">
               <div><strong>Name:</strong> {profile.company_name || '—'}</div>
               <div><strong>Industry:</strong> {profile.industry || '—'}</div>
@@ -324,6 +509,9 @@ export default function CompanyPage() {
             <div className="text-ink-muted text-[13.5px]">No profile yet — write a description and parse it.</div>
           )}
         </Card>
+
+        <WorkspaceTeam workspaceId={profile?.id} isOwner={!profile?.shared} />
+        </div>
       </div>
     </>
   );

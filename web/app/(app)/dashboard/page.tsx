@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardTitle } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { AccuracyScorecard } from '@/components/AccuracyScorecard';
+import { useAccuracyData, AccuracyStatCards } from '@/components/AccuracyCards';
 import { useApp } from '@/lib/store';
 import type { SavedCampaign } from '@/lib/types';
 
@@ -59,6 +60,10 @@ export default function DashboardPage() {
   const firstName = (user?.name ?? '').trim().split(/\s+/)[0] || '';
 
   const metrics = computeMetrics(campaigns);
+  // Accuracy ledger + protected budget — pre-launch forecasts checked
+  // against synced reality, and the test spend our catches protected.
+  const acc = useAccuracyData();
+  const profile = useApp((s) => s.companyProfile);
 
   return (
     <>
@@ -102,6 +107,13 @@ export default function DashboardPage() {
       <div className="my-4">
         <AccuracyScorecard />
       </div>
+
+      {/* The receipts: pre-launch forecasts vs synced reality + protected budget. */}
+      <AccuracyStatCards
+        stats={acc.stats} shield={acc.shield} loaded={acc.loaded}
+        hasOutcomes={acc.outcomes.length > 0}
+        currency={profile?.currency || 'GBP'} compact
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
