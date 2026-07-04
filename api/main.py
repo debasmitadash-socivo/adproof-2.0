@@ -1647,17 +1647,40 @@ Return ONLY this JSON:
   ]
 }}"""
 
+    # Grounding is Gemini-only. When it's rate-limited/unavailable, fall back
+    # to the multi-provider chain (Groq / Mistral / etc.) reading the fetched
+    # site text — no web search, but it uses the user's OTHER keys instead of
+    # dead-ending on a Gemini 429. Provenance is flagged so the UI is honest.
+    response = None
+    model_used = ""
+    grounded = True
+    gemini_err = ""
     try:
         response, model_used = _gemini_grounded_call(prompt, max_tokens=3000)
+        raw_text = response.text or ""
     except Exception as exc:                          # noqa: BLE001
-        msg = str(exc)
-        status = 503 if "429" in msg or "RESOURCE_EXHAUSTED" in msg else 502
-        raise HTTPException(
-            status_code=status,
-            detail=f"Research failed: {msg[:240]}. You can still fill the profile manually.")
+        gemini_err = str(exc)
+        grounded = False
+        try:
+            from llm import text_complete, have_any_key
+        except ImportError:
+            from src.llm import text_complete, have_any_key
+        fb_prompt = prompt + (
+            "\n\nNOTE: web search is unavailable right now. Base your answer on "
+            "the WEBSITE CONTENT above plus general knowledge of this business "
+            "type and market. Still return the full JSON; use category-level "
+            "estimates rather than nulls.")
+        raw_text = text_complete(
+            fb_prompt, max_tokens=2000, json_mode=True) if have_any_key() else None
+        if not raw_text:
+            status = 503 if "429" in gemini_err or "RESOURCE_EXHAUSTED" in gemini_err else 502
+            raise HTTPException(
+                status_code=status,
+                detail=(f"Research failed: {gemini_err[:200]}. No backup provider "
+                        "answered either — fill the profile manually below."))
+        model_used = "fallback (no web search)"
 
     import re as _re
-    raw_text = response.text or ""
     cleaned = _re.sub(r"^```(?:json)?\s*", "", raw_text.strip())
     cleaned = _re.sub(r"\s*```$", "", cleaned)
     start, end = cleaned.find("{"), cleaned.rfind("}")
@@ -1693,15 +1716,16 @@ Return ONLY this JSON:
         brand_color = None
 
     grounding_urls: list = []
-    try:
-        gm = response.candidates[0].grounding_metadata
-        if gm and gm.grounding_chunks:
-            for ch in gm.grounding_chunks:
-                if ch.web:
-                    grounding_urls.append({"title": ch.web.title or "",
-                                            "uri": ch.web.uri or ""})
-    except Exception:                                 # noqa: BLE001
-        pass
+    if grounded and response is not None:
+        try:
+            gm = response.candidates[0].grounding_metadata
+            if gm and gm.grounding_chunks:
+                for ch in gm.grounding_chunks:
+                    if ch.web:
+                        grounding_urls.append({"title": ch.web.title or "",
+                                                "uri": ch.web.uri or ""})
+        except Exception:                             # noqa: BLE001
+            pass
 
     return {
         "profile": parsed.get("profile") or {},
@@ -1711,10 +1735,15 @@ Return ONLY this JSON:
                   "color_source": "website" if site.get("theme_color") else "estimate"},
         "audiences": audiences,
         "site_fetched": bool(site.get("fetched")),
+        "grounded": grounded,
         "model": model_used,
         "sources": grounding_urls[:6],
-        "disclaimer": "AI-researched proposal from public web data — confirm or "
-                      "correct anything; your numbers drive the forecast, not ours.",
+        "disclaimer": ("AI-researched proposal from public web data — confirm or "
+                       "correct anything; your numbers drive the forecast, not ours."
+                       if grounded else
+                       "Web search was rate-limited, so this reads your site + general "
+                       "knowledge (no live competitor lookup). Confirm the numbers — "
+                       "they're estimates, and yours drive the forecast."),
     }
 
 

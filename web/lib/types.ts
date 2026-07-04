@@ -56,6 +56,7 @@ export interface CompanyIntel {
   brand: { brand_color_hex?: string | null; logo_url?: string | null; color_source?: string };
   audiences: SmartAudience[];
   site_fetched: boolean;
+  grounded?: boolean;            // false = web search was rate-limited, site-only
   model: string;
   sources: { title: string; uri: string }[];
   disclaimer: string;
