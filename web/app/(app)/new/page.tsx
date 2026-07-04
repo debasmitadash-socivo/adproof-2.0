@@ -14,131 +14,14 @@ import { uploadCreativeToSupabase } from '@/lib/storage';
 import type { BenchmarkRefreshResponse, Platform, SavedCampaign, SavedVariantResult } from '@/lib/types';
 
 // Map a wizard platform id to the calibration bucket produced by the ingest.
-function calibrationPlatformKey(platformId: string): string {
-  const p = platformId.toLowerCase();
-  if (p.includes('instagram')) return 'meta_instagram';
-  if (p.includes('facebook') || p.includes('meta')) return 'meta_facebook';
-  if (p.includes('linkedin')) return 'linkedin';
-  if (p.includes('tiktok')) return 'tiktok';
-  if (p.includes('youtube')) return 'youtube';
-  if (p.includes('google') || p.includes('search')) return 'google_search';
-  return platformId;
-}
-
-// Pillar B+: same interest taxonomy as outcomes.INTEREST_BUCKETS (Python).
-// Keep these two lists in sync — same slug + same priority order so the
-// frontend's calibration lookup matches what the backend's ingest tagged.
-const INTEREST_PATTERNS: ReadonlyArray<readonly [string, readonly string[]]> = [
-  ['fitness',       ['fitness', 'gym', 'workout', 'yoga', 'running', 'cycling', 'crossfit', 'athleisure']],
-  ['fashion',       ['fashion', 'apparel', 'clothing', 'streetwear', 'menswear', 'womenswear']],
-  ['beauty',        ['beauty', 'skincare', 'makeup', 'cosmetic', 'haircare', 'fragrance']],
-  ['tech',          ['tech', 'electronics', 'gadget', 'saas', 'software', 'ai', 'gaming', 'developer', 'startup']],
-  ['travel',        ['travel', 'vacation', 'holiday', 'flights', 'hotels', 'tourism']],
-  ['food',          ['food', 'drink', 'beverage', 'restaurant', 'cooking', 'recipe', 'foodie', 'coffee', 'wine']],
-  ['home',          ['home', 'diy', 'furniture', 'interior', 'decor', 'garden', 'kitchen']],
-  ['finance',       ['finance', 'investing', 'crypto', 'trading', 'wealth', 'loans', 'mortgage']],
-  ['automotive',    ['automotive', 'auto', 'cars', 'ev', 'electric vehicle', 'motorbike']],
-  ['entertainment', ['entertainment', 'movies', 'music', 'streaming', 'podcast', 'reading', 'books']],
-  ['business',      ['business', 'b2b', 'professional', 'decision maker', 'marketing', 'sales', 'operations', 'c-suite', 'leadership']],
-  ['wellness',      ['wellness', 'mindfulness', 'mental health', 'self-care', 'meditation', 'sleep']],
-];
-
-function interestsFromText(text: string): string[] {
-  const hay = (text || '').toLowerCase();
-  if (!hay.trim()) return [];
-  const hits: string[] = [];
-  for (const [slug, patterns] of INTEREST_PATTERNS) {
-    if (patterns.some((p) => hay.includes(p))) hits.push(slug);
-  }
-  return hits;
-}
-
-function interestsFromChipIds(chipIds: string[]): string[] {
-  if (!chipIds.length) return [];
-  const bag = chipIds
-    .filter((c) => !c.startsWith('gender:') && !c.startsWith('location:') && !c.startsWith('age:'))
-    .map((c) => c.split(':').slice(1).join(' ').toLowerCase())
-    .join(' ');
-  return interestsFromText(bag);
-}
-
-// 4-level anchor chain: (segment × interest) → segment → interest → platform → overall.
-// Returns the matching cell + a source label the backend will render in the
-// data-provenance row. Each cell still has to clear the calibration's own
-// per-cell threshold (3 ads + 5k impressions) — those checks happen at
-// outcomes.calibrate() time, so a present cell is already trustworthy.
-type AnchorPick = {
-  source: string | null;
-  nAds: number | null;
-  ctr: number | null;
-  cpm: number | null;
-  cvr: number | null;
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function pickCalibrationAnchor(
-  cal: import('@/lib/types').AccountCalibration,
-  segment: string | null,
-  interests: string[],
-  platformKey: string,
-): AnchorPick {
-  const take = (pc: import('@/lib/types').PlatformCalibration | undefined, source: string): AnchorPick | null => {
-    if (!pc || !pc.real_ctr) return null;
-    return {
-      source, nAds: pc.n_ads ?? null,
-      ctr: pc.real_ctr ?? null, cpm: pc.real_cpm ?? null,
-      cvr: pc.real_cvr ?? null,
-    };
-  };
-  // 1) segment × interest — pick the largest cell across the user's interests
-  if (segment && interests.length && cal.by_segment_interest?.[segment]) {
-    const segCells = cal.by_segment_interest[segment];
-    let best: { cell: import('@/lib/types').PlatformCalibration; interest: string } | null = null;
-    for (const interest of interests) {
-      const cell = segCells[interest];
-      if (cell && cell.real_ctr && (!best || (cell.n_ads ?? 0) > (best.cell.n_ads ?? 0))) {
-        best = { cell, interest };
-      }
-    }
-    if (best) {
-      const picked = take(best.cell, `segment:${segment}:interest:${best.interest}`);
-      if (picked) return picked;
-    }
-  }
-  // 2) segment only
-  if (segment) {
-    const picked = take(cal.by_segment?.[segment], `segment:${segment}`);
-    if (picked) return picked;
-  }
-  // 3) interest only (when segment didn't match but interest did)
-  if (interests.length && cal.by_interest) {
-    let best: { cell: import('@/lib/types').PlatformCalibration; interest: string } | null = null;
-    for (const interest of interests) {
-      const cell = cal.by_interest[interest];
-      if (cell && cell.real_ctr && (!best || (cell.n_ads ?? 0) > (best.cell.n_ads ?? 0))) {
-        best = { cell, interest };
-      }
-    }
-    if (best) {
-      const picked = take(best.cell, `interest:${best.interest}`);
-      if (picked) return picked;
-    }
-  }
-  // 4) platform average
-  const ppicked = take(cal.by_platform?.[platformKey], `platform:${platformKey}`);
-  if (ppicked) return ppicked;
-  // 5) overall account average
-  if (cal.overall?.real_ctr) {
-    return {
-      source: 'overall',
-      nAds: cal.overall.n_ads ?? null,
-      ctr: cal.overall.real_ctr ?? null,
-      cpm: cal.overall.real_cpm ?? null,
-      cvr: cal.overall.real_cvr ?? null,
-    };
-  }
-  return { source: null, nAds: null, ctr: null, cpm: null, cvr: null };
-}
+// P3a: anchor picking (hierarchical shrinkage), interest mapping and the
+// platform-key normalizer live in lib/anchor.ts — pure + unit-tested.
+import {
+  calibrationPlatformKey,
+  interestsFromText,
+  interestsFromChipIds,
+  pickCalibrationAnchor,
+} from '@/lib/anchor';
 import {
   filtersForPlatform,
   suggestedChips,
@@ -366,7 +249,15 @@ export default function NewAnalysisPage() {
         if (cal) {
           const seg = audienceMethod === 'saved' ? w.audienceSegment : null;
           const platformKey = calibrationPlatformKey(w.platformId);
-          const pick = pickCalibrationAnchor(cal, seg ?? null, userInterests, platformKey);
+          // P3a: the chosen format's published benchmark is the root prior —
+          // thin account data gets blended toward it instead of either fully
+          // overriding it (3 ads of luck) or being fully ignored (2 ads).
+          const fmtBench = platforms
+            .find((p) => p.id === w.platformId)?.formats
+            .find((f) => f.id === w.formatId)?.benchmarks ?? null;
+          const pick = pickCalibrationAnchor(
+            cal, seg ?? null, userInterests, platformKey,
+            fmtBench ? { ctr: fmtBench.ctr, cpm: fmtBench.cpm } : null);
           calCtr = pick.ctr;
           calCpm = pick.cpm;
           calCvr = pick.cvr;
