@@ -56,6 +56,7 @@ export function Sidebar() {
       badge: audienceCount > 0 ? String(audienceCount) : undefined },
     { href: '/creatives', label: 'Creatives', icon: Icon.Sq },
     { href: '/data', label: 'Your data', icon: Icon.Chart },
+    { href: '/accuracy', label: 'Accuracy', icon: Icon.Pulse },
   ];
   const workspaceLinks = [
     { href: '/company', label: 'Company profile', icon: Icon.Home },

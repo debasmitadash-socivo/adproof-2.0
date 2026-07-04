@@ -217,6 +217,10 @@ class SimulateRequest(BaseModel):
     # _calibration_provenance_value handles both shapes.
     calibration_source: Optional[str] = None  # 'segment:<seg>[:interest:<int>]' | 'interest:<int>' | 'platform:<plat>' | 'overall' | None
     calibration_n_ads: Optional[int] = None
+    # Honest-ROAS: the workspace's conversion goal (purchase|lead|demo|signup)
+    # picks the CITED industry CVR range shown when no real conversion data
+    # has calibrated this account yet.
+    conversion_goal: Optional[str] = None
     # Pillar B+: the user-chosen interests (after wizard mapping to the
     # canonical taxonomy). Stored on creative_scores and surfaced in the
     # report's provenance row. Empty list = no interest signal.
@@ -1718,6 +1722,50 @@ Return ONLY this JSON:
 # Main simulation
 # ===========================================================================
 
+_DEFAULT_CVR = 0.025          # the legacy everyone-gets-this default
+
+
+def _roas_scenarios(req, profile, roas_p50: float, conv_used: float) -> dict:
+    """Honest-ROAS provenance. Returns a dict the report renders as either a
+    'calibrated to your data' badge or a cited scenario BAND.
+
+    basis 'your_data'   — a real conversion rate reached the forecast
+                          (calibration anchor carried one). Point ROAS is fair.
+    basis 'default_cvr' — the CVR is still the generic default; ROAS is shown
+                          as [roas_low, roas_high] across the cited industry
+                          CVR range for this business. Revenue is linear in
+                          CVR, so scaling p50 by (range / used-cvr) is exact.
+    """
+    non_default = abs((req.target_conversion_rate or _DEFAULT_CVR) - _DEFAULT_CVR) > 1e-9
+    if non_default and req.calibration_source:
+        return {
+            "basis": "your_data",
+            "cvr_used": conv_used,
+            "n_ads": req.calibration_n_ads,
+            "source": req.calibration_source,
+        }
+    if non_default:
+        # The user typed their own expected CVR in the wizard — respect it
+        # (point estimate), but label where it came from.
+        return {"basis": "user_input", "cvr_used": conv_used}
+    try:
+        from cvr_priors import cvr_prior
+    except ImportError:
+        from src.cvr_priors import cvr_prior
+    prior = cvr_prior(req.conversion_goal,
+                      getattr(profile, "business_model", None))
+    scale = max(conv_used, 1e-9)
+    return {
+        "basis": "default_cvr",
+        "cvr_used": conv_used,
+        "cvr_low": prior["low"],
+        "cvr_high": prior["high"],
+        "roas_low": round(roas_p50 * prior["low"] / scale, 2),
+        "roas_high": round(roas_p50 * prior["high"] / scale, 2),
+        "source": prior["source"],
+    }
+
+
 def _strip_unserialisable(obj: Any) -> Any:
     """Drop heavy / non-JSON fields so the response stays light."""
     if isinstance(obj, dict):
@@ -2357,6 +2405,11 @@ def simulate(req: SimulateRequest) -> dict:
             "reach_value": _reach_kpi,
             # Single source of truth — same value the headline's risk wording uses.
             "break_even_chance_pct": break_even_probability,
+            # Honest-ROAS: when the conversion rate is still the generic
+            # default (no real conversion data calibrated this account),
+            # present ROAS as a CITED scenario band instead of fake point
+            # precision. Revenue is linear in CVR, so the band is exact.
+            "roas_scenarios": _roas_scenarios(req, profile, roas, _conv),
         },
         # Pillar A3: explicit grading-basis line so the user always sees
         # WHICH metric is the grading axis and WHY (their objective). The

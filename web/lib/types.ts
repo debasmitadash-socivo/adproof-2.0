@@ -286,6 +286,8 @@ export interface SimulateRequest {
   // / platform- / overall-calibrated).
   calibration_source?: string | null;       // 'segment:<seg>:interest:<int>' | 'segment:<seg>' | 'interest:<int>' | 'platform:<plat>' | 'overall' | null
   calibration_n_ads?: number | null;
+  // Honest-ROAS: picks the cited industry CVR range when uncalibrated.
+  conversion_goal?: string | null;
   // Pillar B+: the user-chosen interests after wizard mapping to the
   // canonical taxonomy (see outcomes.INTEREST_BUCKETS).
   interests?: string[];
@@ -529,6 +531,18 @@ export interface SimulateResponse {
     cpm_vs_bench_pct?: number;
     reach_value?: number;
     break_even_chance_pct: number;
+    // Honest-ROAS provenance: 'your_data' = a real conversion rate calibrated
+    // this forecast; 'default_cvr' = ROAS shown as a cited scenario band.
+    roas_scenarios?: {
+      basis: 'your_data' | 'user_input' | 'default_cvr';
+      cvr_used: number;
+      n_ads?: number | null;
+      source?: string;
+      cvr_low?: number;
+      cvr_high?: number;
+      roas_low?: number;
+      roas_high?: number;
+    };
   };
   factor_plain: { name: string; share: number; direction: '+' | '-'; label: string }[];
   data_sources: { label: string; value: string; note: string }[];

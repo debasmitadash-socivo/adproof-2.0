@@ -511,6 +511,83 @@ export async function insertOutcomes(
   return inserted;
 }
 
+// ============================== accuracy ledger reads =======================
+// The ledger joins what we PREDICTED (creative_scores, stamped at every
+// forecast) with what actually HAPPENED (ad_outcomes, from CSV/API sync).
+// Matching happens client-side in lib/accuracy.ts — these are just the reads.
+
+export interface PredictionRow {
+  id: string;
+  campaignId: string | null;
+  adName: string | null;          // variant label
+  creativeUrl: string | null;
+  forecastCtr: number | null;     // fraction, e.g. 0.012
+  forecastRoas: number | null;
+  verdictClass: string | null;
+  platformId: string | null;
+  createdAt: number;
+}
+
+export async function listCreativeScores(companyId?: string): Promise<PredictionRow[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  let q = sb.from('creative_scores')
+    .select('id, campaign_id, ad_name, creative_url, forecast_ctr_p50, forecast_roas_p50, verdict_class, platform_id, created_at')
+    .order('created_at', { ascending: false }).limit(1000);
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data, error } = await q;
+  if (error) { console.error('[db] listCreativeScores', error.message); return []; }
+  return (data ?? []).map((d) => ({
+    id: d.id as string,
+    campaignId: (d.campaign_id as string) ?? null,
+    adName: (d.ad_name as string) ?? null,
+    creativeUrl: (d.creative_url as string) ?? null,
+    forecastCtr: (d.forecast_ctr_p50 as number) ?? null,
+    forecastRoas: (d.forecast_roas_p50 as number) ?? null,
+    verdictClass: (d.verdict_class as string) ?? null,
+    platformId: (d.platform_id as string) ?? null,
+    createdAt: new Date(d.created_at as string).getTime(),
+  }));
+}
+
+export interface OutcomeRow {
+  id: string;
+  adName: string | null;
+  creativeUrl: string | null;
+  platform: string | null;
+  dateStart: string | null;       // YYYY-MM-DD
+  impressions: number;
+  clicks: number;
+  spend: number;
+  revenue: number | null;
+  realCtr: number | null;         // fraction
+  realRoas: number | null;
+  createdAt: number;
+}
+
+export async function listOutcomes(companyId?: string): Promise<OutcomeRow[]> {
+  const sb = getSupabase(); if (!sb) return [];
+  let q = sb.from('ad_outcomes')
+    .select('id, ad_name, creative_url, platform, date_start, impressions, clicks, spend, revenue, real_ctr, real_roas, created_at')
+    .order('created_at', { ascending: false }).limit(3000);
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data, error } = await q;
+  if (error) { console.error('[db] listOutcomes', error.message); return []; }
+  return (data ?? []).map((d) => ({
+    id: d.id as string,
+    adName: (d.ad_name as string) ?? null,
+    creativeUrl: (d.creative_url as string) ?? null,
+    platform: (d.platform as string) ?? null,
+    dateStart: (d.date_start as string) ?? null,
+    impressions: Number(d.impressions ?? 0),
+    clicks: Number(d.clicks ?? 0),
+    spend: Number(d.spend ?? 0),
+    revenue: d.revenue == null ? null : Number(d.revenue),
+    realCtr: (d.real_ctr as number) ?? null,
+    realRoas: (d.real_roas as number) ?? null,
+    createdAt: new Date(d.created_at as string).getTime(),
+  }));
+}
+
 // ============================== calibrations (Path B) =======================
 export async function saveCalibration(
   cal: AccountCalibration, nAds: number,

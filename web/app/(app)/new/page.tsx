@@ -401,6 +401,9 @@ export default function NewAnalysisPage() {
         // ads it was built from — surfaced in the report's data-provenance row.
         calibration_source: calSource,
         calibration_n_ads: calNAds,
+        // Honest-ROAS: the workspace's conversion goal picks the CITED
+        // industry CVR range shown when no real data calibrates the account.
+        conversion_goal: cp?.conversion_goal ?? null,
         // Pillar B+: the user's mapped interests, sent so the backend can
         // store them on creative_scores + label the calibration source.
         interests: userInterests,

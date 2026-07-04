@@ -336,8 +336,18 @@ export default function ResultPage() {
               bigNumber = <>{(ctrVal * 100).toFixed(2)}% <span className="text-[28px] font-sans not-italic align-top opacity-90">CTR</span></>;
               subLine = <>About <strong>{Math.round(clicksP50).toLocaleString()}</strong> link clicks at <strong>{cur} {cpcP50.toFixed(2)}</strong> per click. Format benchmark CTR <strong>{(ctrBench * 100).toFixed(2)}%</strong>.</>;
             } else {                                          // 'roas' — conversion
-              bigNumber = <>{mc.predicted_roas.p50.toFixed(2)}× <span className="text-[28px] font-sans not-italic align-top opacity-90">ROAS</span></>;
-              subLine = <>Median return <strong>{(mc.predicted_roi.p50 * 100).toFixed(0)}%</strong>. p10–p90 band <strong>{mc.predicted_roas.p10.toFixed(2)}× → {mc.predicted_roas.p90.toFixed(2)}×</strong>.</>;
+              const sc = result.plain_verdict?.roas_scenarios;
+              if (sc?.basis === 'default_cvr' && sc.roas_low != null && sc.roas_high != null) {
+                // No real conversion data yet → the honest number is a band
+                // across the cited industry CVR range, not fake precision.
+                bigNumber = <>{sc.roas_low.toFixed(1)}–{sc.roas_high.toFixed(1)}× <span className="text-[28px] font-sans not-italic align-top opacity-90">ROAS</span></>;
+                subLine = <>If your conversion rate lands in the typical range for your goal
+                  (<strong>{((sc.cvr_low ?? 0) * 100).toFixed(1)}–{((sc.cvr_high ?? 0) * 100).toFixed(1)}%</strong>).
+                  Connect your results on the Data page and this becomes one number — yours.</>;
+              } else {
+                bigNumber = <>{mc.predicted_roas.p50.toFixed(2)}× <span className="text-[28px] font-sans not-italic align-top opacity-90">ROAS</span></>;
+                subLine = <>Median return <strong>{(mc.predicted_roi.p50 * 100).toFixed(0)}%</strong>. p10–p90 band <strong>{mc.predicted_roas.p10.toFixed(2)}× → {mc.predicted_roas.p90.toFixed(2)}×</strong>.</>;
+              }
             }
 
             return (
@@ -391,6 +401,64 @@ export default function ResultPage() {
               <div className="text-[13px] text-ink leading-snug">{result.grading_basis.explanation}</div>
               <div className="text-[11.5px] text-ink-muted mt-1">{result.grading_basis.change_hint}</div>
             </Card>
+          )}
+
+          {/* PROTECTED BUDGET MOMENT — when the forecast catches a creative
+              that shouldn't run, say what that catch is worth: the test
+              budget it would have burned. Tallied on the Accuracy page. */}
+          {['wont_run', 'broken_creative', 'underperforming', 'weak_engagement', 'void']
+            .includes(result.plain_verdict?.class ?? '') && (
+            <Card className="mb-5 !bg-lime-soft !border-lime-deep/40 !py-3 !px-4">
+              <div className="text-[13px] flex items-center gap-2 flex-wrap">
+                <span className="text-lg">🛡️</span>
+                <span>
+                  <strong>This catch protected your test budget.</strong> Finding this out on the platform
+                  would have cost real spend — it&apos;s now counted in your{' '}
+                  <Link href="/accuracy" className="text-violet underline font-semibold">protected budget</Link>.
+                </span>
+              </div>
+            </Card>
+          )}
+
+          {/* ROAS PROVENANCE — where the revenue math comes from. Either a
+              "calibrated to your N ads" badge, or the cited industry band
+              that produced the honest range above. */}
+          {result.plain_verdict?.objective === 'conversion' && result.plain_verdict?.roas_scenarios && (
+            result.plain_verdict.roas_scenarios.basis === 'your_data' ? (
+              <Card className="mb-5 !bg-lime-soft !border-lime-deep/40 !py-3 !px-4">
+                <div className="flex items-center gap-2 flex-wrap text-[13px]">
+                  <Pill tone="success" dot>calibrated to your data</Pill>
+                  <span>
+                    Conversion rate <strong className="mono">{(result.plain_verdict.roas_scenarios.cvr_used * 100).toFixed(2)}%</strong> comes from
+                    your real results{result.plain_verdict.roas_scenarios.n_ads ? <> (<strong>{result.plain_verdict.roas_scenarios.n_ads} ads</strong>)</> : null} — not an industry average.
+                  </span>
+                </div>
+              </Card>
+            ) : result.plain_verdict.roas_scenarios.basis === 'user_input' ? (
+              <Card className="mb-5 !bg-violet-soft !border-violet/30 !py-3 !px-4">
+                <div className="flex items-center gap-2 flex-wrap text-[13px]">
+                  <Pill tone="violet">your assumption</Pill>
+                  <span>
+                    ROAS uses the <strong className="mono">{(result.plain_verdict.roas_scenarios.cvr_used * 100).toFixed(2)}%</strong> conversion
+                    rate you entered. Connect real results on the Data page to replace the assumption with your measured rate.
+                  </span>
+                </div>
+              </Card>
+            ) : (
+              <Card className="mb-5 !bg-warning-soft !border-warning/40 !py-3 !px-4">
+                <div className="flex items-center gap-2 flex-wrap text-[13px] mb-1">
+                  <Pill tone="warning">ROAS shown as a range</Pill>
+                  <span className="font-semibold">No conversion data from your account yet.</span>
+                </div>
+                <div className="text-[12.5px] text-ink leading-snug">
+                  Nobody can know your conversion rate before you've had conversions — so instead of pretending,
+                  we show ROAS across the typical range for your goal
+                  ({((result.plain_verdict.roas_scenarios.cvr_low ?? 0) * 100).toFixed(1)}–{((result.plain_verdict.roas_scenarios.cvr_high ?? 0) * 100).toFixed(1)}% conversion).
+                  Basis: {result.plain_verdict.roas_scenarios.source}. Upload results or connect a platform on the
+                  Data page and this collapses to your real number.
+                </div>
+              </Card>
+            )
           )}
 
           {/* CONTEXT */}
