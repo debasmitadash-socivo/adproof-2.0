@@ -300,6 +300,7 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
     for _ in range(days):
         tm.step()
         frames.append("".join(str(_agent_state(a)) for a in shown))
+    tm_daily_records = tm.daily_records     # needed below, after tm is released
     release_model(tm)     # else mesa.Agent._ids pins this model forever
     del tm
 
@@ -315,7 +316,7 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
     spend = float(budget)
     cpm = spend / mc.total_impressions * 1000 if mc.total_impressions else None
 
-    events = _narrate(tm.daily_records, currency,
+    events = _narrate(tm_daily_records, currency,
                       float(mc.predicted_roas.get("p50", 0)) or None,
                       float(mc.predicted_conversions.get("p50", 0)) or None)
 
