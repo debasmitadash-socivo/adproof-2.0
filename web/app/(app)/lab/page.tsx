@@ -49,14 +49,134 @@ function ProvChip({ p }: { p: Provenance }) {
 type MixCell = { age: string; gender: string; share: number };
 
 // ---------------------------------------------------------------------------
+// The Living Market — the audience as demographic districts (squarified
+// treemap). District area = how much of the simulated population that
+// age × gender cell holds; heat = the fraction of that district the
+// campaign has actually reached BY THE CURRENT DAY of playback. Clicks and
+// purchases per district come straight from the per-agent frames, so a
+// district that genuinely responds better in the sim visibly runs hotter.
+// ---------------------------------------------------------------------------
+type Rect = { x: number; y: number; w: number; h: number };
+
+function squarify(values: number[], W: number, H: number): Rect[] {
+  // Classic squarified treemap; expects values sorted descending.
+  const total = values.reduce((a, b) => a + b, 0) || 1;
+  const scaled = values.map((v) => (v / total) * W * H);
+  const out: Rect[] = new Array(values.length);
+  let x = 0, y = 0, w = W, h = H, i = 0;
+  const worst = (row: number[], side: number) => {
+    const s = row.reduce((a, b) => a + b, 0);
+    const mx = Math.max(...row), mn = Math.min(...row);
+    return Math.max((side * side * mx) / (s * s), (s * s) / (side * side * mn));
+  };
+  while (i < scaled.length) {
+    const side = Math.min(w, h);
+    let row = [scaled[i]]; let j = i + 1; let best = worst(row, side);
+    while (j < scaled.length) {
+      const cand = [...row, scaled[j]];
+      const wr = worst(cand, side);
+      if (wr > best) break;
+      row = cand; best = wr; j++;
+    }
+    const sum = row.reduce((a, b) => a + b, 0);
+    const thick = sum / side;
+    if (w >= h) {
+      let yy = y;
+      row.forEach((v, k) => { const hh = v / thick; out[i + k] = { x, y: yy, w: thick, h: hh }; yy += hh; });
+      x += thick; w -= thick;
+    } else {
+      let xx = x;
+      row.forEach((v, k) => { const ww = v / thick; out[i + k] = { x: xx, y, w: ww, h: thick }; xx += ww; });
+      y += thick; h -= thick;
+    }
+    i = j;
+  }
+  return out;
+}
+
+function cellTitle(cell: string): string {
+  const [age, gender] = cell.split('|');
+  const g = gender === 'male' ? 'Men' : gender === 'female' ? 'Women' : 'People';
+  return `${g} ${age === '?' ? '' : age}`.trim();
+}
+
+function MarketMap({ frames, cells, day }: {
+  frames: string[]; cells: string[]; day: number;
+}) {
+  // Group agent indices by district once per result.
+  const districts = useMemo(() => {
+    const by = new Map<string, number[]>();
+    cells.forEach((c, i) => { (by.get(c) ?? by.set(c, []).get(c)!).push(i); });
+    return [...by.entries()]
+      .map(([cell, idx]) => ({ cell, idx }))
+      .sort((a, b) => b.idx.length - a.idx.length);
+  }, [cells]);
+
+  const W = 760; const H = 330; const GAP = 3;
+  const rects = useMemo(
+    () => squarify(districts.map((d) => d.idx.length), W, H), [districts]);
+
+  const frame = frames[Math.min(day, frames.length - 1)] ?? '';
+  return (
+    <div className="relative" style={{ width: '100%', aspectRatio: `${W}/${H}`, borderRadius: 10, background: LAB.bg, overflow: 'hidden' }}
+      role="img" aria-label={`Market districts by age and gender, day ${day + 1}`}>
+      {districts.map((d, i) => {
+        const r = rects[i];
+        let reached = 0, clicked = 0, bought = 0;
+        for (const a of d.idx) {
+          const s = frame.charCodeAt(a) - 48;
+          if (s >= 1) reached++;
+          if (s >= 2) clicked++;
+          if (s === 3) bought++;
+        }
+        const frac = d.idx.length ? reached / d.idx.length : 0;
+        const pw = (r.w / W) * 100, ph = (r.h / H) * 100;
+        const big = r.w > 130 && r.h > 72;
+        return (
+          <div key={d.cell} className="absolute transition-all duration-500"
+            style={{
+              left: `${(r.x / W) * 100}%`, top: `${(r.y / H) * 100}%`,
+              width: `calc(${pw}% - ${GAP}px)`, height: `calc(${ph}% - ${GAP}px)`,
+              margin: GAP / 2, borderRadius: 8,
+              background: `linear-gradient(150deg, rgba(62,134,196,${(0.08 + frac * 0.42).toFixed(3)}), rgba(62,134,196,${(frac * 0.22).toFixed(3)}))`,
+              border: `1px solid ${frac > 0.02 ? 'rgba(62,134,196,0.45)' : LAB.line}`,
+              boxShadow: bought > 0 ? `inset 0 0 ${Math.min(10 + bought * 3, 34)}px rgba(78,160,107,0.30)` : 'none',
+              padding: big ? '9px 11px' : '5px 7px', overflow: 'hidden',
+            }}>
+            <div className="font-bold leading-tight" style={{ color: LAB.ink, fontSize: big ? 12.5 : 10 }}>
+              {cellTitle(d.cell)}
+            </div>
+            <div className="font-mono" style={{ color: LAB.muted, fontSize: big ? 10.5 : 9 }}>
+              {((d.idx.length / cells.length) * 100).toFixed(0)}% of audience
+            </div>
+            <div className="font-mono mt-1" style={{ color: frac > 0 ? LAB.exposed : LAB.faint, fontSize: big ? 11 : 9 }}>
+              {(frac * 100).toFixed(0)}% reached
+            </div>
+            {big && (clicked > 0 || bought > 0) && (
+              <div className="font-mono" style={{ fontSize: 10.5 }}>
+                {clicked > 0 && <span style={{ color: LAB.clicked }}>{clicked} clicked</span>}
+                {clicked > 0 && bought > 0 && <span style={{ color: LAB.faint }}> · </span>}
+                {bought > 0 && <span style={{ color: LAB.converted }}>{bought} bought</span>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Population field — the hero
 // ---------------------------------------------------------------------------
-function PopulationField({ frames, agents, onDay }: {
-  frames: string[]; agents: number; onDay?: (d: number) => void;
+function PopulationField({ frames, agents, cells, onDay }: {
+  frames: string[]; agents: number; cells?: string[]; onDay?: (d: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [day, setDay] = useState(0);
   const [playing, setPlaying] = useState(true);
+  const [view, setView] = useState<'people' | 'market'>('people');
+  const hasMap = !!cells && cells.length > 0;
   const reduced = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -97,14 +217,36 @@ function PopulationField({ frames, agents, onDay }: {
         : s === 1 ? LAB.exposed : LAB.unexposed;
       ctx.fill();
     }
-  }, [day, frames, agents]);
+  }, [day, frames, agents, view]);   // view: canvas remounts when toggling back
 
   if (frames.length === 0) return null;
   return (
     <div>
-      <canvas ref={canvasRef} width={760} height={330}
-        style={{ width: '100%', height: 'auto', borderRadius: 10, background: LAB.bg }}
-        aria-label={`Simulated audience of ${agents} people, day ${day + 1} of ${frames.length}`} />
+      {hasMap && (
+        <div className="flex items-center gap-1 mb-2.5 rounded-lg p-1 w-fit" style={{ background: LAB.panelUp }}>
+          {([['people', '◦◦ People'], ['market', '▦ Living market']] as const).map(([v, label]) => (
+            <button key={v} type="button" onClick={() => setView(v)}
+              className="px-3 py-1 rounded-md text-[11px] font-bold transition-colors"
+              style={view === v
+                ? { background: 'linear-gradient(120deg,#FF5E1A,#E8366B)', color: '#fff' }
+                : { color: LAB.muted }}>
+              {label}
+            </button>
+          ))}
+          {view === 'market' && (
+            <span className="text-[10px] pl-2 pr-1" style={{ color: LAB.faint }}>
+              districts sized by audience share · heat = reach on this day
+            </span>
+          )}
+        </div>
+      )}
+      {view === 'market' && hasMap ? (
+        <MarketMap frames={frames} cells={cells!} day={day} />
+      ) : (
+        <canvas ref={canvasRef} width={760} height={330}
+          style={{ width: '100%', height: 'auto', borderRadius: 10, background: LAB.bg }}
+          aria-label={`Simulated audience of ${agents} people, day ${day + 1} of ${frames.length}`} />
+      )}
       <div className="flex items-center gap-3 mt-2.5 flex-wrap">
         <button type="button" onClick={() => setPlaying((p) => !p)}
           className="px-3.5 py-1.5 rounded-md text-[12px] font-bold transition-transform active:scale-95"
@@ -686,7 +828,8 @@ export default function LabPage() {
                       {running ? '● re-simulating…' : result.meta.audience_source}
                     </span>
                   </div>
-                  <PopulationField frames={result.timeline.frames} agents={result.timeline.agents} onDay={setFieldDay} />
+                  <PopulationField frames={result.timeline.frames} agents={result.timeline.agents}
+                    cells={result.timeline.cells} onDay={setFieldDay} />
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-[1fr_330px] gap-4">

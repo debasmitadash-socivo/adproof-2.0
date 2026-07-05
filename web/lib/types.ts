@@ -84,7 +84,8 @@ export interface LabRunResult {
   };
   daily: { day: number; clicks: Record<string, number>; conversions: Record<string, number> }[];
   factors: Record<string, number>;
-  timeline: { agents: number; days: number; frames: string[] };
+  // cells: per-agent "age|gender" labels — powers the Living Market view.
+  timeline: { agents: number; days: number; frames: string[]; cells?: string[] };
   saturation: Record<string, unknown> | null;
   meta: {
     n_runs: number; sim_days: number; channel: string;

@@ -85,6 +85,20 @@ _AGE_BANDS = {
 }
 
 
+def _cell_of(persona: dict) -> str:
+    """Age-band × gender label for one persona ("25-34|female") — lets the
+    Living Market view group timeline agents into real demographic districts."""
+    try:
+        age = int(persona.get("age", 0) or 0)
+    except (TypeError, ValueError):
+        age = 0
+    band = next((b for b, (lo, hi) in _AGE_BANDS.items() if lo <= age <= hi), "?")
+    g = str(persona.get("gender", "") or "").lower()
+    if g not in ("male", "female"):
+        g = "other"
+    return f"{band}|{g}"
+
+
 def _condition_to_mix(audience, mix: list[dict]):
     """Resample the persona population so its age × gender composition
     matches the account's REAL delivery shares (from ad_breakdowns).
@@ -114,7 +128,10 @@ def _condition_to_mix(audience, mix: list[dict]):
         parts.append(sel.sample(n=n, replace=len(sel) < n, random_state=_SEED))
     if not parts:
         return audience
-    out = pd.concat(parts, ignore_index=True)
+    # Shuffle so any downstream subsample (the ≤400-agent timeline) keeps the
+    # mix's proportions instead of over-representing the first cell.
+    out = pd.concat(parts, ignore_index=True) \
+        .sample(frac=1, random_state=_SEED).reset_index(drop=True)
     return out.head(MAX_AGENTS)
 
 
@@ -272,7 +289,8 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
         "daily": daily,
         "factors": {k: round(float(v), 4)
                     for k, v in (mc.aggregate_click_factors or {}).items()},
-        "timeline": {"agents": n_show, "days": days, "frames": frames},
+        "timeline": {"agents": n_show, "days": days, "frames": frames,
+                     "cells": [_cell_of(a.persona) for a in shown]},
         "saturation": mc.saturation or None,
         "meta": {
             "n_runs": n_runs, "sim_days": days, "channel": channel,
