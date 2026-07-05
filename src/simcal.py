@@ -50,10 +50,10 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 try:
     from src.agent import compute_click_probability
-    from src.model import AdSimulationModel
+    from src.model import AdSimulationModel, release_model
 except ImportError:
     from agent import compute_click_probability
-    from model import AdSimulationModel
+    from model import AdSimulationModel, release_model
 
 import numpy as np
 
@@ -179,6 +179,7 @@ def fit_fatigue_theta(*, lambda_target: float, audience, ad, calibration,
                   "lambda_target": round(lam, 5), "iterations": it,
                   "converged": abs(lam_sim - lam) <= tol}
 
+    release_model(model)     # else mesa.Agent._ids pins this model forever
     with _cache_lock:
         if len(_cache) >= _CACHE_MAX:
             _cache.pop(next(iter(_cache)))

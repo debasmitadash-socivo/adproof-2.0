@@ -44,10 +44,10 @@ from config import DEFAULT_MONTE_CARLO_RUNS, DEFAULT_SIM_DAYS  # noqa: E402
 
 try:
     from src.agent import AdStimulus  # noqa: F401
-    from src.model import AdSimulationModel
+    from src.model import AdSimulationModel, release_model
 except ImportError:                                # `python src/simulation.py`
     from agent import AdStimulus  # noqa: F401
-    from model import AdSimulationModel
+    from model import AdSimulationModel, release_model
 
 __all__ = [
     "CHANNEL_CPM",
@@ -282,6 +282,7 @@ def monte_carlo(personas,
         # on a small (Railway) instance is too late and OOM-kills the worker
         # (seen as a 502). Drop the refs and force a cyclic collection each run
         # so peak memory stays at ~one model, not n_runs of them.
+        release_model(model)     # else mesa.Agent._ids pins this model forever
         del model, r
         gc.collect()
 

@@ -58,12 +58,34 @@ except ImportError:  # when run as `python src/model.py`
 
 try:
     from mesa import Model as _MesaModel
+    from mesa import Agent as _MesaAgentBase
     _MESA_AVAILABLE = True
 except ImportError:
     _MesaModel = object
+    _MesaAgentBase = None
     _MESA_AVAILABLE = False
 
-__all__ = ["AdSimulationModel", "SimulationResults"]
+__all__ = ["AdSimulationModel", "SimulationResults", "release_model"]
+
+
+def release_model(model) -> None:
+    """Break the ONE reference that keeps a finished model (and its entire
+    agent population + word-of-mouth network) alive forever.
+
+    Mesa's ``Agent`` base class keeps a class-level ``_ids`` dict
+    (``defaultdict``, not weak) keyed BY MODEL INSTANCE, used only to hand
+    out sequential unique_ids -- every model we ever construct becomes a
+    permanent key the moment its first agent is created, and nothing in
+    Mesa ever evicts it. We build a fresh model per Monte Carlo run (and
+    per sensitivity-sweep point, and per Lab call), so on a long-running
+    worker this leaks without bound: RSS climbs, and every existing
+    ``gc.collect()`` call gets slower because it's scanning an
+    ever-growing live-object graph. That combination -- slow, then OOM
+    -- is exactly the "Railway 502 under load" failure mode. Call this
+    right before discarding any ``AdSimulationModel``.
+    """
+    if _MesaAgentBase is not None:
+        _MesaAgentBase._ids.pop(model, None)
 
 
 # ===========================================================================

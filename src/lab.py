@@ -31,7 +31,7 @@ from config import PSYCHOLOGY_FEATURES, VISUAL_SCORE_KEYS  # noqa: E402
 
 try:
     from src.agent import AdStimulus, visual_weights_for
-    from src.model import AdSimulationModel
+    from src.model import AdSimulationModel, release_model
     from src.personas import filter_personas
     from src.pipeline import get_resources
     from src.platforms import get_format
@@ -39,7 +39,7 @@ try:
     from src.simulation import monte_carlo
 except ImportError:
     from agent import AdStimulus, visual_weights_for
-    from model import AdSimulationModel
+    from model import AdSimulationModel, release_model
     from personas import filter_personas
     from pipeline import get_resources
     from platforms import get_format
@@ -300,6 +300,8 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
     for _ in range(days):
         tm.step()
         frames.append("".join(str(_agent_state(a)) for a in shown))
+    release_model(tm)     # else mesa.Agent._ids pins this model forever
+    del tm
 
     env_clicks = mc.daily_envelope("clicks")
     env_purch = mc.daily_envelope("purchases")
