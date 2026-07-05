@@ -1,16 +1,27 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { Button } from '@/components/ui/Button';
 import { Card, CardTitle } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { useApp } from '@/lib/store';
+import { api } from '@/lib/api';
+import { listConnections } from '@/lib/db';
 import {
   filtersForPlatform,
   describeFilters,
   type FilterCard as FilterCardType,
 } from '@/lib/filters';
-import type { SavedAudience } from '@/lib/types';
+import type { SavedAudience, MetaInterest, PlatformConnection } from '@/lib/types';
+
+// "12,400,000" → "12.4M" for interest audience-size chips.
+function compactCount(n: number | null | undefined): string {
+  if (!n || n <= 0) return '';
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${Math.round(n / 1e3)}K`;
+  return String(n);
+}
 
 export default function AudiencesPage() {
   const audiences = useApp((s) => s.savedAudiences);
@@ -116,9 +127,53 @@ function CreateAudienceModal({
   const [platformId, setPlatformId] = useState('meta_instagram');
   const [selections, setSelections] = useState<Record<string, true>>({});
 
+  // ---- Live Meta interest search — the same targeting options Ads Manager
+  // shows, pulled straight from the connected account's Graph API token.
+  const currentCompanyId = useApp((s) => s.currentCompanyId);
+  const [metaConn, setMetaConn] = useState<PlatformConnection | null>(null);
+  const [interestQ, setInterestQ] = useState('');
+  const [interestResults, setInterestResults] = useState<MetaInterest[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchErr, setSearchErr] = useState('');
+  const [picked, setPicked] = useState<MetaInterest[]>([]);
+  const searchSeq = useRef(0);
+
+  useEffect(() => {
+    if (!currentCompanyId) return;
+    listConnections(currentCompanyId)
+      .then((conns) => setMetaConn(conns.find((c) => c.provider === 'meta' && c.status === 'ok') ?? null))
+      .catch(() => setMetaConn(null));
+  }, [currentCompanyId]);
+
+  const isMetaPlatform = platformId.startsWith('meta_');
+
+  useEffect(() => {
+    const q = interestQ.trim();
+    if (!metaConn || !isMetaPlatform || q.length < 2) {
+      setInterestResults([]); setSearching(false); setSearchErr('');
+      return;
+    }
+    setSearching(true); setSearchErr('');
+    const seq = ++searchSeq.current;
+    const t = setTimeout(() => {
+      api.searchInterests({ provider: 'meta', credentials: metaConn.credentials, q })
+        .then((r) => { if (seq === searchSeq.current) { setInterestResults(r.interests); setSearching(false); } })
+        .catch((e) => { if (seq === searchSeq.current) { setSearchErr((e as Error).message); setSearching(false); } });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [interestQ, metaConn, isMetaPlatform]);
+
+  function pickInterest(it: MetaInterest) {
+    setPicked((prev) => prev.some((p) => p.id === it.id) ? prev : [...prev, it]);
+    setInterestQ(''); setInterestResults([]);
+  }
+
   const cards = filtersForPlatform(platformId);
   const selectedIds = Object.keys(selections);
-  const description = describeFilters(selectedIds, platformId);
+  const baseDescription = describeFilters(selectedIds, platformId);
+  const description = picked.length
+    ? `${baseDescription ? `${baseDescription} ` : ''}Meta interests: ${picked.map((p) => p.name).join(', ')}.`
+    : baseDescription;
 
   function toggle(id: string) {
     setSelections((prev) => {
@@ -175,6 +230,70 @@ function CreateAudienceModal({
             </div>
           </div>
 
+          {isMetaPlatform && (
+            <Card className={clsx(!metaConn && 'opacity-90')}>
+              <div className="font-semibold text-[14px] mb-1 flex items-center gap-2">
+                <span>🎯</span>Detailed targeting — live from Meta
+                {metaConn && <Pill tone="success">connected</Pill>}
+              </div>
+              {metaConn ? (
+                <>
+                  <div className="text-[12.5px] text-ink-muted mb-3">
+                    Search the exact same interest options Ads Manager offers, with real audience sizes — pulled from your connected Meta account{metaConn.label ? ` (${metaConn.label})` : ''}.
+                  </div>
+                  <div className="relative">
+                    <input className="input" placeholder="e.g. streetwear, CrossFit, sustainable fashion…"
+                      value={interestQ} onChange={(e) => setInterestQ(e.target.value)} />
+                    {(searching || interestResults.length > 0 || searchErr) && interestQ.trim().length >= 2 && (
+                      <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-10 bg-surface border border-border rounded-lg shadow-lift max-h-[260px] overflow-y-auto">
+                        {searching && <div className="px-4 py-3 text-[13px] text-ink-muted">Searching Meta…</div>}
+                        {!searching && searchErr && <div className="px-4 py-3 text-[13px] text-coral">{searchErr}</div>}
+                        {!searching && !searchErr && interestResults.length === 0 && (
+                          <div className="px-4 py-3 text-[13px] text-ink-muted">No matching interests.</div>
+                        )}
+                        {!searching && interestResults.map((it) => (
+                          <button key={it.id} type="button" onClick={() => pickInterest(it)}
+                            className="w-full text-left px-4 py-2.5 hover:bg-coral-soft transition-colors border-b border-border last:border-b-0">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-[13.5px] font-medium">{it.name}</span>
+                              {it.audience_size_lower ? (
+                                <span className="text-[11.5px] text-ink-muted">
+                                  {compactCount(it.audience_size_lower)}–{compactCount(it.audience_size_upper)} people
+                                </span>
+                              ) : null}
+                            </div>
+                            {it.path && <div className="text-[11px] text-ink-muted mt-0.5">{it.path}</div>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {picked.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {picked.map((it) => (
+                        <span key={it.id}
+                          onClick={() => setPicked((prev) => prev.filter((p) => p.id !== it.id))}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[13px] font-semibold cursor-pointer bg-coral-soft border-coral text-coral"
+                          title={it.path || it.name}>
+                          {it.name}
+                          {it.audience_size_lower ? (
+                            <span className="font-normal opacity-75">{compactCount(it.audience_size_lower)}+</span>
+                          ) : null}
+                          <span className="font-bold">×</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-[12.5px] text-ink-muted">
+                  Connect your Meta ad account on the <strong>Data</strong> page to search Meta&apos;s real interest
+                  options here (with audience sizes) — until then, use the filter chips below.
+                </div>
+              )}
+            </Card>
+          )}
+
           <div className="space-y-3">
             {cards.map((card) => (
               <ModalFilterPanel
@@ -186,7 +305,7 @@ function CreateAudienceModal({
             ))}
           </div>
 
-          {selectedIds.length > 0 && (
+          {(selectedIds.length > 0 || picked.length > 0) && (
             <Card className="!bg-coral-soft !border-coral/30">
               <div className="text-[11.5px] text-coral font-bold uppercase tracking-[0.08em] mb-1.5">Audience description</div>
               <div className="text-[13.5px] leading-snug">{description}</div>
@@ -196,11 +315,12 @@ function CreateAudienceModal({
 
         <div className="px-7 py-4 border-t border-border flex items-center justify-between bg-bg-deep rounded-b-lg">
           <div className="text-[12.5px] text-ink-muted">
-            <strong>{selectedIds.length}</strong> filter{selectedIds.length === 1 ? '' : 's'} selected
+            <strong>{selectedIds.length}</strong> filter{selectedIds.length === 1 ? '' : 's'}
+            {picked.length > 0 && <> + <strong>{picked.length}</strong> Meta interest{picked.length === 1 ? '' : 's'}</>} selected
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button onClick={save} disabled={!name.trim() || selectedIds.length === 0}>Save audience</Button>
+            <Button onClick={save} disabled={!name.trim() || (selectedIds.length === 0 && picked.length === 0)}>Save audience</Button>
           </div>
         </div>
       </div>

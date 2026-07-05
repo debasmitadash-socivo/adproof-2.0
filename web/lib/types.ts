@@ -64,7 +64,13 @@ export interface CompanyIntel {
 
 // ---- Simulation Lab (/api/lab/run) ----------------------------------------
 export interface LabBand { p10: number; p50: number; p90: number }
+export interface LabEvent { day: number; kind: 'reach' | 'click' | 'convert' | 'wom' | 'fatigue' | 'summary'; text: string }
+export interface MetaInterest {
+  id: string; name: string; path?: string; topic?: string | null;
+  audience_size_lower?: number | null; audience_size_upper?: number | null;
+}
 export interface LabRunResult {
+  events?: LabEvent[];
   kpis: {
     impressions: number;
     ctr: number;                 // fraction
@@ -83,6 +89,7 @@ export interface LabRunResult {
   meta: {
     n_runs: number; sim_days: number; channel: string;
     audience_personas: number; segment: string;
+    audience_source?: string;
     creative: string; fatigue_source: string;
   };
 }

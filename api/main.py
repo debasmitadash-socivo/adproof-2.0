@@ -591,6 +591,25 @@ def connections_test(req: ConnectionTestRequest) -> dict:
         raise HTTPException(status_code=502, detail=str(e)[:400])
 
 
+class InterestSearchRequest(BaseModel):
+    provider: str = "meta"
+    credentials: dict = {}
+    q: str
+
+
+@app.post("/api/connections/interests")
+def connections_interests(req: InterestSearchRequest) -> dict:
+    """Live targeting-interest search (Meta adinterest today) — the same
+    options Ads Manager shows, with audience sizes, for the audience builder."""
+    from connectors import search_interests
+    try:
+        return {"interests": search_interests(req.provider, req.credentials or {}, req.q)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:                            # noqa: BLE001
+        raise HTTPException(status_code=502, detail=str(e)[:300])
+
+
 @app.post("/api/connections/sync")
 def connections_sync(req: ConnectionSyncRequest) -> dict:
     """Pull REAL ad performance from a connected account (read-only) and return
@@ -1858,6 +1877,10 @@ class LabRunRequest(BaseModel):
     aov: Optional[float] = None
     fatigue_per_exposure: Optional[float] = None
     reachable_audience: Optional[int] = None
+    # P3c-lite: the account's REAL age×gender delivery shares — when present,
+    # the simulated population is reshaped to match.
+    audience_mix: Optional[list] = None
+    currency: str = "GBP"
 
 
 @app.post("/api/lab/run")
@@ -1881,6 +1904,7 @@ def lab_run(req: LabRunRequest) -> dict:
                 target_conversion_rate=req.target_conversion_rate,
                 aov=req.aov, fatigue_per_exposure=req.fatigue_per_exposure,
                 reachable_audience=req.reachable_audience,
+                audience_mix=req.audience_mix, currency=req.currency,
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))

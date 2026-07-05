@@ -15,6 +15,7 @@ import type {
   ConnectorProvider,
   CompanyIntel,
   LabRunResult,
+  MetaInterest,
 } from './types';
 
 // Plain-English explanation for infrastructure / HTTP errors that don't carry
@@ -84,6 +85,8 @@ export const api = {
     target_ctr?: number | null; cpm_override?: number | null;
     target_conversion_rate?: number | null; aov?: number | null;
     fatigue_per_exposure?: number | null; reachable_audience?: number | null;
+    audience_mix?: { age: string; gender: string; share: number }[] | null;
+    currency?: string;
   }) =>
     request<LabRunResult>('/api/lab/run', {
       method: 'POST', body: JSON.stringify(payload),
@@ -154,6 +157,12 @@ export const api = {
   // credentials each needs, how gated its access is. UI renders from this.
   connectionProviders: () =>
     request<{ providers: ConnectorProvider[] }>('/api/connections/providers'),
+  // Live targeting-interest search (Meta today) — same options Ads Manager
+  // shows, with audience sizes. Used by the audience builder.
+  searchInterests: (payload: { provider: string; credentials: Record<string, string>; q: string }) =>
+    request<{ interests: MetaInterest[] }>('/api/connections/interests', {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
   // Verify credentials read-only (one cheap GET against the platform).
   testConnection: (payload: { provider: string; credentials: Record<string, string> }) =>
     request<{ ok: boolean; detail: string; account_name?: string | null; currency?: string | null }>(

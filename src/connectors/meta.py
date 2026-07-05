@@ -110,6 +110,38 @@ def test(credentials: dict) -> dict:
             "account_name": data.get("name"), "currency": data.get("currency")}
 
 
+def search_interests(credentials: dict, query: str, limit: int = 25) -> list[dict]:
+    """Live interest targeting search — the SAME options Meta's Ads Manager
+    shows, straight from the Graph API (type=adinterest), with audience
+    sizes. Powers AdProof's audience builder for Meta campaigns."""
+    token = (credentials.get("access_token") or "").strip()
+    if not token:
+        raise ValueError("Missing Meta access token.")
+    q = (query or "").strip()
+    if len(q) < 2:
+        return []
+    resp = requests.get(
+        f"{_BASE}/search",
+        params={"type": "adinterest", "q": q, "limit": min(limit, 50),
+                "access_token": token},
+        timeout=30)
+    data = resp.json()
+    if isinstance(data, dict) and "error" in data:
+        err = data["error"]
+        raise RuntimeError(f"Meta API error: {err.get('message', err)}")
+    out = []
+    for it in data.get("data", []):
+        out.append({
+            "id": str(it.get("id", "")),
+            "name": it.get("name", ""),
+            "audience_size_lower": it.get("audience_size_lower_bound"),
+            "audience_size_upper": it.get("audience_size_upper_bound"),
+            "path": " › ".join(it.get("path") or []),
+            "topic": it.get("topic") or None,
+        })
+    return out
+
+
 def pull_breakdowns(credentials: dict, since: str, until: str,
                     *, timeout: int = 90) -> list[dict]:
     """WHO responded: ad-level insights broken down by age × gender,

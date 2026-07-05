@@ -397,6 +397,7 @@ class AdSimulationModel(_MesaModel):
             "exposed": exposed,
             "clicks": clicks,
             "purchases": purchases,
+            "wom_clicks": wom_clicks,
             "cumulative_exposures": self._cum_exposures,
             "cumulative_clicks": self._cum_clicks,
             "cumulative_purchases": self._cum_purchases,

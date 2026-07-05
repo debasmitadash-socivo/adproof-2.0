@@ -207,6 +207,17 @@ def test_connection(provider: str, credentials: dict) -> dict:
     return _module(p).test(credentials)
 
 
+def search_interests(provider: str, credentials: dict,
+                     query: str) -> list[dict]:
+    """Live targeting-interest search for providers that support it (Meta's
+    adinterest search today). Returns [] for providers without it."""
+    p = _canonical(provider)
+    fn = getattr(_module(p), "search_interests", None)
+    if fn is None:
+        return []
+    return fn(credentials, query)
+
+
 def pull_breakdowns(provider: str, credentials: dict,
                     since: str, until: str) -> list[dict]:
     """Audience breakdown rows (age × gender per ad) for providers that

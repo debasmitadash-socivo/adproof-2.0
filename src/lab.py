@@ -77,13 +77,97 @@ def _agent_state(a) -> int:
     return 0
 
 
+# Meta's breakdown age bands → persona age ranges (P3c-lite conditioning).
+_AGE_BANDS = {
+    "13-17": (13, 17), "18-24": (18, 24), "25-34": (25, 34),
+    "35-44": (35, 44), "45-54": (45, 54), "55-64": (55, 64),
+    "65+": (65, 120),
+}
+
+
+def _condition_to_mix(audience, mix: list[dict]):
+    """Resample the persona population so its age × gender composition
+    matches the account's REAL delivery shares (from ad_breakdowns).
+
+    This is population conditioning, lite: cells with more of the account's
+    delivery get proportionally more agents. Cells the persona pool can't
+    represent are skipped (their share redistributes implicitly). Sampling is
+    with replacement only when a cell is scarcer than its share demands.
+    """
+    import pandas as pd
+    total = sum(float(m.get("share", 0) or 0) for m in mix)
+    if total <= 0:
+        return audience
+    parts = []
+    for m in mix:
+        share = float(m.get("share", 0) or 0) / total
+        if share <= 0:
+            continue
+        lo, hi = _AGE_BANDS.get(str(m.get("age", "")), (18, 120))
+        sel = audience[(audience["age"] >= lo) & (audience["age"] <= hi)]
+        g = str(m.get("gender", "")).lower()
+        if g in ("male", "female") and "gender" in sel.columns:
+            sel = sel[sel["gender"] == g]
+        if len(sel) == 0:
+            continue
+        n = max(1, round(MAX_AGENTS * share))
+        parts.append(sel.sample(n=n, replace=len(sel) < n, random_state=_SEED))
+    if not parts:
+        return audience
+    out = pd.concat(parts, ignore_index=True)
+    return out.head(MAX_AGENTS)
+
+
+def _narrate(recs: list[dict], currency: str, roas_p50: float | None,
+             conv_p50: float | None) -> list[dict]:
+    """Turn ONE representative run's daily records into an honest event
+    stream. Every line traces to a simulated number — no invented drama."""
+    evs: list[dict] = []
+    if not recs:
+        return evs
+    evs.append({"day": 1, "kind": "reach",
+                "text": f"{recs[0]['exposed']:,} people saw the ad for the first time"})
+    first_conv = next((r for r in recs if r["cumulative_purchases"] > 0), None)
+    if first_conv:
+        evs.append({"day": first_conv["day"], "kind": "convert",
+                    "text": f"First conversions land — {first_conv['cumulative_purchases']} buyer"
+                            f"{'s' if first_conv['cumulative_purchases'] != 1 else ''} so far"})
+    best = max(recs, key=lambda r: r["clicks"])
+    if best["clicks"] > 0:
+        evs.append({"day": best["day"], "kind": "click",
+                    "text": f"Peak day: {best['clicks']} clicks in one day"})
+    first_wom = next((r for r in recs if r.get("wom_clicks", 0) > 0), None)
+    if first_wom:
+        total_wom = sum(r.get("wom_clicks", 0) for r in recs)
+        evs.append({"day": first_wom["day"], "kind": "wom",
+                    "text": f"Word of mouth kicks in — {total_wom} clicks arrive via friends of buyers over the flight"})
+    # Fatigue onset: clicks fall below 60% of the peak after the peak.
+    tired = next((r for r in recs
+                  if r["day"] > best["day"] and best["clicks"] > 5
+                  and r["clicks"] < 0.6 * best["clicks"]), None)
+    if tired:
+        evs.append({"day": tired["day"], "kind": "fatigue",
+                    "text": f"Response cooling — daily clicks down to {tired['clicks']} "
+                            f"(peak was {best['clicks']}). In a real flight this is refresh territory."})
+    last = recs[-1]
+    summary = (f"Flight ends: {last['cumulative_clicks']:,} clicks · "
+               f"{last['cumulative_purchases']} conversions in this run")
+    if conv_p50 is not None and roas_p50 is not None:
+        summary += f" · across all runs: {conv_p50:.0f} conversions, {roas_p50:.2f}× ROAS at p50"
+    evs.append({"day": last["day"], "kind": "summary", "text": summary})
+    evs.sort(key=lambda e: e["day"])
+    return evs
+
+
 def run_lab(*, platform_id: str, format_id: str, objective: str,
             budget: float, days: int, daily_reach: float, n_runs: int,
             segment: str, creative_quality: float,
             target_ctr: float | None, cpm_override: float | None,
             target_conversion_rate: float | None,
             aov: float | None, fatigue_per_exposure: float | None,
-            reachable_audience: int | None) -> dict:
+            reachable_audience: int | None,
+            audience_mix: list[dict] | None = None,
+            currency: str = "GBP") -> dict:
     """One Lab simulation. Pure numeric — safe to call repeatedly."""
     days = max(3, min(int(days), MAX_DAYS))
     n_runs = max(2, min(int(n_runs), MAX_RUNS))
@@ -102,6 +186,14 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
     audience = filter_personas(personas, segment)
     if len(audience) < 20:
         raise ValueError(f"Audience '{segment}' has too few personas.")
+    # P3c-lite: reshape the population to the account's REAL delivery mix
+    # (age × gender shares from their synced breakdowns).
+    conditioned = False
+    if audience_mix:
+        shaped = _condition_to_mix(audience, audience_mix)
+        if len(shaped) >= 20:
+            audience = shaped
+            conditioned = True
     if len(audience) > MAX_AGENTS:
         audience = audience.sample(MAX_AGENTS, random_state=_SEED)
 
@@ -160,7 +252,12 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
     spend = float(budget)
     cpm = spend / mc.total_impressions * 1000 if mc.total_impressions else None
 
+    events = _narrate(tm.daily_records, currency,
+                      float(mc.predicted_roas.get("p50", 0)) or None,
+                      float(mc.predicted_conversions.get("p50", 0)) or None)
+
     result = {
+        "events": events,
         "kpis": {
             "impressions": int(mc.total_impressions),
             "ctr": round(mean_ctr, 5),
@@ -180,6 +277,8 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
         "meta": {
             "n_runs": n_runs, "sim_days": days, "channel": channel,
             "audience_personas": int(len(audience)), "segment": segment,
+            "audience_source": ("your real delivery mix (age × gender)"
+                                if conditioned else "generic segment"),
             "creative": "hypothetical (quality slider)",
             "fatigue_source": ("account/custom" if fatigue_per_exposure is not None
                                else "generic default 0.10"),
