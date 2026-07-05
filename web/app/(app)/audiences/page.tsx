@@ -220,7 +220,13 @@ function CreateAudienceModal({
             </div>
             <div>
               <label className="label">Platform</label>
-              <select className="input" value={platformId} onChange={(e) => { setPlatformId(e.target.value); setSelections({}); }}>
+              <select className="input" value={platformId} onChange={(e) => {
+                setPlatformId(e.target.value); setSelections({});
+                // Meta interests only make sense on Meta placements — drop
+                // them when leaving Meta so they can't silently ride along
+                // into a LinkedIn/Google audience with no visible chips.
+                if (!e.target.value.startsWith('meta_')) { setPicked([]); setInterestQ(''); }
+              }}>
                 <option value="meta_instagram">Meta — Instagram</option>
                 <option value="meta_facebook">Meta — Facebook</option>
                 <option value="linkedin">LinkedIn</option>

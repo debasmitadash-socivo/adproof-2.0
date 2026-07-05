@@ -456,6 +456,10 @@ export default function LabPage() {
   const [pinned, setPinned] = useState<Pinned[]>([]);
   const pinSeq = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  // The control values that produced the CURRENT result — pins must be
+  // labelled with these, not the live sliders (which may already have moved
+  // during the debounce/API window).
+  const resultParams = useRef<{ budget: number; days: number; quality: number; audLabel: string } | null>(null);
 
   const [defaultsNote, setDefaultsNote] = useState<Record<string, Provenance>>({});
 
@@ -561,7 +565,11 @@ export default function LabPage() {
       fatigue_per_exposure: fatigue / 100,
       reachable_audience: null,
       audience_mix: audience.mix, currency: cur,
-    }).then((r) => { if (!ac.signal.aborted) { setResult(r); setRunning(false); } })
+    }).then((r) => {
+      if (ac.signal.aborted) return;
+      resultParams.current = { budget, days, quality, audLabel: audience.label };
+      setResult(r); setRunning(false);
+    })
       .catch((e) => {
         if (ac.signal.aborted) return;
         setError((e as Error).message); setRunning(false);
@@ -577,11 +585,13 @@ export default function LabPage() {
   // ---- Scenario tray -----------------------------------------------------------
   function pinCurrent() {
     if (!result || pinned.length >= 2) return;
+    // Label from the params that PRODUCED this result, not the live sliders.
+    const p = resultParams.current ?? { budget, days, quality, audLabel: audience.label };
     pinSeq.current += 1;
     setPinned((cur0) => [...cur0, {
       id: pinSeq.current,
-      label: `${cur} ${(budget / 1000).toFixed(budget >= 10000 ? 0 : 1)}k · ${days}d · q${quality} · ${audience.label.slice(0, 14)}`,
-      color: GHOST_COLORS[cur0.length % GHOST_COLORS.length],
+      label: `${cur} ${(p.budget / 1000).toFixed(p.budget >= 10000 ? 0 : 1)}k · ${p.days}d · q${p.quality} · ${p.audLabel.slice(0, 14)}`,
+      color: GHOST_COLORS.find((c) => !cur0.some((x) => x.color === c)) ?? GHOST_COLORS[0],
       kpis: result.kpis,
       p50: result.daily.map((d) => d.clicks.p50 ?? 0),
     }]);
@@ -624,7 +634,11 @@ export default function LabPage() {
     }
     return [
       { label: 'Conversions', v: Math.round(k.conversions.p50).toLocaleString(), sub: `${Math.round(k.conversions.p10)}–${Math.round(k.conversions.p90)}`, d: delta(k.conversions.p50, baseline?.kpis.conversions.p50) },
-      { label: 'Cost / conversion', v: k.conversions.p50 > 0 ? money(k.spend / k.conversions.p50) : '—', sub: 'at p50', d: delta(k.spend / Math.max(k.conversions.p50, 0.01), baseline ? baseline.kpis.spend / Math.max(baseline.kpis.conversions.p50, 0.01) : undefined, true) },
+      // CPA delta only when BOTH sides actually converted — dividing by a
+      // floored 0.01 fabricates absurd numbers next to a '—' value.
+      { label: 'Cost / conversion', v: k.conversions.p50 > 0 ? money(k.spend / k.conversions.p50) : '—', sub: 'at p50',
+        d: (k.conversions.p50 > 0 && baseline && baseline.kpis.conversions.p50 > 0)
+          ? delta(k.spend / k.conversions.p50, baseline.kpis.spend / baseline.kpis.conversions.p50, true) : null },
       { label: 'ROAS', v: `${k.roas.p50.toFixed(2)}×`, sub: `${k.roas.p10.toFixed(2)}–${k.roas.p90.toFixed(2)}×`, d: delta(k.roas.p50, baseline?.kpis.roas.p50) },
     ];
   }, [result, objective, cur, baseline]);
@@ -741,7 +755,7 @@ export default function LabPage() {
               <span className={ctl} style={{ color: LAB.faint }}>
                 Fatigue · <ProvChip p={defaultsNote.fatigue ?? 'assumption'} />
               </span>
-              <input type="range" min={0} max={30} value={fatigue}
+              <input type="range" min={0} max={35} value={fatigue}
                 onChange={(e) => setFatigue(Number(e.target.value))}
                 className="w-full" style={{ accentColor: LAB.clicked }} />
               <span className="font-mono text-[13px]">−{fatigue}% per repeat view</span>
