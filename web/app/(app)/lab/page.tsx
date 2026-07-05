@@ -404,7 +404,7 @@ export default function LabPage() {
                 }}
                 className="w-full rounded-md px-2.5 py-2 text-[12.5px] mb-1.5 border-0"
                 style={{ background: LAB.panel, color: LAB.ink }}>
-                {platforms.map((p) => <option key={p.id} value={p.id}>{p.name.split(' — ')[0]}</option>)}
+                {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <select value={format?.id ?? ''} onChange={(e) => setFormatId(e.target.value)}
                 className="w-full rounded-md px-2.5 py-2 text-[12.5px] border-0"

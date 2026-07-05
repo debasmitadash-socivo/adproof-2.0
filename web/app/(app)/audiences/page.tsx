@@ -16,6 +16,10 @@ export default function AudiencesPage() {
   const audiences = useApp((s) => s.savedAudiences);
   const addAudience = useApp((s) => s.addAudience);
   const deleteAudience = useApp((s) => s.deleteAudience);
+  const moveAudience = useApp((s) => s.moveAudience);
+  const companies = useApp((s) => s.companies);
+  const currentCompanyId = useApp((s) => s.currentCompanyId);
+  const otherWorkspaces = companies.filter((c) => c.id && c.id !== currentCompanyId);
   const [creating, setCreating] = useState(false);
 
   return (
@@ -45,7 +49,9 @@ export default function AudiencesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {audiences.map((a) => (
-            <AudienceCard key={a.id} audience={a} onDelete={() => deleteAudience(a.id)} />
+            <AudienceCard key={a.id} audience={a} onDelete={() => deleteAudience(a.id)}
+              moveTargets={otherWorkspaces.map((w) => ({ id: w.id!, name: w.company_name || 'Untitled' }))}
+              onMove={(target) => moveAudience(a.id, target).catch((e) => window.alert((e as Error).message))} />
           ))}
         </div>
       )}
@@ -60,7 +66,11 @@ export default function AudiencesPage() {
   );
 }
 
-function AudienceCard({ audience, onDelete }: { audience: SavedAudience; onDelete: () => void }) {
+function AudienceCard({ audience, onDelete, moveTargets, onMove }: {
+  audience: SavedAudience; onDelete: () => void;
+  moveTargets: { id: string; name: string }[];
+  onMove: (targetCompanyId: string) => void;
+}) {
   return (
     <Card className="relative">
       <div className="flex items-start justify-between mb-2">
@@ -68,7 +78,22 @@ function AudienceCard({ audience, onDelete }: { audience: SavedAudience; onDelet
           <div className="font-semibold text-[15px]">{audience.name}</div>
           <div className="text-[11.5px] text-ink-muted mt-0.5">Created {new Date(audience.createdAt).toLocaleDateString()}</div>
         </div>
-        <Pill tone="coral">{audience.segment}</Pill>
+        <div className="flex items-center gap-1.5">
+          {moveTargets.length > 0 && (
+            <select value="" title="Move this audience to another workspace"
+              onChange={(e) => {
+                const t = e.target.value; e.target.value = '';
+                if (!t) return;
+                const name = moveTargets.find((w) => w.id === t)?.name ?? 'that workspace';
+                if (window.confirm(`Move "${audience.name}" to ${name}?`)) onMove(t);
+              }}
+              className="text-[11px] text-ink-muted bg-transparent border border-border rounded-md px-1 py-0.5 cursor-pointer max-w-[80px]">
+              <option value="">Move…</option>
+              {moveTargets.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          )}
+          <Pill tone="coral">{audience.segment}</Pill>
+        </div>
       </div>
       <div className="text-[13px] text-ink leading-snug mb-3">{audience.description || <em className="text-ink-muted">No description</em>}</div>
       <div className="flex items-center gap-2">

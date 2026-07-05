@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { api } from '@/lib/api';
-import { saveCalibration, insertOutcomes, insertBreakdowns, getLatestCalibration } from '@/lib/db';
+import {
+  saveCalibration, insertOutcomes, insertBreakdowns, getLatestCalibration,
+  clearWorkspaceResults, clearWorkspaceCalibrations,
+} from '@/lib/db';
 import { useApp } from '@/lib/store';
 import { PlatformConnections } from '@/components/PlatformConnections';
 import type { IngestResult, AccountCalibration, PlatformCalibration } from '@/lib/types';
@@ -476,6 +479,41 @@ export default function DataPage() {
           )}
         </>
       )}
+
+      {/* STORAGE — clear this workspace's synced data. Free-tier Supabase
+          space is finite; daily-grain syncs are the bulk of it. */}
+      <Card className="mt-8 !border-danger/30">
+        <div className="font-heading text-[15px] font-bold mb-1">Storage</div>
+        <p className="text-[12.5px] text-ink-muted mb-3">
+          Synced results are the bulk of your database use. Clearing them frees space —
+          re-pull from a connected platform any time to get them back.
+        </p>
+        <div className="flex gap-3 flex-wrap">
+          <Button variant="ghost" className="!text-danger" disabled={!currentCompanyId}
+            onClick={async () => {
+              if (!currentCompanyId) return;
+              if (!window.confirm('Delete ALL synced results (ad rows + audience breakdowns) for this workspace? Your calibration snapshot stays; re-pull to restore the rows.')) return;
+              try {
+                await clearWorkspaceResults(currentCompanyId);
+                setSaved('Synced results cleared. Re-pull from a connected platform to restore them.');
+              } catch (e) { setError((e as Error).message); }
+            }}>
+            Clear synced results…
+          </Button>
+          <Button variant="ghost" className="!text-danger" disabled={!currentCompanyId || !existing}
+            onClick={async () => {
+              if (!currentCompanyId) return;
+              if (!window.confirm('Delete this workspace\'s calibration? Forecasts fall back to generic benchmarks until your next pull or upload.')) return;
+              try {
+                await clearWorkspaceCalibrations(currentCompanyId);
+                setExisting(null);
+                setSaved('Calibration cleared — forecasts use generic benchmarks until the next pull.');
+              } catch (e) { setError((e as Error).message); }
+            }}>
+            Clear calibration…
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }

@@ -22,6 +22,8 @@ import {
   listAudiences as dbListAudiences,
   saveCompany as dbSaveCompany,
   createCompany as dbCreateCompany,
+  deleteCompanyById as dbDeleteCompanyById,
+  moveAudience as dbMoveAudience,
   listCompanies as dbListCompanies,
   claimPendingInvites as dbClaimPendingInvites,
 } from './db';
@@ -50,6 +52,7 @@ interface AppState {
   currentCompanyId: string | null;
   setCurrentCompany: (id: string) => Promise<void>;
   createWorkspace: (p: CompanyProfile) => Promise<string>;
+  deleteWorkspace: (id: string) => Promise<void>;
 
   savedCampaigns: SavedCampaign[];
   addCampaign: (c: SavedCampaign) => void;
@@ -59,6 +62,7 @@ interface AppState {
   savedAudiences: SavedAudience[];
   addAudience: (a: SavedAudience) => void;
   deleteAudience: (id: string) => void;
+  moveAudience: (id: string, targetCompanyId: string) => Promise<void>;
 
   hydrated: boolean;
   setHydrated: (b: boolean) => void;
@@ -258,6 +262,20 @@ export const useApp = create<AppState>()(
         }));
         return id;
       },
+      deleteWorkspace: async (id) => {
+        // DB first (owner-only via RLS; FK cascades wipe its data). Only then
+        // update local state and hop to another workspace — or back to
+        // onboarding if none remain.
+        await dbDeleteCompanyById(id);
+        const remaining = get().companies.filter((c) => c.id !== id);
+        set({ companies: remaining });
+        if (get().currentCompanyId === id) {
+          const next = remaining[0]?.id;
+          if (next) await get().setCurrentCompany(next);
+          else set({ currentCompanyId: null, companyProfile: null,
+                     savedCampaigns: [], savedAudiences: [] });
+        }
+      },
       savedCampaigns: [],
       addCampaign: (c) => {
         // Tag every new campaign with the current workspace. Fall back to the
@@ -288,6 +306,10 @@ export const useApp = create<AppState>()(
       deleteAudience: (id) => {
         set((s) => ({ savedAudiences: s.savedAudiences.filter((a) => a.id !== id) }));
         dbDeleteAudience(id).catch((e) => console.error('[db] deleteAudience', e));
+      },
+      moveAudience: async (id, targetCompanyId) => {
+        await dbMoveAudience(id, targetCompanyId);   // DB first — a failed move must not hide it
+        set((s) => ({ savedAudiences: s.savedAudiences.filter((a) => a.id !== id) }));
       },
       hydrated: false,
       setHydrated: (b) => set({ hydrated: b }),

@@ -105,6 +105,46 @@ export async function saveCompany(p: CompanyProfile): Promise<void> {
   if (error) console.error('[db] saveCompany', error.message);
 }
 
+/** Delete a workspace outright. FK cascades take its campaigns, audiences,
+ *  outcomes, breakdowns, calibrations and connections with it. RLS keeps
+ *  this owner-only. Irreversible — callers must confirm with the user. */
+export async function deleteCompanyById(id: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured.');
+  const { error } = await sb.from('companies').delete().eq('id', id);
+  if (error) throw new Error(`Couldn\'t delete the workspace: ${error.message}`);
+}
+
+/** Move an audience to another workspace (fixes cross-workspace bleed). */
+export async function moveAudience(audienceId: string, targetCompanyId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured.');
+  const { error } = await sb.from('audiences')
+    .update({ company_id: targetCompanyId }).eq('id', audienceId);
+  if (error) throw new Error(`Couldn\'t move the audience: ${error.message}`);
+}
+
+/** Storage hygiene: wipe this workspace's synced results (ad_outcomes +
+ *  ad_breakdowns). The calibration snapshot survives unless cleared too. */
+export async function clearWorkspaceResults(companyId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured.');
+  const { error } = await sb.from('ad_outcomes').delete().eq('company_id', companyId);
+  if (error) throw new Error(`Couldn\'t clear results: ${error.message}`);
+  // Breakdowns table may predate migration 0010 — best-effort.
+  const { error: e2 } = await sb.from('ad_breakdowns').delete().eq('company_id', companyId);
+  if (e2 && !isMissingTable(e2)) console.error('[db] clear breakdowns', e2.message);
+}
+
+/** Storage hygiene: drop this workspace's stored calibrations (forecasts
+ *  fall back to generic benchmarks until the next pull/upload). */
+export async function clearWorkspaceCalibrations(companyId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase isn\'t configured.');
+  const { error } = await sb.from('calibrations').delete().eq('company_id', companyId);
+  if (error) throw new Error(`Couldn\'t clear calibrations: ${error.message}`);
+}
+
 /** Backward-compat for code that loaded "the company": returns the first one. */
 export async function getCompany(): Promise<CompanyProfile | null> {
   const list = await listCompanies();

@@ -28,6 +28,7 @@ function CompanyPageInner() {
   const setProfile = useApp((s) => s.setCompanyProfile);
   const savedAudiences = useApp((s) => s.savedAudiences);
   const addAudience = useApp((s) => s.addAudience);
+  const deleteWorkspace = useApp((s) => s.deleteWorkspace);
 
   const [text, setText] = useState(desc);
   const [parsing, setParsing] = useState(false);
@@ -511,6 +512,37 @@ function CompanyPageInner() {
         </Card>
 
         <WorkspaceTeam workspaceId={profile?.id} isOwner={!profile?.shared} />
+
+        {/* DANGER ZONE — delete this workspace outright. Owner-only (RLS
+            enforces it; the UI hides it for shared members). Cascades take
+            campaigns, audiences, synced results and connections with it. */}
+        {profile?.id && !profile.shared && (
+          <Card className="!border-danger/40">
+            <CardTitle>Danger zone</CardTitle>
+            <p className="text-[13px] text-ink-muted -mt-1 mb-3">
+              Deleting this workspace permanently removes its campaigns, audiences,
+              synced results and platform connections. This cannot be undone.
+            </p>
+            <Button
+              variant="ghost"
+              className="!text-danger"
+              onClick={async () => {
+                const name = profile.company_name || 'this workspace';
+                const typed = window.prompt(
+                  `This permanently deletes "${name}" and ALL its data.\n\nType DELETE to confirm:`);
+                if (typed !== 'DELETE') return;
+                try {
+                  await deleteWorkspace(profile.id!);
+                  window.location.href = '/dashboard';
+                } catch (e) {
+                  window.alert((e as Error).message);
+                }
+              }}
+            >
+              Delete this workspace…
+            </Button>
+          </Card>
+        )}
         </div>
       </div>
     </>

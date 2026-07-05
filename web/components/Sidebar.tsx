@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useApp, userInitials, workspaceLabel } from '@/lib/store';
+import { getSupabase } from '@/lib/supabase';
 
 const Icon = {
   Grid: (<svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>),
@@ -19,7 +20,16 @@ const Icon = {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const resetAccount = useApp((s) => s.resetAccount);
   const user = useApp((s) => s.user);
+
+  async function signOut() {
+    const sb = getSupabase();
+    if (sb) await sb.auth.signOut();
+    resetAccount();
+    router.replace('/login');
+  }
   const profile = useApp((s) => s.companyProfile);
   const companies = useApp((s) => s.companies);
   const currentCompanyId = useApp((s) => s.currentCompanyId);
@@ -153,14 +163,28 @@ export function Sidebar() {
           </Link>
         ))}
       </nav>
-      <Link href="/settings"
-        className="relative z-10 mt-auto pt-3.5 border-t border-border flex items-center gap-2.5 px-2.5 hover:bg-coral-soft -mx-3.5 px-3.5 py-3 transition-colors">
-        <div className="w-8 h-8 rounded-[10px] bg-gradient-aurora text-white font-heading font-bold text-[12px] flex items-center justify-center">{initials}</div>
-        <div className="min-w-0">
-          <div className="text-[13px] font-semibold truncate">{userName}</div>
-          <div className="text-[11.5px] text-ink-muted truncate">{userEmail}</div>
-        </div>
-      </Link>
+      <div className="relative z-10 mt-auto pt-3.5 border-t border-border -mx-3.5 px-3.5 py-3 flex items-center gap-2">
+        <Link href="/settings" className="flex items-center gap-2.5 flex-1 min-w-0 rounded-lg px-1 py-1 hover:bg-coral-soft transition-colors">
+          <div className="w-8 h-8 rounded-[10px] bg-gradient-aurora text-white font-heading font-bold text-[12px] flex items-center justify-center">{initials}</div>
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold truncate">{userName}</div>
+            <div className="text-[11.5px] text-ink-muted truncate">{userEmail}</div>
+          </div>
+        </Link>
+        <button
+          type="button"
+          onClick={signOut}
+          title="Sign out"
+          aria-label="Sign out"
+          className="shrink-0 p-2 rounded-lg text-ink-muted hover:text-danger hover:bg-danger-soft transition-colors"
+        >
+          <svg className="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16,17 21,12 16,7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
+      </div>
     </aside>
   );
 }
