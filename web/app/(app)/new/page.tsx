@@ -276,8 +276,10 @@ export default function NewAnalysisPage() {
           // decay (λ, observed CTR slope per repeat view). The backend runs
           // the simcal bisection loop to convert it into the engine's logit
           // constant — never pasted in raw.
+          // λ floored to 0 means "not identified" (confounded fit), not
+          // "no fatigue" — only a genuinely positive decay is calibration.
           const fat = cal.auction?.fatigue;
-          if (fat?.usable && fat.lambda_per_exposure != null) {
+          if (fat?.usable && fat.lambda_per_exposure != null && fat.lambda_per_exposure > 0) {
             calFatigueLambda = fat.lambda_per_exposure;
           }
         }

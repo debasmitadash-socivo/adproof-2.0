@@ -125,7 +125,14 @@ def search_interests(credentials: dict, query: str, limit: int = 25) -> list[dic
         params={"type": "adinterest", "q": q, "limit": min(limit, 50),
                 "access_token": token},
         timeout=30)
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError:
+        # Non-JSON body (HTML rate-limit / proxy page) — say what happened
+        # instead of surfacing a JSONDecodeError.
+        raise RuntimeError(
+            f"Meta's interest search didn't answer properly "
+            f"(HTTP {resp.status_code}). Wait a moment and try again.")
     if isinstance(data, dict) and "error" in data:
         err = data["error"]
         raise RuntimeError(f"Meta API error: {err.get('message', err)}")

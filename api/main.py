@@ -15,6 +15,7 @@ Run with:
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import sys
@@ -2391,15 +2392,26 @@ def simulate(req: SimulateRequest) -> dict:
     # Simulation-calibrated fatigue provenance (when the account's fitted
     # decay drove the engine constant through the simcal loop).
     _ffit = result.get("fatigue_fit")
-    if _ffit:
+    if _ffit and _ffit["lambda_target"] > 0:
+        # lambda is a ln-CTR slope: per-view drop = 1 − e^−λ, not λ×100.
+        _pct = (1 - math.exp(-_ffit["lambda_target"])) * 100
+        if _ffit.get("converged"):
+            _note = (f"Fitted from your ad history, then converted to the engine's "
+                     f"internal constant (θ={_ffit['theta']:.3f}) by running the "
+                     f"simulation until its decay matched yours — pasting the raw "
+                     f"slope in would understate fatigue ~2×.")
+        else:
+            _sim_pct = (1 - math.exp(-_ffit["lambda_sim"])) * 100
+            _note = (f"Your fitted decay is steeper than the simulation can "
+                     f"express — we used the engine's maximum "
+                     f"(−{_sim_pct:.0f}%/view, θ={_ffit['theta']:.3f}), so "
+                     f"late-flight fatigue may still be understated. Steep "
+                     f"cross-ad slopes are often partly confounding.")
         data_sources.append({
             "label": "Creative fatigue",
             "value": (f"✨ your account — observed "
-                      f"−{_ffit['lambda_target'] * 100:.0f}% CTR per repeat view"),
-            "note": (f"Fitted from your ad history, then converted to the engine's "
-                     f"internal constant (θ={_ffit['theta']:.3f}) by running the "
-                     f"simulation until its decay matched yours — pasting the raw "
-                     f"slope in would understate fatigue ~2×."),
+                      f"−{_pct:.0f}% CTR per repeat view"),
+            "note": _note,
         })
 
     # Industry × platform context (Phase 1 of benchmark integration). When

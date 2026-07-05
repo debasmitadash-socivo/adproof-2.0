@@ -23,6 +23,20 @@ Proven by parameter recovery (scripts/test_simcal.py): simulate a known
 theta_true, fit lambda from the synthetic data the real way, run this loop,
 and the recovered theta_hat must land within tolerance of theta_true —
 otherwise the loop doesn't ship.
+
+KNOWN LIMITS (be honest about them):
+- The simulated moment is measured over uniform frequencies 1..MAX_FREQ;
+  a real account whose ads cluster at low frequency (1-3) sees a slightly
+  steeper slope over that range (ln-cumulative-CTR is nonlinear in f), so
+  theta carries a design bias of order ~10% for such accounts. Fixing this
+  properly means passing the account's real frequency distribution through.
+- The moment has a structural ceiling: cumulative CTR >= p1/f, so
+  ln-cum-CTR can't fall faster than -ln f and lambda_sim maxes out around
+  ~0.17-0.26 depending on regime. A fitted lambda above that (legal — the
+  upstream clamp allows up to 0.35, and cross-ad fits can be confounded
+  upward) hits the theta bracket cap with converged=False. Callers MUST
+  check `converged` and present the result as 'closest achievable', not as
+  a successful match.
 """
 from __future__ import annotations
 
@@ -121,9 +135,14 @@ def fit_fatigue_theta(*, lambda_target: float, audience, ad, calibration,
 
     # Cache on the decision-relevant regime: the anchor CTR moves the
     # sigmoid's operating point, which is exactly why this loop exists.
+    # The FULL creative (visual + psychology dicts) is keyed — two ads with
+    # equal mean visual score but different psychology land at genuinely
+    # different thetas (measured ~1.7x apart), so a mean is not enough.
+    def _sig(d: dict) -> tuple:
+        return tuple(sorted((k, round(float(v), 4)) for k, v in d.items()))
     key = (round(lam, 4), channel,
            round(target_ctr, 5) if target_ctr else None,
-           round(float(np.mean(list(ad.visual_scores.values()))), 3),
+           _sig(ad.visual_scores), _sig(ad.psychology_features),
            len(audience))
     with _cache_lock:
         if key in _cache:

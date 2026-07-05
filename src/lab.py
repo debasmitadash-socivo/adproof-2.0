@@ -107,19 +107,24 @@ def _condition_to_mix(audience, mix: list[dict]):
 
     This is population conditioning, lite: cells with more of the account's
     delivery get proportionally more agents. Cells the persona pool can't
-    represent are skipped (their share redistributes implicitly). Sampling is
-    with replacement only when a cell is scarcer than its share demands.
+    represent — and cells with an unrecognised age band ('unknown') — are
+    skipped, their share redistributing across the matched cells. Returns
+    None when NO cell matched, so the caller never claims a population was
+    conditioned when it wasn't.
     """
     import pandas as pd
     total = sum(float(m.get("share", 0) or 0) for m in mix)
     if total <= 0:
-        return audience
+        return None
     parts = []
     for m in mix:
         share = float(m.get("share", 0) or 0) / total
         if share <= 0:
             continue
-        lo, hi = _AGE_BANDS.get(str(m.get("age", "")), (18, 120))
+        band = _AGE_BANDS.get(str(m.get("age", "")))
+        if band is None:
+            continue      # 'unknown' / unrecognised band can't condition
+        lo, hi = band
         sel = audience[(audience["age"] >= lo) & (audience["age"] <= hi)]
         g = str(m.get("gender", "")).lower()
         if g in ("male", "female") and "gender" in sel.columns:
@@ -129,7 +134,7 @@ def _condition_to_mix(audience, mix: list[dict]):
         n = max(1, round(MAX_AGENTS * share))
         parts.append(sel.sample(n=n, replace=len(sel) < n, random_state=_SEED))
     if not parts:
-        return audience
+        return None
     # Shuffle so any downstream subsample (the ≤400-agent timeline) keeps the
     # mix's proportions instead of over-representing the first cell.
     out = pd.concat(parts, ignore_index=True) \
@@ -178,6 +183,26 @@ def _narrate(recs: list[dict], currency: str, roas_p50: float | None,
     return evs
 
 
+def _fatigue_source(fit: dict | None) -> str:
+    """Honest one-liner about how the fatigue constant was set. lambda is a
+    ln-CTR slope, so the per-view CTR drop is 1−e^−λ (NOT λ×100); a
+    non-converged fit is the engine's CEILING, not a successful match."""
+    import math
+    if fit is None:
+        return "generic default 0.10"
+    lam = fit["lambda_target"]
+    if lam <= 0:
+        return "no fatigue (decay set to 0)"
+    pct = (1 - math.exp(-lam)) * 100
+    if not fit.get("converged"):
+        sim_pct = (1 - math.exp(-fit["lambda_sim"])) * 100
+        return (f"observed −{pct:.0f}%/view exceeds what the model can "
+                f"express — using its steepest decay (−{sim_pct:.0f}%/view, "
+                f"θ={fit['theta']:.3f})")
+    return (f"simulation-calibrated (observed −{pct:.0f}%/view "
+            f"→ engine θ={fit['theta']:.3f})")
+
+
 def run_lab(*, platform_id: str, format_id: str, objective: str,
             budget: float, days: int, daily_reach: float, n_runs: int,
             segment: str, creative_quality: float,
@@ -210,7 +235,7 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
     conditioned = False
     if audience_mix:
         shaped = _condition_to_mix(audience, audience_mix)
-        if len(shaped) >= 20:
+        if shaped is not None and len(shaped) >= 20:
             audience = shaped
             conditioned = True
     if len(audience) > MAX_AGENTS:
@@ -236,8 +261,11 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
     theta = fatigue_per_exposure
     fatigue_fit = None
     if fatigue_per_exposure is not None:
+        # Clamp to the same plausibility bounds the account fit uses — the
+        # API layer doesn't validate this field.
+        lam_in = min(max(float(fatigue_per_exposure), 0.0), 0.35)
         fatigue_fit = fit_fatigue_theta(
-            lambda_target=float(fatigue_per_exposure), audience=audience,
+            lambda_target=lam_in, audience=audience,
             ad=ad, calibration=calibration, channel=channel,
             target_ctr=target_ctr)
         theta = fatigue_fit["theta"]
@@ -314,10 +342,7 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
             "audience_source": ("your real delivery mix (age × gender)"
                                 if conditioned else "generic segment"),
             "creative": "hypothetical (quality slider)",
-            "fatigue_source": (
-                (f"simulation-calibrated (observed −{fatigue_fit['lambda_target'] * 100:.0f}%/view "
-                 f"→ engine θ={fatigue_fit['theta']:.3f})")
-                if fatigue_fit is not None else "generic default 0.10"),
+            "fatigue_source": _fatigue_source(fatigue_fit),
             "fatigue_fit": fatigue_fit,
         },
     }

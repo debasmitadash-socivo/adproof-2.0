@@ -758,7 +758,9 @@ export default function LabPage() {
               <input type="range" min={0} max={35} value={fatigue}
                 onChange={(e) => setFatigue(Number(e.target.value))}
                 className="w-full" style={{ accentColor: LAB.clicked }} />
-              <span className="font-mono text-[13px]">−{fatigue}% per repeat view</span>
+              {/* slider stores λ×100 (a ln-CTR slope); the honest per-view
+                  CTR drop is 1−e^−λ, which diverges from λ as it grows */}
+              <span className="font-mono text-[13px]">−{((1 - Math.exp(-fatigue / 100)) * 100).toFixed(0)}% CTR per repeat view</span>
             </div>
             <div>
               <span className={ctl} style={{ color: LAB.faint }}>Order value</span>

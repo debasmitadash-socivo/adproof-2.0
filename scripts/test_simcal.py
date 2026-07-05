@@ -122,6 +122,15 @@ def main() -> int:
                           calibration=calibration, channel="instagram",
                           target_ctr=target_ctr)
     check("lambda<=0 short-circuits to theta=0", z["theta"] == 0.0 and z["converged"])
+    # The moment has a structural ceiling (~0.17 in this regime): a fitted
+    # lambda above it must come back converged=False so callers can present
+    # it as 'closest achievable', never as a successful match.
+    cap = fit_fatigue_theta(lambda_target=0.30, audience=personas, ad=ad,
+                            calibration=calibration, channel="instagram",
+                            target_ctr=target_ctr)
+    check("lambda beyond the engine's ceiling reports converged=False",
+          not cap["converged"] and cap["lambda_sim"] < 0.30,
+          f"theta={cap['theta']}, lambda_sim={cap['lambda_sim']}")
 
     if FAILURES:
         print(f"\n{len(FAILURES)} FAILURE(S): {FAILURES}")

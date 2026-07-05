@@ -800,10 +800,13 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
     # the engine constant whose SIMULATED decay reproduces it. Pasting
     # lambda into the logit directly understates fatigue ~2× (the sigmoid
     # squashes it) — see src/simcal.py and scripts/test_simcal.py.
+    # lam == 0 means the account fit was floored (CTR rising with frequency
+    # = confounding — "not identified", NOT "no fatigue"): keep the generic
+    # constant rather than switching fatigue off and calling it calibration.
     fatigue_theta = None
     fatigue_fit = None
     lam = getattr(brief, "fatigue_lambda", None)
-    if lam is not None and lam >= 0:
+    if lam is not None and lam > 0:
         try:
             fatigue_fit = fit_fatigue_theta(
                 lambda_target=float(lam), audience=audience, ad=ad,
