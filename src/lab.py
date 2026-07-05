@@ -293,15 +293,20 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
         fatigue_per_exposure=theta,
         seed=_SEED,
     )
-    n_show = min(TIMELINE_AGENTS, len(tm.consumer_agents))
-    stride = max(1, len(tm.consumer_agents) // n_show)
-    shown = tm.consumer_agents[::stride][:n_show]
-    frames: list[str] = []
-    for _ in range(days):
-        tm.step()
-        frames.append("".join(str(_agent_state(a)) for a in shown))
-    tm_daily_records = tm.daily_records     # needed below, after tm is released
-    release_model(tm)     # else mesa.Agent._ids pins this model forever
+    try:
+        n_show = min(TIMELINE_AGENTS, len(tm.consumer_agents))
+        stride = max(1, len(tm.consumer_agents) // n_show)
+        shown = tm.consumer_agents[::stride][:n_show]
+        frames: list[str] = []
+        for _ in range(days):
+            tm.step()
+            frames.append("".join(str(_agent_state(a)) for a in shown))
+        tm_daily_records = tm.daily_records  # needed below, after tm is released
+    finally:
+        # Release even if the manual step loop raises, so a mid-run failure
+        # can't leak the model into mesa.Agent._ids the same way skipping
+        # the release entirely would have.
+        release_model(tm)     # else mesa.Agent._ids pins this model forever
     del tm
 
     env_clicks = mc.daily_envelope("clicks")

@@ -856,7 +856,8 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
                      "reachable_audience": brief.reachable_audience,
                      "aov_multiplier": aov_mult,
                      "aov_override": aov_override,
-                     "visual_weights": obj_visual_weights},
+                     "visual_weights": obj_visual_weights,
+                     "fatigue_per_exposure": fatigue_theta},
         n_runs=small_runs,
     )
     reach_sweep = sensitivity_sweep(
@@ -870,7 +871,8 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
                      "reachable_audience": brief.reachable_audience,
                      "aov_multiplier": aov_mult,
                      "aov_override": aov_override,
-                     "visual_weights": obj_visual_weights},
+                     "visual_weights": obj_visual_weights,
+                     "fatigue_per_exposure": fatigue_theta},
         n_runs=small_runs,
     )
 

@@ -268,22 +268,26 @@ def monte_carlo(personas,
             fatigue_per_exposure=fatigue_per_exposure,
             seed=base_seed + i,
         )
-        r = model.run()
-        sample_ctr.append(r.ctr)
-        sample_conv.append(r.conversion_rate)
-        sample_conv_expected.append(r.expected_conversion_rate)
-        sample_buy.append(r.buy_rate)
-        aovs.append(r.mean_buyer_aov)        # always non-zero thanks to fallback
-        daily_records.append(r.daily_records)
-        factor_runs.append(r.aggregate_click_factors)
-        # The agent model + its word-of-mouth graph hold CIRCULAR references
-        # (model <-> agents <-> network), so plain ref-counting never frees
-        # them — all n_runs pile up until the cyclic GC eventually fires, which
-        # on a small (Railway) instance is too late and OOM-kills the worker
-        # (seen as a 502). Drop the refs and force a cyclic collection each run
-        # so peak memory stays at ~one model, not n_runs of them.
-        release_model(model)     # else mesa.Agent._ids pins this model forever
-        del model, r
+        try:
+            r = model.run()
+            sample_ctr.append(r.ctr)
+            sample_conv.append(r.conversion_rate)
+            sample_conv_expected.append(r.expected_conversion_rate)
+            sample_buy.append(r.buy_rate)
+            aovs.append(r.mean_buyer_aov)    # always non-zero thanks to fallback
+            daily_records.append(r.daily_records)
+            factor_runs.append(r.aggregate_click_factors)
+        finally:
+            # The agent model + its word-of-mouth graph hold CIRCULAR
+            # references (model <-> agents <-> network), so plain
+            # ref-counting never frees them — all n_runs pile up until the
+            # cyclic GC eventually fires, which on a small (Railway)
+            # instance is too late and OOM-kills the worker (seen as a
+            # 502). Release even if model.run() raises, so a mid-run
+            # failure can't leak the model the same way a clean run would
+            # have if we forgot to release it at all.
+            release_model(model)   # else mesa.Agent._ids pins it forever
+        del model
         gc.collect()
 
     arr_ctr = np.asarray(sample_ctr, dtype=float)

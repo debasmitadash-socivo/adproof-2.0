@@ -158,28 +158,32 @@ def fit_fatigue_theta(*, lambda_target: float, audience, ad, calibration,
     agents = model.consumer_agents
 
     lo, hi = THETA_LO, THETA_HI
-    lam_hi = simulated_lambda(hi, model, ad, calibration, agents)
-    if lam_hi <= lam:
-        # Target steeper than the engine can produce in-bracket: take the cap.
-        result = {"theta": hi, "lambda_sim": lam_hi, "lambda_target": lam,
-                  "iterations": 1, "converged": False}
-    else:
-        theta = lam  # warm start: lambda is the right order of magnitude
-        lam_sim = simulated_lambda(theta, model, ad, calibration, agents)
-        it = 1
-        while abs(lam_sim - lam) > tol and it < max_iter:
-            if lam_sim < lam:
-                lo = theta
-            else:
-                hi = theta
-            theta = (lo + hi) / 2
+    try:
+        lam_hi = simulated_lambda(hi, model, ad, calibration, agents)
+        if lam_hi <= lam:
+            # Target steeper than the engine can produce in-bracket: cap it.
+            result = {"theta": hi, "lambda_sim": lam_hi, "lambda_target": lam,
+                      "iterations": 1, "converged": False}
+        else:
+            theta = lam  # warm start: lambda is the right order of magnitude
             lam_sim = simulated_lambda(theta, model, ad, calibration, agents)
-            it += 1
-        result = {"theta": round(theta, 5), "lambda_sim": round(lam_sim, 5),
-                  "lambda_target": round(lam, 5), "iterations": it,
-                  "converged": abs(lam_sim - lam) <= tol}
-
-    release_model(model)     # else mesa.Agent._ids pins this model forever
+            it = 1
+            while abs(lam_sim - lam) > tol and it < max_iter:
+                if lam_sim < lam:
+                    lo = theta
+                else:
+                    hi = theta
+                theta = (lo + hi) / 2
+                lam_sim = simulated_lambda(theta, model, ad, calibration, agents)
+                it += 1
+            result = {"theta": round(theta, 5), "lambda_sim": round(lam_sim, 5),
+                      "lambda_target": round(lam, 5), "iterations": it,
+                      "converged": abs(lam_sim - lam) <= tol}
+    finally:
+        # Release even if the bisection loop raises mid-search, so a failed
+        # fit can't leak the model into mesa.Agent._ids the same way
+        # skipping the release entirely would have.
+        release_model(model)   # else mesa.Agent._ids pins it forever
     with _cache_lock:
         if len(_cache) >= _CACHE_MAX:
             _cache.pop(next(iter(_cache)))

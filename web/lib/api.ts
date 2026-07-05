@@ -78,6 +78,9 @@ export const api = {
   }>('/api/healthz'),
   platforms: () => request<{ platforms: Platform[] }>('/api/platforms'),
   // Simulation Lab: lightweight numeric-only engine run (no LLM/vision).
+  // Accepts an AbortSignal so a superseded run (user dragged another
+  // slider before this one returned) actually cancels the in-flight
+  // request instead of leaving the backend to finish computing it anyway.
   labRun: (payload: {
     platform_id: string; format_id: string; objective: string;
     budget: number; days: number; daily_reach: number; n_runs?: number;
@@ -87,9 +90,9 @@ export const api = {
     fatigue_per_exposure?: number | null; reachable_audience?: number | null;
     audience_mix?: { age: string; gender: string; share: number }[] | null;
     currency?: string;
-  }) =>
+  }, signal?: AbortSignal) =>
     request<LabRunResult>('/api/lab/run', {
-      method: 'POST', body: JSON.stringify(payload),
+      method: 'POST', body: JSON.stringify(payload), signal,
     }),
   providerHealth: () => request<ProviderHealthSnapshot>('/api/admin/provider-health'),
   pingProviders: () =>

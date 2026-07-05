@@ -460,6 +460,12 @@ export default function LabPage() {
   // labelled with these, not the live sliders (which may already have moved
   // during the debounce/API window).
   const resultParams = useRef<{ budget: number; days: number; quality: number; audLabel: string } | null>(null);
+  // The auto-filled value from real data, so the Budget/Fatigue chips can
+  // tell "still your data" from "you've since changed it" — a chip fixed
+  // to whatever was true at page-load would keep claiming 'your data' even
+  // after the user drags the slider to something they made up.
+  const autoBudgetRef = useRef<number | null>(null);
+  const autoFatigueRef = useRef<number | null>(null);
 
   const [defaultsNote, setDefaultsNote] = useState<Record<string, Provenance>>({});
 
@@ -493,21 +499,23 @@ export default function LabPage() {
       if (mix) setAudiencePick('yours');
 
       const notes: Record<string, Provenance> = {};
-      notes.audience = mix ? 'your data' : 'assumption';
       if (profile?.conversion_goal === 'awareness') setObjective('awareness');
       if (profile?.avg_order_value) { setAov(profile.avg_order_value); notes.aov = 'your data'; }
       else notes.aov = 'assumption';
       const budgets = campaigns.map((cc) => cc.budget)
         .filter((b): b is number => typeof b === 'number' && b > 0).sort((a, b) => a - b);
-      if (budgets.length >= 3) { setBudget(Math.round(budgets[Math.floor(budgets.length / 2)])); notes.budget = 'your data'; }
-      else notes.budget = 'assumption';
+      if (budgets.length >= 3) {
+        const autoB = Math.round(budgets[Math.floor(budgets.length / 2)]);
+        setBudget(autoB); autoBudgetRef.current = autoB;
+      }
       // lambda floored to exactly 0 means the account's fit was confounded
       // (CTR rising with frequency) -- "not identified", not "verified zero
       // fatigue" -- so it doesn't earn a 'your data' chip.
       const fat = c?.auction?.fatigue;
       if (fat?.usable && fat.lambda_per_exposure != null && fat.lambda_per_exposure > 0) {
-        setFatigue(Math.round(fat.lambda_per_exposure * 100)); notes.fatigue = 'your data';
-      } else notes.fatigue = 'assumption';
+        const autoF = Math.round(fat.lambda_per_exposure * 100);
+        setFatigue(autoF); autoFatigueRef.current = autoF;
+      }
       notes.market = c?.usable ? 'your data' : 'industry';
       setDefaultsNote(notes);
       setReady(true);
@@ -568,7 +576,7 @@ export default function LabPage() {
       fatigue_per_exposure: fatigue / 100,
       reachable_audience: null,
       audience_mix: audience.mix, currency: cur,
-    }).then((r) => {
+    }, ac.signal).then((r) => {
       if (ac.signal.aborted) return;
       resultParams.current = { budget, days, quality, audLabel: audience.label };
       setResult(r); setRunning(false);
@@ -657,9 +665,11 @@ export default function LabPage() {
       </div>
       <p className="text-ink-muted text-[14.5px] mb-5 max-w-2xl">
         Move a factor — watch {result?.meta.audience_personas ?? 600} simulated consumers
-        {yourMix
+        {audience.mix
           ? <> shaped like <strong>{companyName}&apos;s real buyers</strong></>
-          : <> — connect &amp; sync an ad account on the Data page to shape this on <strong>{companyName}&apos;s real buyers</strong> instead of a generic segment</>
+          : yourMix
+            ? <> shaped like <strong>{audience.label}</strong> — pick &quot;{companyName}&apos;s buyers&quot; below to use your real delivery mix instead</>
+            : <> — connect &amp; sync an ad account on the Data page to shape this on <strong>{companyName}&apos;s real buyers</strong> instead of a generic segment</>
         }, re-live the campaign.
         Ready to score a real creative? <Link href="/new" className="text-violet underline font-semibold">New analysis</Link>.
       </p>
@@ -691,7 +701,7 @@ export default function LabPage() {
 
             <div>
               <span className={ctl} style={{ color: LAB.faint }}>
-                Audience <ProvChip p={defaultsNote.audience ?? 'assumption'} />
+                Audience <ProvChip p={audience.mix ? 'your data' : 'assumption'} />
               </span>
               <select value={audiencePick} onChange={(e) => setAudiencePick(e.target.value)}
                 className="w-full rounded-md px-2.5 py-2 text-[12.5px] border-0" style={selStyle}>
@@ -736,7 +746,7 @@ export default function LabPage() {
 
             <div>
               <span className={ctl} style={{ color: LAB.faint }}>
-                Budget · <ProvChip p={defaultsNote.budget ?? 'assumption'} />
+                Budget · <ProvChip p={autoBudgetRef.current === budget ? 'your data' : 'assumption'} />
               </span>
               <input type="range" min={500} max={50000} step={250} value={budget}
                 onChange={(e) => setBudget(Number(e.target.value))}
@@ -759,7 +769,7 @@ export default function LabPage() {
             </div>
             <div>
               <span className={ctl} style={{ color: LAB.faint }}>
-                Fatigue · <ProvChip p={defaultsNote.fatigue ?? 'assumption'} />
+                Fatigue · <ProvChip p={autoFatigueRef.current === fatigue ? 'your data' : 'assumption'} />
               </span>
               <input type="range" min={0} max={35} value={fatigue}
                 onChange={(e) => setFatigue(Number(e.target.value))}
