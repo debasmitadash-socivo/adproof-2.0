@@ -227,6 +227,7 @@ export default function NewAnalysisPage() {
       let calCvr: number | null = null;
       let calSource: string | null = null;
       let calNAds: number | null = null;
+      let calFatigueLambda: number | null = null;
       // Build the user's interest list from the active mode.
       const profileInterestText = [
         w.companyProfile?.product_category ?? '',
@@ -271,6 +272,14 @@ export default function NewAnalysisPage() {
             const f = season.factors[String(new Date().getMonth() + 1)];
             if (f && f > 0) calCpm = calCpm * f;
           }
+          // Simulation-based calibration: send the account's fitted fatigue
+          // decay (λ, observed CTR slope per repeat view). The backend runs
+          // the simcal bisection loop to convert it into the engine's logit
+          // constant — never pasted in raw.
+          const fat = cal.auction?.fatigue;
+          if (fat?.usable && fat.lambda_per_exposure != null) {
+            calFatigueLambda = fat.lambda_per_exposure;
+          }
         }
       } catch { /* calibration is best-effort — never block a run */ }
 
@@ -296,6 +305,9 @@ export default function NewAnalysisPage() {
         // Calibrated click + cost benchmarks (null = fall back to generic).
         target_ctr: calCtr,
         cpm_override: calCpm,
+        // Account fatigue decay — converted server-side to the engine
+        // constant by the simulation-calibration loop (src/simcal.py).
+        fatigue_lambda: calFatigueLambda,
         // Pillar B / B+: which calibration layer fed the anchor + how many
         // ads it was built from — surfaced in the report's data-provenance row.
         calibration_source: calSource,

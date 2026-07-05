@@ -30,6 +30,7 @@ try:
     from src.personas import (AUDIENCE_SEGMENTS, filter_personas,
                               generate_personas, load_personas, save_personas)
     from src.platforms import get_format, list_platforms, platform_formats
+    from src.simcal import fit_fatigue_theta
     from src.simulation import monte_carlo, sensitivity_sweep
     from src.visual_analysis import analyze_ad, available_providers  # noqa
 except ImportError:                                # `python src/pipeline.py`
@@ -46,6 +47,7 @@ except ImportError:                                # `python src/pipeline.py`
     from personas import (AUDIENCE_SEGMENTS, filter_personas,
                           generate_personas, load_personas, save_personas)
     from platforms import get_format, list_platforms, platform_formats
+    from simcal import fit_fatigue_theta
     from simulation import monte_carlo, sensitivity_sweep
     from visual_analysis import analyze_ad, available_providers  # noqa
 
@@ -793,6 +795,24 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
     # logit through different weights depending on brief.objective.
     obj_visual_weights = visual_weights_for(brief.objective)
 
+    # Simulation-based calibration: when the account has a fitted fatigue
+    # decay (lambda, observed ln-CTR slope per unit frequency), bisect for
+    # the engine constant whose SIMULATED decay reproduces it. Pasting
+    # lambda into the logit directly understates fatigue ~2× (the sigmoid
+    # squashes it) — see src/simcal.py and scripts/test_simcal.py.
+    fatigue_theta = None
+    fatigue_fit = None
+    lam = getattr(brief, "fatigue_lambda", None)
+    if lam is not None and lam >= 0:
+        try:
+            fatigue_fit = fit_fatigue_theta(
+                lambda_target=float(lam), audience=audience, ad=ad,
+                calibration=calibration, channel=fmt.simulation_channel,
+                target_ctr=brief.effective_target_ctr)
+            fatigue_theta = fatigue_fit["theta"]
+        except Exception:                                  # noqa: BLE001
+            fatigue_theta = None    # generic constant stays in charge
+
     _step(0.45,
           f"Running Monte Carlo: {brief.n_runs} runs x {brief.days} days...")
     mc = monte_carlo(
@@ -807,6 +827,7 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
         aov_multiplier=aov_mult,
         aov_override=aov_override,
         visual_weights=obj_visual_weights,
+        fatigue_per_exposure=fatigue_theta,
     )
 
     _step(0.78, "Running sensitivity sweeps (budget + reach)...")
@@ -915,4 +936,8 @@ def _run_simulation_inner(*, profile, match, brief, assets, fmt,
         "linkedin_critique": linkedin_critique,
         "meta_critique": meta_critique,
         "visual_prominence": visual_prominence,
+        # Simulation-based calibration provenance: how the account's observed
+        # fatigue decay was converted into the engine constant (None = the
+        # generic 0.10 default ran).
+        "fatigue_fit": fatigue_fit,
     }

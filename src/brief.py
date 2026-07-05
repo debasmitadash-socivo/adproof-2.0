@@ -40,6 +40,11 @@ class CampaignBrief:
     target_ctr_override: float | None = None
     cpm_override: float | None = None
     target_conversion_rate: float | None = 0.025
+    # Account's OBSERVED creative-fatigue decay (ln-CTR slope per unit
+    # frequency, from auction.fit_fatigue_lambda). The pipeline converts it
+    # to the engine's logit constant via the simcal bisection loop — never
+    # pasted in directly (the sigmoid would understate it ~2×).
+    fatigue_lambda: float | None = None
     # Budget saturation (opt-in, assumption-based): the realistically reachable
     # audience for this targeting. When set, the forecast applies diminishing
     # returns as budget grows. None = no saturation (linear in budget).

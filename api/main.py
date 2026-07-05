@@ -207,6 +207,10 @@ class SimulateRequest(BaseModel):
     # from their ad history, override the generic format benchmarks. ---------
     target_ctr: Optional[float] = None
     cpm_override: Optional[float] = None
+    # Account's fitted creative-fatigue decay (observed ln-CTR slope per
+    # unit frequency). Converted to the engine constant by the simcal
+    # bisection loop — see src/simcal.py. None = generic 0.10 constant.
+    fatigue_lambda: Optional[float] = None
     # Pillar B: provenance for the anchor — which calibration layer the
     # frontend picked + how many ads it was built from. Surfaced in the
     # result page's data-provenance row so users can see whether the
@@ -1949,6 +1953,7 @@ def simulate(req: SimulateRequest) -> dict:
         target_conversion_rate=req.target_conversion_rate,
         target_ctr_override=req.target_ctr,
         cpm_override=req.cpm_override,
+        fatigue_lambda=req.fatigue_lambda,
         reachable_audience=req.reachable_audience,
         avg_order_value=req.avg_order_value,
         product_price=req.product_price,
@@ -2383,6 +2388,19 @@ def simulate(req: SimulateRequest) -> dict:
           "value": "synthetic CTR dataset (replaceable)",
           "note": "Psychology-rule weights fitted on a generated dataset, not your past performance. Upload your Meta/Google/LinkedIn CSV exports on the Data page to recalibrate against YOUR campaigns."}),
     ]
+    # Simulation-calibrated fatigue provenance (when the account's fitted
+    # decay drove the engine constant through the simcal loop).
+    _ffit = result.get("fatigue_fit")
+    if _ffit:
+        data_sources.append({
+            "label": "Creative fatigue",
+            "value": (f"✨ your account — observed "
+                      f"−{_ffit['lambda_target'] * 100:.0f}% CTR per repeat view"),
+            "note": (f"Fitted from your ad history, then converted to the engine's "
+                     f"internal constant (θ={_ffit['theta']:.3f}) by running the "
+                     f"simulation until its decay matched yours — pasting the raw "
+                     f"slope in would understate fatigue ~2×."),
+        })
 
     # Industry × platform context (Phase 1 of benchmark integration). When
     # we can map the company to one of Rival IQ's 14 industries, attach

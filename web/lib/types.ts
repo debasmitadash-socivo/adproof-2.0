@@ -315,6 +315,9 @@ export interface SimulateRequest {
   // generic format benchmarks when they've uploaded their ad history.
   target_ctr?: number | null;
   cpm_override?: number | null;
+  // Fitted fatigue decay (observed CTR slope per repeat view) — the backend
+  // converts it to the engine constant via the simcal bisection loop.
+  fatigue_lambda?: number | null;
   // Pillar B / B+: which calibration layer fed the anchor (so the report can
   // be honest about whether this is segment-interest- / segment- / interest-
   // / platform- / overall-calibrated).

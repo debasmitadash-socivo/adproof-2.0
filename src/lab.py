@@ -35,6 +35,7 @@ try:
     from src.personas import filter_personas
     from src.pipeline import get_resources
     from src.platforms import get_format
+    from src.simcal import fit_fatigue_theta
     from src.simulation import monte_carlo
 except ImportError:
     from agent import AdStimulus, visual_weights_for
@@ -42,6 +43,7 @@ except ImportError:
     from personas import filter_personas
     from pipeline import get_resources
     from platforms import get_format
+    from simcal import fit_fatigue_theta
     from simulation import monte_carlo
 
 # Hard caps — the Lab must never be able to take down the wizard.
@@ -226,6 +228,20 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
         channel=channel,
     )
 
+    # Simulation-based calibration: the incoming fatigue number is the
+    # OBSERVED decay per repeat view (the account's fitted lambda, or the
+    # slider's "−X% per repeat view"). It can't be pasted into the logit —
+    # the sigmoid squashes it (theta=0.20 shows up as ~0.08 observed decay).
+    # The simcal loop bisects until the engine's simulated decay matches it.
+    theta = fatigue_per_exposure
+    fatigue_fit = None
+    if fatigue_per_exposure is not None:
+        fatigue_fit = fit_fatigue_theta(
+            lambda_target=float(fatigue_per_exposure), audience=audience,
+            ad=ad, calibration=calibration, channel=channel,
+            target_ctr=target_ctr)
+        theta = fatigue_fit["theta"]
+
     mc = monte_carlo(
         audience, ad, calibration,
         channel=channel, budget=budget, sim_days=days,
@@ -236,7 +252,7 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
         aov_override=aov,
         reachable_audience=reachable_audience,
         visual_weights=visual_weights_for(objective),
-        fatigue_per_exposure=fatigue_per_exposure,
+        fatigue_per_exposure=theta,
     )
 
     # One extra representative run, stepped manually to capture the
@@ -246,7 +262,7 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
         channel=channel, daily_reach=daily_reach, sim_days=days,
         target_ctr=target_ctr,
         target_conversion_rate=target_conversion_rate,
-        fatigue_per_exposure=fatigue_per_exposure,
+        fatigue_per_exposure=theta,
         seed=_SEED,
     )
     n_show = min(TIMELINE_AGENTS, len(tm.consumer_agents))
@@ -298,8 +314,11 @@ def run_lab(*, platform_id: str, format_id: str, objective: str,
             "audience_source": ("your real delivery mix (age × gender)"
                                 if conditioned else "generic segment"),
             "creative": "hypothetical (quality slider)",
-            "fatigue_source": ("account/custom" if fatigue_per_exposure is not None
-                               else "generic default 0.10"),
+            "fatigue_source": (
+                (f"simulation-calibrated (observed −{fatigue_fit['lambda_target'] * 100:.0f}%/view "
+                 f"→ engine θ={fatigue_fit['theta']:.3f})")
+                if fatigue_fit is not None else "generic default 0.10"),
+            "fatigue_fit": fatigue_fit,
         },
     }
     with _cache_lock:
