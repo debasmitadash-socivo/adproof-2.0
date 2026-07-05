@@ -501,8 +501,11 @@ export default function LabPage() {
         .filter((b): b is number => typeof b === 'number' && b > 0).sort((a, b) => a - b);
       if (budgets.length >= 3) { setBudget(Math.round(budgets[Math.floor(budgets.length / 2)])); notes.budget = 'your data'; }
       else notes.budget = 'assumption';
+      // lambda floored to exactly 0 means the account's fit was confounded
+      // (CTR rising with frequency) -- "not identified", not "verified zero
+      // fatigue" -- so it doesn't earn a 'your data' chip.
       const fat = c?.auction?.fatigue;
-      if (fat?.usable && fat.lambda_per_exposure != null) {
+      if (fat?.usable && fat.lambda_per_exposure != null && fat.lambda_per_exposure > 0) {
         setFatigue(Math.round(fat.lambda_per_exposure * 100)); notes.fatigue = 'your data';
       } else notes.fatigue = 'assumption';
       notes.market = c?.usable ? 'your data' : 'industry';
@@ -653,8 +656,11 @@ export default function LabPage() {
         <Pill tone="violet">the real forecasting engine, live</Pill>
       </div>
       <p className="text-ink-muted text-[14.5px] mb-5 max-w-2xl">
-        Move a factor — watch {result?.meta.audience_personas ?? 600} simulated consumers,
-        shaped like <strong>{companyName}&apos;s real buyers</strong>, re-live the campaign.
+        Move a factor — watch {result?.meta.audience_personas ?? 600} simulated consumers
+        {yourMix
+          ? <> shaped like <strong>{companyName}&apos;s real buyers</strong></>
+          : <> — connect &amp; sync an ad account on the Data page to shape this on <strong>{companyName}&apos;s real buyers</strong> instead of a generic segment</>
+        }, re-live the campaign.
         Ready to score a real creative? <Link href="/new" className="text-violet underline font-semibold">New analysis</Link>.
       </p>
 
