@@ -6,6 +6,7 @@ import { Card, CardTitle } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { AccuracyScorecard } from '@/components/AccuracyScorecard';
 import { useAccuracyData, AccuracyStatCards } from '@/components/AccuracyCards';
+import { SignalBadge } from '@/components/SignalCard';
 import { useApp } from '@/lib/store';
 import type { SavedCampaign } from '@/lib/types';
 
@@ -85,6 +86,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex-1" />
+        <SignalBadge />
         <Link href="/audiences"><Button variant="secondary">+ New audience</Button></Link>
       </div>
 

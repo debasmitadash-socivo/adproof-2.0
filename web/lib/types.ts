@@ -323,6 +323,8 @@ export interface SimulateRequest {
   // / platform- / overall-calibrated).
   calibration_source?: string | null;       // 'segment:<seg>:interest:<int>' | 'segment:<seg>' | 'interest:<int>' | 'platform:<plat>' | 'overall' | null
   calibration_n_ads?: number | null;
+  // Account Signal stage → "Account stage" provenance row in the report.
+  account_stage?: string | null;
   // Honest-ROAS: picks the cited industry CVR range when uncalibrated.
   conversion_goal?: string | null;
   // Pillar B+: the user-chosen interests after wizard mapping to the
@@ -349,6 +351,17 @@ export interface CalibrationTrend {
   change_pct: number;
   direction: 'up' | 'down' | 'flat';
 }
+// One ad set's learning-phase state, exactly as the platform reports it.
+export interface AdsetStage {
+  adset_name: string;
+  campaign_name: string | null;
+  effective_status: string | null;        // ACTIVE | PAUSED | ...
+  learning_status: string | null;         // LEARNING | SUCCESS | FAIL | null
+  learning_conversions: number;           // events gathered toward the ~50 bar
+  optimization_goal: string | null;
+  daily_budget: number | null;
+}
+
 export interface AccountCalibration {
   currency: string;
   overall: Partial<PlatformCalibration>;
@@ -375,6 +388,11 @@ export interface AccountCalibration {
   usable: boolean;
   window?: string;
   trend?: CalibrationTrend | null;
+  // The platform's OWN learning-phase state per ad set (Meta's
+  // learning_stage_info), captured at sync time. Real delivery-system
+  // truth — the Signal card renders this, never a reconstruction.
+  adset_stages?: AdsetStage[];
+  adset_stages_at?: string;   // ISO date of the sync that captured them
   // P3b: auction-layer params fitted from the account's own daily data.
   auction?: {
     cpm_seasonality: {
@@ -446,6 +464,9 @@ export interface IngestResult {
   // Audience breakdowns (age × gender per ad) from live pulls — stored in the
   // separate ad_breakdowns table so they never double-count outcome totals.
   breakdowns?: { rows: Record<string, unknown>[]; n: number; note: string };
+  // Per-ad-set learning-phase state from the platform's delivery system
+  // (live pulls only). Persisted inside the calibration params jsonb.
+  adset_stages?: { rows: AdsetStage[]; n: number; note: string };
 }
 
 export interface DistBand {

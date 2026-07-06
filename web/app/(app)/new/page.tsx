@@ -10,6 +10,7 @@ import { HelpHint } from '@/components/ui/HelpHint';
 import { useApp } from '@/lib/store';
 import { api } from '@/lib/api';
 import { getLatestCalibration } from '@/lib/db';
+import { classifySignal, type SignalReadout } from '@/lib/maturity';
 import { uploadCreativeToSupabase } from '@/lib/storage';
 import type { BenchmarkRefreshResponse, Platform, SavedCampaign, SavedVariantResult } from '@/lib/types';
 
@@ -70,6 +71,24 @@ export default function NewAnalysisPage() {
   useEffect(() => {
     api.platforms().then((d) => setPlatforms(d.platforms)).catch(() => setPlatforms([]));
   }, []);
+
+  // Account Signal stage — classified once from the same calibration the
+  // anchors use. Drives the stage-aware budget hint on the Run step and is
+  // sent with the forecast so the report carries an "Account stage" row.
+  const [signal, setSignal] = useState<SignalReadout | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getLatestCalibration(w.currentCompanyId ?? undefined)
+      .then((cal) => {
+        if (!alive) return;
+        setSignal(classifySignal({
+          cal, nOutcomeAds: cal?.overall?.n_ads ?? 0, ledger: null,
+        }));
+      })
+      .catch(() => { if (alive) setSignal(null); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [w.currentCompanyId]);
 
   // Default audience method: filters if no saved audiences exist
   // (matches what most users want), saved otherwise.
@@ -314,6 +333,8 @@ export default function NewAnalysisPage() {
         // ads it was built from — surfaced in the report's data-provenance row.
         calibration_source: calSource,
         calibration_n_ads: calNAds,
+        // Account Signal stage → "Account stage" provenance row in the report.
+        account_stage: signal?.stage ?? null,
         // Honest-ROAS: the workspace's conversion goal picks the CITED
         // industry CVR range shown when no real data calibrates the account.
         conversion_goal: cp?.conversion_goal ?? null,
@@ -887,6 +908,13 @@ export default function NewAnalysisPage() {
                 <label className="label">Budget ({currency})</label>
                 <input className="input" type="number" value={w.budget} onChange={(e) => w.setBudget(+e.target.value)} />
                 <div className="help">Total over the flight</div>
+                {(signal?.stage === 'learning' || signal?.stage === 'cold' || signal?.stage === 'limited') && (
+                  <div className="text-[12px] text-warning mt-1">
+                    Your account is at the <strong>{signal.label}</strong> stage — when you run this
+                    for real, size the daily budget so the ad set can gather ~50 conversion events a week
+                    (Meta&apos;s learning-phase bar), and skip bid caps until it exits learning.
+                  </div>
+                )}
               </div>
               <div>
                 <label className="label">Campaign days</label>

@@ -149,6 +149,58 @@ def search_interests(credentials: dict, query: str, limit: int = 25) -> list[dic
     return out
 
 
+def pull_learning_stages(credentials: dict, *, timeout: int = 60) -> list[dict]:
+    """Meta's REAL learning-phase status per ad set — straight from the
+    delivery system, zero heuristics. This is the exact state Ads Manager
+    shows ('Learning' / 'Learning limited' / exited), so AdProof reports
+    the platform's own truth instead of reconstructing an approximation.
+
+    learning_stage_info.status values from Meta:
+      LEARNING — still gathering its ~50 optimization events
+      SUCCESS  — exited learning (the 'Active' state)
+      FAIL     — learning limited (couldn't gather enough events)
+    Ad sets created before the field existed may omit it → status None.
+    """
+    access_token = (credentials.get("access_token") or "").strip()
+    account_id = (credentials.get("account_id") or "").strip()
+    if not access_token:
+        raise ValueError("Missing Meta access token.")
+    acct = account_id if str(account_id).startswith("act_") else f"act_{account_id}"
+    params: dict = {
+        "access_token": access_token,
+        "fields": ("name,effective_status,campaign{name},"
+                   "learning_stage_info,optimization_goal,daily_budget"),
+        "limit": 200,
+    }
+    url = f"{_BASE}/{acct}/adsets"
+    rows: list[dict] = []
+    while url:
+        resp = requests.get(url, params=params, timeout=timeout)
+        try:
+            data = resp.json()
+        except ValueError:
+            raise RuntimeError(
+                f"Meta's ad-set read didn't answer properly "
+                f"(HTTP {resp.status_code}). Wait a moment and try again.")
+        if isinstance(data, dict) and "error" in data:
+            err = data["error"]
+            raise RuntimeError(f"Meta API error: {err.get('message', err)}")
+        for a in data.get("data", []):
+            lsi = a.get("learning_stage_info") or {}
+            rows.append({
+                "adset_name": a.get("name") or "Ad set",
+                "campaign_name": (a.get("campaign") or {}).get("name"),
+                "effective_status": a.get("effective_status"),
+                "learning_status": lsi.get("status"),   # LEARNING|SUCCESS|FAIL|None
+                "learning_conversions": _int(lsi.get("conversions")),
+                "optimization_goal": a.get("optimization_goal"),
+                "daily_budget": _float(a.get("daily_budget")),
+            })
+        url = (data.get("paging") or {}).get("next")
+        params = {}
+    return rows
+
+
 def pull_breakdowns(credentials: dict, since: str, until: str,
                     *, timeout: int = 90) -> list[dict]:
     """WHO responded: ad-level insights broken down by age × gender,

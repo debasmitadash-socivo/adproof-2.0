@@ -10,6 +10,7 @@ import {
 } from '@/lib/db';
 import { useApp } from '@/lib/store';
 import { PlatformConnections } from '@/components/PlatformConnections';
+import { SignalCard } from '@/components/SignalCard';
 import type { IngestResult, AccountCalibration, PlatformCalibration } from '@/lib/types';
 
 const CONF_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
@@ -257,7 +258,14 @@ export default function DataPage() {
     try {
       const nAds = result.calibration.overall?.n_ads ?? result.report.n_rows_kept;
       const source = resultSource ?? file?.name;
-      await saveCalibration(result.calibration, nAds, result.backtest, source, currentCompanyId ?? undefined);
+      // Live pulls carry the platform's own per-ad-set learning-phase state —
+      // persist it inside the calibration params so the Signal card can show
+      // delivery-system truth without another API round-trip.
+      const calToSave = result.adset_stages?.rows?.length
+        ? { ...result.calibration, adset_stages: result.adset_stages.rows,
+            adset_stages_at: new Date().toISOString().slice(0, 10) }
+        : result.calibration;
+      await saveCalibration(calToSave, nAds, result.backtest, source, currentCompanyId ?? undefined);
       const n = await insertOutcomes(result.rows, source, currentCompanyId ?? undefined);
       // Audience breakdowns (live pulls only) — separate table, best-effort.
       let bdNote = '';
@@ -266,7 +274,7 @@ export default function DataPage() {
         const nb = await insertBreakdowns(result.breakdowns.rows, provider, currentCompanyId ?? undefined);
         if (nb > 0) bdNote = ` Audience breakdown stored (${nb.toLocaleString()} age×gender cells) — see the Ad library.`;
       }
-      setExisting(result.calibration);
+      setExisting(calToSave);
       setSaved(`Saved. Your forecasts now use your real benchmarks (${n.toLocaleString()} rows stored).${bdNote}`);
       setResult(null); setFile(null);
     } catch (e) {
@@ -284,6 +292,8 @@ export default function DataPage() {
         click-through and cost rates per platform and use them in every forecast — instead of generic industry averages.
         Your data stays private to your account.
       </p>
+
+      <SignalCard />
 
       {existing && !result && (
         <Card className="mb-5 !bg-lime-soft !border-lime-deep/40">

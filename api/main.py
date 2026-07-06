@@ -222,6 +222,11 @@ class SimulateRequest(BaseModel):
     # _calibration_provenance_value handles both shapes.
     calibration_source: Optional[str] = None  # 'segment:<seg>[:interest:<int>]' | 'interest:<int>' | 'platform:<plat>' | 'overall' | None
     calibration_n_ads: Optional[int] = None
+    # Account Signal stage (cold|learning|limited|calibrated|optimized),
+    # classified client-side from the same calibration the anchors use.
+    # Drives a provenance row so the report says how deep the account's
+    # data actually goes — and therefore how much weight to give the numbers.
+    account_stage: Optional[str] = None
     # Honest-ROAS: the workspace's conversion goal (purchase|lead|demo|signup)
     # picks the CITED industry CVR range shown when no real conversion data
     # has calibrated this account yet.
@@ -658,6 +663,23 @@ def connections_sync(req: ConnectionSyncRequest) -> dict:
     except Exception as e:                            # noqa: BLE001
         result["breakdowns"] = {"rows": [], "n": 0,
                                 "note": f"Breakdown pull skipped: {str(e)[:200]}"}
+
+    # The platform's OWN learning-phase state per ad set (Meta's
+    # learning_stage_info) — the real thing Ads Manager shows, so the Signal
+    # card reports delivery-system truth, not a reconstructed guess. Also an
+    # enrichment: never fails the sync.
+    try:
+        from connectors import pull_learning_stages
+        stages = pull_learning_stages(req.provider, req.merged_credentials())
+        result["adset_stages"] = {
+            "rows": stages, "n": len(stages),
+            "note": ("Learning-phase status read directly from the platform's "
+                     "delivery system." if stages else
+                     "This platform doesn't expose learning-phase state yet."),
+        }
+    except Exception as e:                            # noqa: BLE001
+        result["adset_stages"] = {"rows": [], "n": 0,
+                                  "note": f"Learning-stage pull skipped: {str(e)[:200]}"}
     return result
 
 
@@ -2389,6 +2411,23 @@ def simulate(req: SimulateRequest) -> dict:
           "value": "synthetic CTR dataset (replaceable)",
           "note": "Psychology-rule weights fitted on a generated dataset, not your past performance. Upload your Meta/Google/LinkedIn CSV exports on the Data page to recalibrate against YOUR campaigns."}),
     ]
+    # Account Signal stage — how deep this workspace's real data goes, so the
+    # reader knows how much weight the numbers deserve at THEIR stage.
+    _STAGE_ROW = {
+        "cold": ("Cold start", "No ad history yet — this forecast runs on industry benchmarks. Directionally useful; treat absolute numbers as scenarios."),
+        "learning": ("Learning", "Some real history, below the 8-ad bar — your data is blended with benchmarks. Every sync sharpens the anchors."),
+        "limited": ("Learning limited", "Meta reports most active ad sets can't gather enough events — fix delivery (budget/caps/consolidation) before optimizing for efficiency."),
+        "calibrated": ("Calibrated", "CTR/CPM anchored on your real ads. Conversion economics may still lean on cited industry priors."),
+        "optimized": ("Optimized", "Full-depth calibration: your CTR/CPM/CVR, fitted fatigue and seasonality all drive this forecast."),
+    }
+    if req.account_stage in _STAGE_ROW:
+        _label, _note = _STAGE_ROW[req.account_stage]
+        data_sources.append({
+            "label": "Account stage",
+            "value": _label,
+            "note": _note,
+        })
+
     # Simulation-calibrated fatigue provenance (when the account's fitted
     # decay drove the engine constant through the simcal loop).
     _ffit = result.get("fatigue_fit")

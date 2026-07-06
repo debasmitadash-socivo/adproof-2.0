@@ -218,6 +218,17 @@ def search_interests(provider: str, credentials: dict,
     return fn(credentials, query)
 
 
+def pull_learning_stages(provider: str, credentials: dict) -> list[dict]:
+    """The platform's OWN learning-phase state per ad set (Meta's
+    learning_stage_info today). Returns [] for providers without it —
+    an enrichment, never a reason to fail a sync."""
+    p = _canonical(provider)
+    fn = getattr(_module(p), "pull_learning_stages", None)
+    if fn is None:
+        return []
+    return fn(credentials)
+
+
 def pull_breakdowns(provider: str, credentials: dict,
                     since: str, until: str) -> list[dict]:
     """Audience breakdown rows (age × gender per ad) for providers that
