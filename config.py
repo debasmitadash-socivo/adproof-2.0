@@ -31,23 +31,28 @@ OPENAI_MODEL = "gpt-4o"
 # multiple models so when one is exhausted the next picks up. Each model
 # has its own daily quota, multiplying the effective free budget by len(chain).
 # The lite/preview variants tend to recover quota faster.
+# The *-latest aliases lead each chain: Google keeps them pointed at a
+# currently-served model, so retirements (e.g. gemini-2.5-flash-lite going
+# 404 for new accounts) don't break us. Pinned ids stay as extra quota pools
+# for accounts that can still use them.
 GEMINI_TEXT_CHAIN = (
-    "gemini-2.5-flash-lite",
     "gemini-flash-lite-latest",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite",
     "gemini-2.0-flash-lite",
     "gemini-2.0-flash",
-    "gemini-flash-latest",
 )
 GEMINI_VISION_CHAIN = (
-    "gemini-2.5-flash-lite",
     "gemini-flash-lite-latest",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite",
     "gemini-2.0-flash-lite",
     "gemini-2.0-flash",
-    "gemini-flash-latest",
 )
 GEMINI_GROUNDED_CHAIN = (
-    "gemini-2.5-flash-lite",
     "gemini-flash-lite-latest",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite",
     "gemini-2.0-flash",
 )
 # Back-compat single names — first model in each chain.

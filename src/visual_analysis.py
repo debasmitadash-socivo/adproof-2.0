@@ -480,6 +480,10 @@ def _is_quota_error(exc: Exception) -> bool:
     return any(s in msg for s in (
         "429", "resource_exhausted", "quota", "rate limit", "rate_limit",
         "503", "unavailable", "overloaded",
+        # Retired/unknown model ids (Google 404s models per-account as it
+        # deprecates them) — skip to the next model in the chain rather
+        # than failing the whole request on one dead id.
+        "404", "not_found", "not found", "no longer available",
     ))
 
 
